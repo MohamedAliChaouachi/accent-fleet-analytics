@@ -1,0 +1,225 @@
+# =============================================================================
+# Feature definitions for Driver Behavior Scoring (Project P1)
+# =============================================================================
+# Every feature from v1 Feature Groups 1-6 is declared here. The registry at
+# src/accent_fleet/features/registry.py loads this file and exposes a typed
+# object for the transforms module to consume.
+#
+# The grain of every feature is (tenant_id, device_id, year_month).
+# =============================================================================
+
+version: 1
+grain: [tenant_id, device_id, year_month]
+window: monthly
+minimum_trips_for_scoring: 5          # used in v_ml_features_driver_behavior
+minimum_trips_for_risk: 10            # used in v_device_risk_profile
+risk_window_months: 3                 # rolling 3-month window
+
+feature_groups:
+
+  # ---------------------------------------------------------------------------
+  - name: trip_volume_patterns
+    description: Activity level baseline and trip-length distribution
+    features:
+      - name: total_trips
+        source: fact_trip
+        aggregation: count
+        importance: high
+      - name: total_distance_km
+        source: fact_trip
+        aggregation: sum
+        column: distance_km
+        importance: high
+      - name: avg_trip_distance_km
+        source: fact_trip
+        aggregation: avg
+        column: distance_km
+      - name: stddev_trip_distance
+        source: fact_trip
+        aggregation: stddev_samp
+        column: distance_km
+      - name: short_trip_ratio
+        source: fact_trip
+        aggregation: ratio
+        numerator: "is_short_trip = true"
+        denominator: "all rows"
+
+  # ---------------------------------------------------------------------------
+  - name: speed_behavior
+    description: General speed tendency and aggressiveness signals
+    features:
+      - name: avg_max_speed_kmh
+        source: fact_trip
+        aggregation: avg
+        column: max_speed_kmh
+      - name: p95_max_speed
+        source: fact_trip
+        aggregation: percentile
+        column: max_speed_kmh
+        quantile: 0.95
+      - name: avg_speed_ratio
+        source: fact_trip
+        aggregation: avg
+        column: speed_ratio
+      - name: high_speed_trip_ratio
+        source: fact_trip
+        aggregation: ratio
+        numerator: "max_speed_kmh > 100"
+        denominator: "all rows"
+
+  # ---------------------------------------------------------------------------
+  - name: overspeed_events
+    description: Overspeed violation rate and severity distribution
+    features:
+      - name: overspeed_count
+        source: fact_overspeed
+        aggregation: count
+      - name: overspeed_per_100km
+        source: derived
+        formula: "overspeed_count / NULLIF(total_distance_km, 0) * 100"
+        importance: critical
+      - name: overspeed_per_trip
+        source: derived
+        formula: "overspeed_count / NULLIF(total_trips, 0)"
+      - name: overspeed_severity_low
+        source: fact_overspeed
+        aggregation: count
+        filter: "severity = 'low'"
+      - name: overspeed_severity_medium
+        source: fact_overspeed
+        aggregation: count
+        filter: "severity = 'medium'"
+      - name: overspeed_severity_high
+        source: fact_overspeed
+        aggregation: count
+        filter: "severity = 'high'"
+      - name: overspeed_severity_extreme
+        source: fact_overspeed
+        aggregation: count
+        filter: "severity = 'extreme'"
+      - name: avg_speed_over_limit
+        source: fact_overspeed
+        aggregation: avg
+        column: speed_over_limit
+
+  # ---------------------------------------------------------------------------
+  - name: alerts
+    description: Speed alert signals from the notification system (independent channel)
+    features:
+      - name: speed_alert_count
+        source: fact_speed_notification
+        aggregation: count
+      - name: speed_alert_per_100km
+        source: derived
+        formula: "speed_alert_count / NULLIF(total_distance_km, 0) * 100"
+      - name: highway_alert_count
+        source: fact_speed_notification
+        aggregation: count
+        filter: "alert_type = 'SPEED_HIGHWAY'"
+      - name: non_highway_alert_count
+        source: fact_speed_notification
+        aggregation: count
+        filter: "alert_type = 'SPEED_NOT_HIGHWAY'"
+
+  # ---------------------------------------------------------------------------
+  - name: stops_idling
+    description: Stop and idling patterns - indicators of fuel waste and driving style
+    features:
+      - name: total_stops
+        source: fact_stop
+        aggregation: count
+      - name: in_path_stop_ratio
+        source: fact_stop
+        aggregation: ratio
+        numerator: "is_in_path = true"
+        denominator: "all rows"
+      - name: stops_per_trip
+        source: derived
+        formula: "total_stops / NULLIF(total_trips, 0)"
+      - name: micro_stop_count
+        source: fact_stop
+        aggregation: count
+        filter: "stop_type = 'micro'"
+      - name: short_stop_count
+        source: fact_stop
+        aggregation: count
+        filter: "stop_type = 'short'"
+      - name: medium_stop_count
+        source: fact_stop
+        aggregation: count
+        filter: "stop_type = 'medium'"
+      - name: long_stop_count
+        source: fact_stop
+        aggregation: count
+        filter: "stop_type = 'long'"
+
+  # ---------------------------------------------------------------------------
+  - name: temporal_patterns
+    description: When the driver drives - exposure to risk and fatigue
+    features:
+      - name: night_trip_ratio
+        source: fact_trip
+        aggregation: ratio
+        numerator: "is_night_trip = true"
+        denominator: "all rows"
+        importance: high
+      - name: weekend_trip_ratio
+        source: fact_trip
+        aggregation: ratio
+        numerator: "is_weekend_trip = true"
+        denominator: "all rows"
+      - name: rush_hour_trip_ratio
+        source: fact_trip
+        aggregation: ratio
+        numerator: "is_rush_hour_trip = true"
+        denominator: "all rows"
+      - name: active_days
+        source: fact_trip
+        aggregation: distinct_count
+        column: trip_date
+      - name: avg_working_hours
+        source: fact_daily_activity
+        aggregation: avg
+        column: working_hours
+
+# =============================================================================
+# Risk Score Configuration
+# =============================================================================
+# Composite 0-100 risk score. Each factor is normalized to [0,1] then weighted.
+# See src/accent_fleet/features/risk_score.py for the reference implementation
+# and sql/21_v_device_risk_profile.sql for the in-database view.
+# =============================================================================
+
+risk_score:
+  scale: [0, 100]
+  factors:
+    - name: overspeed_rate
+      weight: 0.30
+      feature: overspeed_per_100km
+      normalize: { type: linear, max: 10.0 }
+    - name: severe_overspeed_share
+      weight: 0.20
+      formula: "(overspeed_severity_high + overspeed_severity_extreme) / NULLIF(overspeed_count, 0)"
+      normalize: { type: identity }       # already in [0, 1]
+    - name: high_speed_trip_ratio
+      weight: 0.15
+      feature: high_speed_trip_ratio
+      normalize: { type: linear, max: 0.3 }
+    - name: speed_alert_rate
+      weight: 0.15
+      feature: speed_alert_per_100km
+      normalize: { type: linear, max: 20.0 }
+    - name: night_driving
+      weight: 0.10
+      feature: night_trip_ratio
+      normalize: { type: linear, max: 0.3 }
+    - name: max_speed
+      weight: 0.10
+      feature: avg_max_speed_kmh       # using avg_max_speed as proxy
+      normalize: { type: linear, max: 200.0 }
+
+  categories:
+    - { name: low,      min: 0,  max: 19 }
+    - { name: moderate, min: 20, max: 44 }
+    - { name: high,     min: 45, max: 69 }
+    - { name: critical, min: 70, max: 100 }

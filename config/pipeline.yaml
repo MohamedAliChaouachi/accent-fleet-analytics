@@ -1,0 +1,110 @@
+# =============================================================================
+# Pipeline configuration
+# =============================================================================
+# Runtime parameters that the pipeline consults. Infrastructure-level settings
+# (DB credentials, Kafka brokers) live in .env; analytical settings live here.
+# =============================================================================
+
+version: 1
+
+# ---------------------------------------------------------------------------
+# Window semantics
+# ---------------------------------------------------------------------------
+window:
+  # How often the batch scheduler wakes up (Prefect schedule / cron).
+  incremental_interval_minutes: 5
+
+  # How far back from "now" the incremental run reaches. Must be >=
+  # incremental_interval_minutes to handle late-arriving data.
+  overlap_minutes: 10
+
+  # For the one-time backfill: process in chunks of this many days.
+  # Smaller = more progress checkpoints, larger = faster.
+  backfill_chunk_days: 30
+
+  # Hard cutoff before which no data is ever loaded (matches cleaning rule C1).
+  min_event_time: "2019-10-01T00:00:00Z"
+
+# ---------------------------------------------------------------------------
+# Source tables — staging tables the pipeline watches
+# ---------------------------------------------------------------------------
+sources:
+  - name: path
+    time_column: begin_path_time
+    target_fact: fact_trip
+    priority: 1
+
+  - name: rep_overspeed
+    time_column: begin_path_time
+    target_fact: fact_overspeed
+    priority: 2
+
+  - name: stop
+    time_column: stop_start
+    target_fact: fact_stop
+    priority: 3
+
+  - name: notification
+    time_column: created_at
+    target_fact: fact_speed_notification
+    filter: "description LIKE 'SPEED%'"
+    priority: 4
+
+  - name: rep_activity_daily
+    time_column: activity_start_time
+    target_fact: fact_daily_activity
+    priority: 5
+
+# ---------------------------------------------------------------------------
+# Mart recomputation triggers
+# ---------------------------------------------------------------------------
+# The mart_device_monthly_behavior table is recomputed ONLY for months that
+# received new fact rows in this incremental run.
+marts:
+  device_monthly_behavior:
+    recompute_scope: touched_months
+    upsert_strategy: merge
+    dependent_facts: [fact_trip, fact_overspeed, fact_stop, fact_speed_notification, fact_daily_activity]
+
+# ---------------------------------------------------------------------------
+# Monitoring thresholds
+# ---------------------------------------------------------------------------
+monitoring:
+  freshness:
+    # A run is unhealthy if warehouse.fact_trip max event time is older than this.
+    fact_trip_max_lag_minutes: 15
+    fact_stop_max_lag_minutes: 30
+
+  quality:
+    # Per-run thresholds. Exceeding these produces a monitoring alert.
+    max_rejection_rate_pct: 5.0
+    max_null_rate_pct:
+      fact_trip.distance_km: 0.1
+      fact_trip.max_speed_kmh: 1.0
+
+  row_counts:
+    # Expected min rows per 5-min window during business hours (09:00-18:00 local).
+    expected_min_new_trips_per_window: 50
+    expected_min_new_stops_per_window: 100
+
+# ---------------------------------------------------------------------------
+# Execution
+# ---------------------------------------------------------------------------
+execution:
+  # Batch size for each SQL MERGE / COPY operation.
+  batch_size: 50000
+
+  # Maximum concurrent fact loaders inside a single run.
+  max_parallel_fact_loaders: 3
+
+  # Retry policy per task.
+  retries: 2
+  retry_delay_seconds: 30
+
+# ---------------------------------------------------------------------------
+# Quarantine
+# ---------------------------------------------------------------------------
+quarantine:
+  # Rows that fail a "reject" cleaning rule are written here for audit.
+  enabled: true
+  retention_days: 90

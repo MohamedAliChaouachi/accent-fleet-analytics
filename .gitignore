@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Prefect
+.prefect/
+prefect.db*
+
+# IDE
+.idea/
+*.swp
+
+# Data artefacts (should not be committed)
+data/
+outputs/
+*.parquet
+*.csv
+!tests/fixtures/*.csv

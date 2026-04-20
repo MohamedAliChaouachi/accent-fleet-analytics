@@ -1,0 +1,157 @@
+# =============================================================================
+# Cleaning rules catalog
+# =============================================================================
+# Every rule from Phase 2's data-quality report is declared here, not in SQL.
+# The rule engine in src/accent_fleet/cleaning/rules.py reads this file and
+# applies rules uniformly in batch AND streaming mode.
+#
+# Each rule must have:
+#   - id:        C1..Cn  (traceable to the Phase 2 Data Quality Report)
+#   - name:      short human-readable name
+#   - severity:  critical | high | medium | low
+#   - targets:   list of staging tables the rule applies to
+#   - condition: a SQL-expression fragment that is TRUE for VALID rows
+#   - rationale: why this rule exists (goes into the etl_run_log)
+#   - action:    reject | clamp | nullify
+#   - enabled:   boolean (allows A/B toggling during Phase 4 modelling)
+# =============================================================================
+
+version: 1
+updated: "2026-04-20"
+
+rules:
+
+  - id: C1
+    name: temporal_epoch_error_filter
+    severity: critical
+    targets: [path, stop, rep_overspeed, notification, rep_activity_daily]
+    # Column names differ per table — resolved at apply-time via `time_column`
+    time_column:
+      path: begin_path_time
+      stop: stop_start
+      rep_overspeed: begin_path_time
+      notification: created_at
+      rep_activity_daily: activity_start_time
+    condition: "{time_column} >= '2019-10-01'::timestamp"
+    rationale: >
+      GPS devices without a synchronized clock default to Unix epoch (1970)
+      or GPS epoch (1980). Earliest valid tenant data is 2019-10-01.
+    action: reject
+    enabled: true
+
+  - id: C2
+    name: trip_duration_positive
+    severity: critical
+    targets: [path]
+    condition: "path_duration > 0"
+    rationale: >
+      144 trips have negative duration (end < start); 1,473 have zero.
+      Both are data errors, not valid trips.
+    action: reject
+    enabled: true
+
+  - id: C3
+    name: trip_distance_positive
+    severity: high
+    targets: [path]
+    condition: "distance_driven > 0"
+    rationale: >
+      Zero-distance trips are GPS noise (16 records). Real trips always move.
+    action: reject
+    enabled: true
+
+  - id: C4
+    name: fuel_used_sanitize
+    severity: critical
+    targets: [path]
+    condition: "fuel_used >= 0 AND fuel_used <= 500"
+    rationale: >
+      fuel_used has INT32 overflow (max 2.1B, min -2.1B) and 94.7% zeros.
+      Values outside [0, 500] L are unreliable and must be nullified so
+      Phase 4 models see NULL instead of junk.
+    action: nullify        # replace value with NULL, keep the row
+    enabled: true
+
+  - id: C5
+    name: speed_cap
+    severity: high
+    targets: [path, rep_overspeed]
+    condition: "max_speed <= 200"
+    rationale: >
+      Device hard limit is 200 km/h. Values at exactly 200 may be clipped.
+      We clamp rather than reject to preserve the row for other features.
+    action: clamp
+    clamp_max: 200
+    clamp_column: max_speed
+    enabled: true
+
+  - id: C6
+    name: stop_duration_bounds
+    severity: medium
+    targets: [stop]
+    condition: "stop_duration > 0 AND stop_duration < 31536000"   # 1 year in seconds
+    rationale: >
+      Zero/negative stop durations are errors. Stops longer than 1 year
+      indicate decommissioned vehicles and distort aggregates.
+    action: reject
+    enabled: true
+
+  - id: C7
+    name: device_vehicle_tenant_chain
+    severity: high
+    targets: [device]
+    # This one is enforced as a JOIN at dim-load time, not a row filter.
+    # The rule engine emits an advisory log entry; the actual enforcement
+    # lives in sql/03_dim_device.sql (INNER JOIN on vehicule + tenant).
+    condition: "vehicule_id IS NOT NULL"
+    rationale: >
+      16 devices have no vehicle link and are excluded from analysis.
+      Vehicle mark is normalized (IVECO/Iveco/iveco -> Iveco) here.
+    action: reject
+    enabled: true
+
+# -----------------------------------------------------------------------------
+# Vehicle make normalization — used by dim_vehicle
+# -----------------------------------------------------------------------------
+# Not a row filter; a lookup applied in transforms/dimensions.py and
+# sql/02_dim_vehicle.sql. 17 rules collapse 38 Iveco variants etc.
+# -----------------------------------------------------------------------------
+
+make_normalization:
+  IVECO: Iveco
+  iveco: Iveco
+  Iveco: Iveco
+  ISUZU: Isuzu
+  isuzu: Isuzu
+  Isuzu: Isuzu
+  SCANIA: Scania
+  scania: Scania
+  Scania: Scania
+  RENAULT: Renault
+  renault: Renault
+  Renault: Renault
+  MAN: MAN
+  man: MAN
+  Man: MAN
+  VOLVO: Volvo
+  Volvo: Volvo
+  DACIA: Dacia
+  dacia: Dacia
+  Dacia: Dacia
+  SUZUKI: Suzuki
+  Suzuki: Suzuki
+  SUZUKI SWIFT: Suzuki
+  FIAT: Fiat
+  Fiat: Fiat
+  FIAT FIORINO: Fiat
+  MITSUBISHI: Mitsubishi
+  Mitsubishi: Mitsubishi
+
+# -----------------------------------------------------------------------------
+# Vehicle-class derivation — from normalized make
+# -----------------------------------------------------------------------------
+
+vehicle_class_map:
+  heavy: [Scania, Iveco, MAN, Volvo]
+  medium: [Isuzu, Renault]
+  light: [Dacia, Suzuki, Fiat, Mitsubishi]
