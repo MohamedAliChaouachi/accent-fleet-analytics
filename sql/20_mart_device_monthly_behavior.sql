@@ -20,6 +20,8 @@ CREATE TABLE IF NOT EXISTS marts.mart_device_monthly_behavior (
   total_trips                   INTEGER NOT NULL DEFAULT 0,
   total_distance_km             DOUBLE PRECISION NOT NULL DEFAULT 0,
   avg_trip_distance_km          DOUBLE PRECISION,
+  avg_trip_duration_minutes     DOUBLE PRECISION,
+  avg_fuel_used_l               DOUBLE PRECISION,
   stddev_trip_distance          DOUBLE PRECISION,
   short_trip_ratio              DOUBLE PRECISION,
 
@@ -97,6 +99,8 @@ trip_agg AS (
     COUNT(*)::INTEGER                                          AS total_trips,
     SUM(ft.distance_km)                                        AS total_distance_km,
     AVG(ft.distance_km)                                        AS avg_trip_distance_km,
+    AVG(ft.duration_seconds) / 60.0                            AS avg_trip_duration_minutes,
+    AVG(ft.fuel_used)                                          AS avg_fuel_used_l,
     STDDEV_SAMP(ft.distance_km)                                AS stddev_trip_distance,
     AVG(CASE WHEN ft.is_short_trip THEN 1.0 ELSE 0.0 END)      AS short_trip_ratio,
     AVG(ft.max_speed_kmh)                                      AS avg_max_speed_kmh,
@@ -170,7 +174,8 @@ activity_agg AS (
 
 INSERT INTO marts.mart_device_monthly_behavior (
   tenant_id, device_id, year_month,
-  total_trips, total_distance_km, avg_trip_distance_km, stddev_trip_distance, short_trip_ratio,
+  total_trips, total_distance_km, avg_trip_distance_km, avg_trip_duration_minutes, avg_fuel_used_l,
+  stddev_trip_distance, short_trip_ratio,
   avg_max_speed_kmh, p95_max_speed, avg_speed_ratio, high_speed_trip_ratio,
   overspeed_count, overspeed_per_100km, overspeed_per_trip,
   overspeed_severity_low, overspeed_severity_medium, overspeed_severity_high, overspeed_severity_extreme,
@@ -183,7 +188,8 @@ INSERT INTO marts.mart_device_monthly_behavior (
 )
 SELECT
   t.tenant_id, t.device_id, t.year_month,
-  t.total_trips, t.total_distance_km, t.avg_trip_distance_km, t.stddev_trip_distance, t.short_trip_ratio,
+  t.total_trips, t.total_distance_km, t.avg_trip_distance_km, t.avg_trip_duration_minutes,
+  t.avg_fuel_used_l, t.stddev_trip_distance, t.short_trip_ratio,
   t.avg_max_speed_kmh, t.p95_max_speed, t.avg_speed_ratio, t.high_speed_trip_ratio,
   COALESCE(o.overspeed_count, 0),
   CASE WHEN t.total_distance_km > 0 THEN COALESCE(o.overspeed_count, 0) / t.total_distance_km * 100 END,
@@ -216,6 +222,8 @@ ON CONFLICT (tenant_id, device_id, year_month) DO UPDATE SET
   total_trips                = EXCLUDED.total_trips,
   total_distance_km          = EXCLUDED.total_distance_km,
   avg_trip_distance_km       = EXCLUDED.avg_trip_distance_km,
+  avg_trip_duration_minutes  = EXCLUDED.avg_trip_duration_minutes,
+  avg_fuel_used_l            = EXCLUDED.avg_fuel_used_l,
   stddev_trip_distance       = EXCLUDED.stddev_trip_distance,
   short_trip_ratio           = EXCLUDED.short_trip_ratio,
   avg_max_speed_kmh          = EXCLUDED.avg_max_speed_kmh,
