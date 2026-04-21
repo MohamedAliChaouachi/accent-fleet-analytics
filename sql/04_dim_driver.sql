@@ -30,16 +30,16 @@ INSERT INTO warehouse.dim_driver
   (driver_id, tenant_id, first_name, last_name,
    is_medically_fit, has_training, is_safe_driver, is_authorized)
 SELECT
-  d.id_driver              AS driver_id,
+  d.driver_id              AS driver_id,
   d.tenant_id,
   NULLIF(TRIM(d.first_name), ''),
   NULLIF(TRIM(d.last_name), ''),
-  warehouse.smallint_to_bool(d.is_medically_fit),
-  warehouse.smallint_to_bool(d.has_training),
-  warehouse.smallint_to_bool(d.is_safe_driver),
-  warehouse.smallint_to_bool(d.is_authorized)
+  warehouse.smallint_to_bool(d.driver_medically),
+  warehouse.smallint_to_bool(d.driving_training),
+  warehouse.smallint_to_bool(d.driving_safe),
+  warehouse.smallint_to_bool(d.driver_authorized)
 FROM staging.driver d
-WHERE d.id_driver IS NOT NULL
+WHERE d.driver_id IS NOT NULL
 ON CONFLICT (tenant_id, driver_id) DO UPDATE
   SET first_name       = EXCLUDED.first_name,
       last_name        = EXCLUDED.last_name,

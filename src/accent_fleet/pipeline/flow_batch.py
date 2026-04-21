@@ -95,6 +95,19 @@ def task_ensure_views() -> None:
             run_sql_file(conn, f)
 
 
+@task(retries=1)
+def task_ensure_mart_structure() -> None:
+    """Create mart table/index DDL needed by views without recomputing data."""
+    sql = load_sql("20_mart_device_monthly_behavior.sql")
+    with transaction() as conn:
+        for stmt in split_sql_statements(sql):
+            head = stmt.lstrip().upper()
+            if head.startswith("WITH") or head.startswith("INSERT INTO"):
+                break
+            conn.execute(text(stmt), {"touched_months": None, "etl_run_id": -1})
+    log.info("mart.structure_ready")
+
+
 @task
 def task_run_validation(run_id: int) -> None:   # noqa: ARG001
     report = run_validation_suite()
@@ -111,10 +124,11 @@ def task_run_validation(run_id: int) -> None:   # noqa: ARG001
 @flow(name="accent-bootstrap")
 def bootstrap_flow() -> None:
     """One-time bootstrap. Safe to re-run."""
+    task_bootstrap_schemas()
     run_id = begin_run(mode="bootstrap")
     try:
-        task_bootstrap_schemas()
         task_refresh_dimensions()
+        task_ensure_mart_structure()
         task_ensure_views()
         end_run(run_id, status="success")
     except Exception as exc:
@@ -183,7 +197,7 @@ def backfill_flow(chunk_days: int | None = None) -> None:
     the watermark left off.
     """
     cfg = load_pipeline_config()
-    chunk_days = chunk_days or cfg["window"]["backfill_chunk_days"]
+    chunk_days = int(chunk_days or cfg["window"]["backfill_chunk_days"])
     min_time = datetime.fromisoformat(
         cfg["window"]["min_event_time"].replace("Z", "+00:00")
     ).replace(tzinfo=None)

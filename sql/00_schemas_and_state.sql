@@ -63,7 +63,7 @@ CREATE INDEX IF NOT EXISTS idx_etl_run_log_status
 -- -----------------------------------------------------------------------------
 -- JSONB payload lets us keep a single table for all source tables. Readers
 -- in Phase 4 modelling can use this to audit whether rule thresholds are too
--- aggressive (e.g., rejecting >5% of a tenant's data).
+-- aggressive (e.g., rejecting >5% of a tenants).
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS warehouse.quarantine_rejected (
   quarantine_id      BIGSERIAL PRIMARY KEY,

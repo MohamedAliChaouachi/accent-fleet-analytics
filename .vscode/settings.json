@@ -30,5 +30,17 @@
   },
   "terminal.integrated.env.windows": {
     "PYTHONPATH": "${workspaceFolder}\\src"
-  }
+  },
+  "sqltools.connections": [
+    {
+      "ssh": "Disabled",
+      "previewLimit": 50,
+      "server": "localhost",
+      "port": 15432,
+      "driver": "PostgreSQL",
+      "database": "accent_data",
+      "name": "Azure Postgres Tunnel",
+      "username": "medali_dev"
+    }
+  ]
 }
