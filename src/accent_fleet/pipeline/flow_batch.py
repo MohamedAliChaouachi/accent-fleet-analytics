@@ -99,12 +99,21 @@ def task_ensure_views() -> None:
 def task_ensure_mart_structure() -> None:
     """Create mart table/index DDL needed by views without recomputing data."""
     sql = load_sql("20_mart_device_monthly_behavior.sql")
+
+    def _first_sql_token(statement: str) -> str:
+        for line in statement.splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("--"):
+                continue
+            return stripped.upper()
+        return ""
+
     with transaction() as conn:
         for stmt in split_sql_statements(sql):
-            head = stmt.lstrip().upper()
+            head = _first_sql_token(stmt)
             if head.startswith("WITH") or head.startswith("INSERT INTO"):
                 break
-            conn.execute(text(stmt), {"touched_months": None, "etl_run_id": -1})
+            conn.exec_driver_sql(stmt)
     log.info("mart.structure_ready")
 
 

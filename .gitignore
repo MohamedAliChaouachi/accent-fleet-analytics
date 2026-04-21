@@ -30,6 +30,7 @@ prefect.db*
 # IDE
 .idea/
 *.swp
+.vscode/
 
 # Data artefacts (should not be committed)
 data/
@@ -37,3 +38,40 @@ outputs/
 *.parquet
 *.csv
 !tests/fixtures/*.csv
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+*.lnk
+
+# Logs
+*.log
+logs/
+
+# Additional editor backups
+*.swo
+*~
+*.bak
+
+# Local database files
+*.db
+*.sqlite
+*.sqlite3
+
+
+# Python version management
+.python-version
+
+# Local environment overrides
+.env.local
+
+# Pip cache
+pip-log.txt
+pip-delete-this-directory.txt
+
+# IDE workspace settings
+*.code-workspace
+.vscode-settings.json
+
+# VSCode extensions
+.vscode/extensions/
