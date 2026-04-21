@@ -34,6 +34,14 @@ feature_groups:
         source: fact_trip
         aggregation: avg
         column: distance_km
+      - name: avg_trip_duration_minutes
+        source: fact_trip
+        aggregation: avg
+        column: duration_seconds
+      - name: avg_fuel_used_l
+        source: fact_trip
+        aggregation: avg
+        column: fuel_used
       - name: stddev_trip_distance
         source: fact_trip
         aggregation: stddev_samp
