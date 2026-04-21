@@ -17,7 +17,6 @@ import hashlib
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote_plus
 
 import yaml
 from pydantic import Field
@@ -71,10 +70,8 @@ class Settings(BaseSettings):
     @property
     def sqlalchemy_url(self) -> str:
         """Assemble the SQLAlchemy URL for psycopg v3."""
-        user = quote_plus(self.pg_user)
-        password = quote_plus(self.pg_password)
         return (
-            f"postgresql+psycopg://{user}:{password}"
+            f"postgresql+psycopg://{self.pg_user}:{self.pg_password}"
             f"@{self.pg_host}:{self.pg_port}/{self.pg_database}"
         )
 

@@ -25,8 +25,6 @@ SELECT
   COALESCE(m.total_trips, 0)                                    AS total_trips,
   COALESCE(m.total_distance_km, 0.0)                            AS total_distance_km,
   COALESCE(m.avg_trip_distance_km, 0.0)                         AS avg_trip_distance_km,
-  COALESCE(m.avg_trip_duration_minutes, 0.0)                   AS avg_trip_duration_minutes,
-  COALESCE(m.avg_fuel_used_l, 0.0)                              AS avg_fuel_used_l,
   COALESCE(m.stddev_trip_distance, 0.0)                         AS stddev_trip_distance,
   COALESCE(m.short_trip_ratio, 0.0)                             AS short_trip_ratio,
 
