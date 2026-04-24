@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python notebooks/_build_notebooks.py)",
+      "Bash(python -c \":*)",
+      "mcp__postgres_database__query"
+    ]
+  }
+}

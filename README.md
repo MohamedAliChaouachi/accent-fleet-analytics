@@ -11,6 +11,8 @@ Stream-ready data preparation pipeline for **Project P1: Driver Behavior Scoring
 
 ## Quick start
 
+The canonical development workflow is **notebook-first**. Scripts remain the production entry point, but every step is also available as a standalone notebook so you can see and inspect each CRISP-DM phase on its own.
+
 ```bash
 # 1. Environment
 python -m venv .venv
@@ -18,20 +20,14 @@ source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 cp .env.example .env               # then edit DB credentials
 
-# 2. One-time DW + marts bootstrap (creates schemas, watermark table, dims)
-python scripts/run_batch.py --mode bootstrap
+# 2. Launch Jupyter and run the notebooks in order — see notebooks/ layout below
+jupyter lab
 
-# 3. Back-fill historical staging data into warehouse + marts
-python scripts/run_batch.py --mode backfill
-
-# 4. From here on: run every 5 minutes (cron / Prefect / systemd timer)
-python scripts/run_batch.py --mode incremental
-
-# Future: stream mode (requires Kafka / Redpanda)
-python scripts/run_streaming.py
+# 3. Once the warehouse is fully built, schedule incremental runs on the Azure VM
+python scripts/run_batch.py --mode incremental   # driven by cron, see notebooks/06_deployment/
 ```
 
-Or explore interactively with the notebooks under `notebooks/`.
+Stream mode (`scripts/run_streaming.py`, `pipeline/flow_stream.py`, `ingestion/stream_source.py`) is currently **deferred** and lives under `_deferred/` folders. It is preserved, not deleted, and will be reactivated later.
 
 ---
 
@@ -77,18 +73,31 @@ accent-fleet-analytics/
 │   ├── 22_v_ml_features.sql
 │   ├── 23_v_fleet_risk_dashboard.sql
 │   └── 99_validation_suite.sql
-├── src/accent_fleet/      # The Python package
+├── src/accent_fleet/      # The Python package (reused by both scripts and notebooks)
 │   ├── config.py          # Pydantic settings + YAML loading
 │   ├── db/                # SQLAlchemy engine, watermark, SQL loader
 │   ├── contracts/         # Pydantic row-level schemas
 │   ├── cleaning/          # Config-driven cleaning rule engine
 │   ├── transforms/        # Dim / fact / feature transforms
-│   ├── ingestion/         # Batch + stream sources (same interface)
-│   ├── pipeline/          # Prefect flows (batch, streaming)
+│   ├── ingestion/         # Batch source (stream source in _deferred/)
+│   ├── pipeline/          # Prefect batch flow (stream flow in _deferred/)
 │   ├── features/          # Feature registry + risk score
 │   └── monitoring/        # Row counts, freshness, null-rate checks
-├── notebooks/             # Jupyter: profile → load → validate → demo
-├── scripts/               # Entrypoints for CI / cron
+├── notebooks/             # CRISP-DM-aligned notebooks (see below)
+│   ├── 00_setup/                      # M0-M1: env check, DDL
+│   ├── 01_data_understanding/         # M2: Phase-2 replay, cleaning exploration
+│   ├── 02_data_preparation/           # M3-M7: Phase-3 heart
+│   │   ├── cleaning/                  # M4: rule-engine preview
+│   │   ├── dimensions/                # M3: load dims
+│   │   ├── facts/                     # M5: one notebook per fact backfill
+│   │   ├── marts/                     # M6: mart + views
+│   │   └── validation/                # M7: DQ suite
+│   ├── 03_feature_engineering/        # M8: EDA bridging to modeling
+│   ├── 04_modeling/                   # M9: placeholder (Phase 4)
+│   ├── 05_evaluation/                 # M10: placeholder (Phase 5)
+│   ├── 06_deployment/                 # M11: cron recipe + incremental demo
+│   └── _legacy/                       # earlier demo notebooks, kept for reference
+├── scripts/               # Batch entry point (stream entry point in _deferred/)
 ├── tests/                 # Pytest suite
 ├── docker-compose.yml     # Local Postgres + optional Redpanda
 ├── pyproject.toml
@@ -122,16 +131,37 @@ All 7 cleaning rules (C1–C7) have dedicated unit tests. The incremental-semant
 
 | Mode | Trigger | Window | Use case |
 |---|---|---|---|
-| `bootstrap` | Manual, once | — | Create schemas, watermark table, static dimensions (date, hour_band). |
-| `backfill` | Manual, once | Full history | Process the 54.7 M archive rows / 7.4 M trips already in staging. |
-| `incremental` | Cron / Prefect every 5 min | `now - overlap → now` | Normal operating mode. Pulls new rows since last watermark. |
-| `stream` | Kafka / CDC trigger | Per-message | Future mode when IoT events stream directly. Same transforms. |
+| `bootstrap` | Manual, once | — | Create schemas + state tables + **full-refresh dimensions** + mart DDL + views. *Not just DDL — also loads 5 dimension tables.* |
+| `backfill` | Manual, once | Full history | Process the 54.7 M archive rows / 7.4 M trips already in staging. Decomposed per-fact in `notebooks/02_data_preparation/facts/`. |
+| `incremental` | Cron every 5 min | `now - overlap → now` | Normal operating mode. Pulls new rows since last watermark. |
+| `stream` | *Deferred* | — | Future mode when IoT events stream directly. Code in `_deferred/`. |
+
+---
+
+## Milestones (map notebooks to CRISP-DM phases)
+
+| Milestone | Notebook(s) | CRISP-DM |
+|---|---|---|
+| M0 | `00_setup/00_environment_check.ipynb` | Setup |
+| M1 | `00_setup/01_create_schemas.ipynb` | Phase 3 (DDL) |
+| M2 | `01_data_understanding/01_staging_profile.ipynb`, `…/02_cleaning_rules_exploration.ipynb` | Phase 2 replay |
+| M3 | `02_data_preparation/dimensions/01_load_dimensions.ipynb` | Phase 3 |
+| M4 | `02_data_preparation/cleaning/01_apply_cleaning_rules_preview.ipynb` | Phase 3 |
+| M5 | `02_data_preparation/facts/01…05_*.ipynb` (one per fact) | Phase 3 |
+| M6 | `02_data_preparation/marts/01…02_*.ipynb` | Phase 3 |
+| M7 | `02_data_preparation/validation/01_run_validation_suite.ipynb` | Phase 3 |
+| M8 | `03_feature_engineering/01_explore_ml_features.ipynb` | Bridge to Phase 4 |
+| M9 | `04_modeling/README.md` (placeholder) | Phase 4 |
+| M10 | `05_evaluation/README.md` (placeholder) | Phase 5 |
+| M11 | `06_deployment/01_incremental_mode_demo.ipynb`, `02_scheduled_runs.md` | Phase 6 |
+
+Run them in order — each notebook asserts its exit criterion in the last cell.
 
 ---
 
 ## What to read next
 
 1. [`REFACTOR_RATIONALE.md`](./REFACTOR_RATIONALE.md) — why this design, mapped to v1.
-2. [`notebooks/01_data_profiling.ipynb`](./notebooks/01_data_profiling.ipynb) — live profile of staging.
-3. [`notebooks/05_feature_engineering.ipynb`](./notebooks/05_feature_engineering.ipynb) — walk through the 35 features.
-4. [`notebooks/06_stream_simulation.ipynb`](./notebooks/06_stream_simulation.ipynb) — replay path events to prove streaming works.
+2. [`notebooks/_template.ipynb`](./notebooks/_template.ipynb) — the 4-section notebook template.
+3. [`notebooks/00_setup/00_environment_check.ipynb`](./notebooks/00_setup/00_environment_check.ipynb) — start here.
+4. [`notebooks/06_deployment/02_scheduled_runs.md`](./notebooks/06_deployment/02_scheduled_runs.md) — cron recipe for the Azure VM.

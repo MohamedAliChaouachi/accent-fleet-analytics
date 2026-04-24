@@ -1,7 +1,9 @@
-"""Ingestion sources — same interface, batch or stream."""
+"""Ingestion sources — same interface, batch or stream.
+
+Stream implementation is deferred. See ``_deferred/stream_source.py``.
+"""
 
 from accent_fleet.ingestion.batch_source import BatchStagingSource
 from accent_fleet.ingestion.source import Source
-from accent_fleet.ingestion.stream_source import StreamKafkaSource
 
-__all__ = ["BatchStagingSource", "Source", "StreamKafkaSource"]
+__all__ = ["BatchStagingSource", "Source"]
