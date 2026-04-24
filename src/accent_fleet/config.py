@@ -20,7 +20,7 @@ from typing import Any
 from urllib.parse import quote_plus
 
 import yaml
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -67,6 +67,22 @@ class Settings(BaseSettings):
     kafka_topic_stop: str = Field("fleet.stop.v1", alias="KAFKA_TOPIC_STOP")
     kafka_topic_overspeed: str = Field("fleet.overspeed.v1", alias="KAFKA_TOPIC_OVERSPEED")
     kafka_consumer_group: str = Field("accent-fleet-phase3", alias="KAFKA_CONSUMER_GROUP")
+
+    @field_validator(
+        "pipeline_batch_size",
+        "pipeline_overlap_minutes",
+        "pipeline_incremental_lookback_minutes",
+        mode="before",
+    )
+    @classmethod
+    def _parse_int_with_optional_inline_comment(cls, value: Any) -> Any:
+        """
+        Accept values like "10 # comment" from env vars and coerce them to ints.
+        This guards against editors/tools that inject raw .env lines into process env.
+        """
+        if isinstance(value, str):
+            value = value.split("#", 1)[0].strip()
+        return value
 
     @property
     def sqlalchemy_url(self) -> str:
