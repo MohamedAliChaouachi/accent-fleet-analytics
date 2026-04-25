@@ -110,6 +110,65 @@ rules:
     action: reject
     enabled: true
 
+  # ---------------------------------------------------------------------------
+  # Archive (telemetry) rules — added in the archive integration refactor.
+  # Enforced inline in sql/15 and sql/16 rather than via the polars rule
+  # engine because the archive table is too large (54.7M rows) for in-memory
+  # filtering to be practical.
+  # ---------------------------------------------------------------------------
+
+  - id: C8
+    name: archive_ignition_on_for_events
+    severity: high
+    targets: [archive]
+    condition: "ignition = 1"
+    rationale: >
+      Accelerometer readings while the engine is off are sensor noise
+      (vibration from passers-by, doors, etc.). Harsh-event detection
+      MUST require ignition=1.
+    action: reject
+    enabled: true
+
+  - id: C9
+    name: archive_accelerometer_int8_sanity
+    severity: medium
+    targets: [archive]
+    condition: "ABS(x) <= 127 AND ABS(y) <= 127 AND ABS(z) <= 127"
+    rationale: >
+      Accelerometer is a signed int8 sensor (-128..127). Out-of-range
+      values indicate corrupted packets and must be filtered.
+    action: reject
+    enabled: true
+
+  - id: C10
+    name: archive_speed_clamp
+    severity: medium
+    targets: [archive]
+    condition: "speed BETWEEN 0 AND 250"
+    rationale: >
+      Reasonable physical bounds for fleet vehicles. Values outside this
+      range are sensor errors and are clamped (not rejected) to preserve
+      the row for other aggregates.
+    action: clamp
+    clamp_min: 0
+    clamp_max: 250
+    clamp_column: speed
+    enabled: true
+
+  - id: C11
+    name: archive_rpm_clamp
+    severity: low
+    targets: [archive]
+    condition: "rpm BETWEEN 0 AND 8000"
+    rationale: >
+      RPM bounds for diesel/petrol fleet engines. Out-of-range values are
+      decoder errors; clamp to preserve the observation.
+    action: clamp
+    clamp_min: 0
+    clamp_max: 8000
+    clamp_column: rpm
+    enabled: true
+
 # -----------------------------------------------------------------------------
 # Vehicle make normalization — used by dim_vehicle
 # -----------------------------------------------------------------------------

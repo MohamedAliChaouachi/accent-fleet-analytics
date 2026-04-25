@@ -55,6 +55,39 @@ sources:
     target_fact: fact_daily_activity
     priority: 5
 
+  # Archive: high-volume telemetry source (54.7M rows). Drives both
+  # fact_harsh_event (event-level) and fact_telemetry_daily (aggregate).
+  - name: archive
+    time_column: date
+    target_fact: fact_harsh_event
+    priority: 6
+
+  - name: archive
+    time_column: date
+    target_fact: fact_telemetry_daily
+    priority: 7
+
+# ---------------------------------------------------------------------------
+# Archive-derived fact parameters
+# ---------------------------------------------------------------------------
+# Thresholds applied at LOAD time inside sql/15_fact_harsh_event_incremental.sql
+# Units are raw int8 accelerometer readings on a ±2g full-scale sensor:
+#   40 ≈ 0.31 g   (moderate)
+#   60 ≈ 0.47 g   (high)
+#   80 ≈ 0.63 g   (extreme)
+# Tune per-tenant after running notebook 03_feature_engineering/03_handle_outliers.ipynb
+archive_thresholds:
+  brake:   40    # |x| trigger for harsh_brake (negative-x)
+  accel:   40    # x trigger for harsh_accel (positive-x)
+  corner:  40    # |y| trigger for harsh_corner
+  high:    60    # severity tier upper bound
+  extreme: 80    # severity tier upper bound
+
+# Telemetry aggregation parameters for sql/16_fact_telemetry_daily_incr.sql
+archive_telemetry:
+  ping_seconds:       30    # nominal observation cadence
+  rpm_high_threshold: 3000  # over-revving threshold
+
 # ---------------------------------------------------------------------------
 # Mart recomputation triggers
 # ---------------------------------------------------------------------------
@@ -65,6 +98,11 @@ marts:
     recompute_scope: touched_months
     upsert_strategy: merge
     dependent_facts: [fact_trip, fact_overspeed, fact_stop, fact_speed_notification, fact_daily_activity]
+
+  device_monthly_telemetry:
+    recompute_scope: touched_months
+    upsert_strategy: merge
+    dependent_facts: [fact_harsh_event, fact_telemetry_daily]
 
 # ---------------------------------------------------------------------------
 # Monitoring thresholds

@@ -86,20 +86,42 @@ def task_recompute_mart(touched_months: list[str], run_id: int) -> int:
 
 
 @task(retries=1)
+def task_recompute_telemetry_mart(touched_months: list[str], run_id: int) -> int:
+    """
+    Recompute marts.mart_device_monthly_telemetry for given year-months.
+
+    This is the archive-side companion to mart_device_monthly_behavior. It
+    aggregates fact_harsh_event + fact_telemetry_daily into the per-month
+    grain expected by the ML feature view (sql/26).
+    """
+    if not touched_months:
+        log.info("telemetry_mart.skip_no_touched_months")
+        return 0
+    with transaction() as conn:
+        result = run_sql_file(
+            conn,
+            "25_mart_device_monthly_telemetry.sql",
+            params={"touched_months": touched_months, "etl_run_id": run_id},
+        )
+        rows = result.rowcount or 0
+        log.info("telemetry_mart.recomputed", months=touched_months, rows=rows)
+        return rows
+
+
+@task(retries=1)
 def task_ensure_views() -> None:
     """(Re)create the marts views. Idempotent."""
     with transaction() as conn:
         for f in ("21_v_device_risk_profile.sql",
                   "22_v_ml_features.sql",
-                  "23_v_fleet_risk_dashboard.sql"):
+                  "23_v_fleet_risk_dashboard.sql",
+                  "26_v_ml_features_full.sql"):
             run_sql_file(conn, f)
 
 
 @task(retries=1)
 def task_ensure_mart_structure() -> None:
     """Create mart table/index DDL needed by views without recomputing data."""
-    sql = load_sql("20_mart_device_monthly_behavior.sql")
-
     def _first_sql_token(statement: str) -> str:
         for line in statement.splitlines():
             stripped = line.strip()
@@ -109,11 +131,16 @@ def task_ensure_mart_structure() -> None:
         return ""
 
     with transaction() as conn:
-        for stmt in split_sql_statements(sql):
-            head = _first_sql_token(stmt)
-            if head.startswith("WITH") or head.startswith("INSERT INTO"):
-                break
-            conn.exec_driver_sql(stmt)
+        for sql_file in (
+            "20_mart_device_monthly_behavior.sql",
+            "25_mart_device_monthly_telemetry.sql",
+        ):
+            sql = load_sql(sql_file)
+            for stmt in split_sql_statements(sql):
+                head = _first_sql_token(stmt)
+                if head.startswith("WITH") or head.startswith("INSERT INTO"):
+                    break
+                conn.exec_driver_sql(stmt)
     log.info("mart.structure_ready")
 
 
@@ -171,9 +198,12 @@ def incremental_flow(window_end: datetime | None = None) -> None:
                 continue
             fact_results.append(task_load_fact(fact_name, run_id, window_end))
 
-        # 3. Recompute mart only for months that received new fact rows
+        # 3. Recompute marts only for months that received new fact rows.
+        #    Two distinct marts: trip-side (behavior) and archive-side
+        #    (telemetry). Both keyed on the same touched-months set.
         touched = touched_months_from_windows(fact_results)
         task_recompute_mart(touched, run_id)
+        task_recompute_telemetry_mart(touched, run_id)
 
         # 4. Views are views — they don't need refreshing, but we keep
         #    the task in case we switch to materialised views later.

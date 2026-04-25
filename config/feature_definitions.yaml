@@ -190,6 +190,113 @@ feature_groups:
         aggregation: avg
         column: working_hours
 
+  # ---------------------------------------------------------------------------
+  - name: harsh_events
+    description: >
+      Accelerometer-derived harsh-driving events from staging.archive
+      (Project 1 core risk signal). Counts and per-100km rates for brakes,
+      acceleration and cornering, plus severity tiers.
+    features:
+      - name: harsh_brake_count
+        source: fact_harsh_event
+        aggregation: count
+        filter: "event_type = 'harsh_brake'"
+        importance: critical
+      - name: harsh_accel_count
+        source: fact_harsh_event
+        aggregation: count
+        filter: "event_type = 'harsh_accel'"
+        importance: high
+      - name: harsh_corner_count
+        source: fact_harsh_event
+        aggregation: count
+        filter: "event_type = 'harsh_corner'"
+        importance: high
+      - name: harsh_event_total
+        source: fact_harsh_event
+        aggregation: count
+        importance: critical
+      - name: harsh_moderate_count
+        source: fact_harsh_event
+        aggregation: count
+        filter: "severity = 'moderate'"
+      - name: harsh_high_count
+        source: fact_harsh_event
+        aggregation: count
+        filter: "severity = 'high'"
+      - name: harsh_extreme_count
+        source: fact_harsh_event
+        aggregation: count
+        filter: "severity = 'extreme'"
+      - name: harsh_brake_per_100km
+        source: derived
+        formula: "harsh_brake_count / NULLIF(total_distance_km, 0) * 100"
+        importance: critical
+      - name: harsh_accel_per_100km
+        source: derived
+        formula: "harsh_accel_count / NULLIF(total_distance_km, 0) * 100"
+      - name: harsh_corner_per_100km
+        source: derived
+        formula: "harsh_corner_count / NULLIF(total_distance_km, 0) * 100"
+      - name: harsh_events_per_100km
+        source: derived
+        formula: "harsh_event_total / NULLIF(total_distance_km, 0) * 100"
+        importance: critical
+
+  # ---------------------------------------------------------------------------
+  - name: telemetry_engine_idling
+    description: >
+      Engine-on / idling / RPM signals derived from staging.archive pings.
+      Idle ratio is a strong predictor of fuel waste and inefficient driving.
+    features:
+      - name: total_ignition_on_minutes
+        source: fact_telemetry_daily
+        aggregation: sum
+        column: ignition_on_minutes
+      - name: total_moving_minutes
+        source: fact_telemetry_daily
+        aggregation: sum
+        column: moving_minutes
+      - name: total_idle_minutes
+        source: fact_telemetry_daily
+        aggregation: sum
+        column: idle_minutes
+      - name: monthly_idle_ratio
+        source: derived
+        formula: "total_idle_minutes / NULLIF(total_ignition_on_minutes, 0)"
+        importance: high
+      - name: active_telemetry_days
+        source: fact_telemetry_daily
+        aggregation: distinct_count
+        column: telemetry_date
+      - name: avg_rpm
+        source: fact_telemetry_daily
+        aggregation: avg
+        column: avg_rpm
+      - name: max_rpm
+        source: fact_telemetry_daily
+        aggregation: max
+        column: max_rpm
+      - name: total_high_rpm_seconds
+        source: fact_telemetry_daily
+        aggregation: sum
+        column: high_rpm_seconds
+      - name: high_rpm_minutes_per_day
+        source: derived
+        formula: "total_high_rpm_seconds / 60.0 / NULLIF(active_telemetry_days, 0)"
+      - name: avg_telemetry_speed_kmh
+        source: fact_telemetry_daily
+        aggregation: avg
+        column: avg_speed_kmh
+      - name: max_telemetry_speed_kmh
+        source: fact_telemetry_daily
+        aggregation: max
+        column: max_speed_kmh
+      - name: total_fuel_used_archive
+        source: fact_telemetry_daily
+        aggregation: sum
+        column: total_fuel_used
+
 # =============================================================================
 # Risk Score Configuration
 # =============================================================================
