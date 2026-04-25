@@ -34,12 +34,16 @@ def run_sql_file(
     """
     Execute a SQL file, optionally with :named parameters.
 
-    Returns the SQLAlchemy Result so callers can consume rowcount or rows.
-    Works for single-statement or multi-statement files; multi-statement
-    files must be split by the caller or contain only top-level DDL.
+    Returns the final SQLAlchemy Result so callers can consume rowcount or rows.
+    Files may contain multiple top-level statements. This matters for psycopg,
+    which refuses prepared statements containing multiple commands when bind
+    parameters are present.
     """
     sql = load_sql(filename)
-    return run_sql_statement(conn, sql, params)
+    result = None
+    for statement in split_sql_statements(sql):
+        result = run_sql_statement(conn, statement, params)
+    return result
 
 
 def run_sql_statement(
