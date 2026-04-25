@@ -52,8 +52,55 @@ def run_sql_statement(
     params: dict[str, Any] | None = None,
 ) -> Any:
     """Execute a single SQL statement with named parameters."""
-    stmt = text(sql)
+    stmt = text(strip_sql_comments(sql))
     return conn.execute(stmt, params or {})
+
+
+def strip_sql_comments(sql: str) -> str:
+    """
+    Remove SQL comments before SQLAlchemy parses :named bind parameters.
+
+    SQLAlchemy's text() treats :tokens inside comments as bind params. That is
+    harmless until a statement has only comment mentions, at which point drivers
+    such as psycopg receive phantom parameters with no SQL type context.
+    """
+    out: list[str] = []
+    in_single = False
+    in_dollar = False
+    in_line_comment = False
+    in_block_comment = False
+    i = 0
+    while i < len(sql):
+        ch = sql[i]
+        nxt = sql[i + 1] if i + 1 < len(sql) else ""
+
+        if in_line_comment:
+            if ch == "\n":
+                in_line_comment = False
+                out.append(ch)
+        elif in_block_comment:
+            if ch == "*" and nxt == "/":
+                in_block_comment = False
+                i += 1
+            elif ch == "\n":
+                out.append(ch)
+        elif ch == "'" and not in_dollar:
+            in_single = not in_single
+            out.append(ch)
+        elif ch == "$" and nxt == "$" and not in_single:
+            in_dollar = not in_dollar
+            out.append("$$")
+            i += 1
+        elif ch == "-" and nxt == "-" and not in_single and not in_dollar:
+            in_line_comment = True
+            i += 1
+        elif ch == "/" and nxt == "*" and not in_single and not in_dollar:
+            in_block_comment = True
+            i += 1
+        else:
+            out.append(ch)
+        i += 1
+    return "".join(out)
 
 
 def split_sql_statements(sql: str) -> list[str]:
