@@ -47,6 +47,8 @@ Stream mode (`scripts/run_streaming.py`, `pipeline/flow_stream.py`, `ingestion/s
                              fact_stop
                              fact_speed_notification
                              fact_daily_activity
+                             fact_harsh_event       (from staging.archive)
+                             fact_telemetry_daily   (from staging.archive)
                              etl_watermark ◄───── drives incremental loads
                              etl_run_log
                              quarantine_rejected
@@ -68,10 +70,14 @@ accent-fleet-analytics/
 │   ├── 00_schemas_and_state.sql
 │   ├── 01_dim_tenant.sql … 05_dim_date_hour.sql
 │   ├── 10_fact_trip_incremental.sql … 14_fact_daily_activity_incr.sql
+│   ├── 15_fact_harsh_event_incremental.sql        # NEW (archive accelerometer)
+│   ├── 16_fact_telemetry_daily_incr.sql           # NEW (archive aggregates)
 │   ├── 20_mart_device_monthly_behavior.sql
 │   ├── 21_v_device_risk_profile.sql
 │   ├── 22_v_ml_features.sql
 │   ├── 23_v_fleet_risk_dashboard.sql
+│   ├── 25_mart_device_monthly_telemetry.sql       # NEW (archive-side mart)
+│   ├── 26_v_ml_features_full.sql                  # NEW (unified ML view)
 │   └── 99_validation_suite.sql
 ├── src/accent_fleet/      # The Python package (reused by both scripts and notebooks)
 │   ├── config.py          # Pydantic settings + YAML loading
@@ -148,9 +154,17 @@ All 7 cleaning rules (C1–C7) have dedicated unit tests. The incremental-semant
 | M3 | `02_data_preparation/dimensions/01_load_dimensions.ipynb` | Phase 3 |
 | M4 | `02_data_preparation/cleaning/01_apply_cleaning_rules_preview.ipynb` | Phase 3 |
 | M5 | `02_data_preparation/facts/01…05_*.ipynb` (one per fact) | Phase 3 |
+| M5b | `02_data_preparation/facts/06_load_fact_harsh_event.ipynb`, `…/07_load_fact_telemetry_daily.ipynb` — archive-derived facts | Phase 3 |
 | M6 | `02_data_preparation/marts/01…02_*.ipynb` | Phase 3 |
+| M6c | `02_data_preparation/marts/03_build_mart_device_monthly_telemetry.ipynb` | Phase 3 |
+| M6d | `02_data_preparation/marts/04_build_unified_ml_view.ipynb` (frozen ML contract) | Phase 3 |
 | M7 | `02_data_preparation/validation/01_run_validation_suite.ipynb` | Phase 3 |
 | M8 | `03_feature_engineering/01_explore_ml_features.ipynb` | Bridge to Phase 4 |
+| M8a | `03_feature_engineering/02_handle_missing_values.ipynb` | Phase 3 (clean) |
+| M8b | `03_feature_engineering/03_handle_outliers.ipynb` | Phase 3 (clean) |
+| M8c | `03_feature_engineering/04_data_encoding.ipynb` (OHE / Ordinal / Target-Guided) | Phase 3 (transform) |
+| M8d | `03_feature_engineering/05_handle_imbalanced_dataset.ipynb` (SMOTE) | Phase 3 (transform) |
+| M8e | `03_feature_engineering/06_build_ml_dataset.ipynb` — exit gate, produces X/y parquet + preprocess.joblib | Phase 3 (final) |
 | M9 | `04_modeling/README.md` (placeholder) | Phase 4 |
 | M10 | `05_evaluation/README.md` (placeholder) | Phase 5 |
 | M11 | `06_deployment/01_incremental_mode_demo.ipynb`, `02_scheduled_runs.md` | Phase 6 |

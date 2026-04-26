@@ -86,8 +86,8 @@ target_months AS (
   -- For backfill the loader passes NULL and we derive from data.
   SELECT DISTINCT TO_CHAR(begin_path_time, 'YYYY-MM') AS year_month
   FROM warehouse.fact_trip
-  WHERE (:touched_months IS NULL
-         OR TO_CHAR(begin_path_time, 'YYYY-MM') = ANY(:touched_months))
+  WHERE (CAST(:touched_months AS text[]) IS NULL
+         OR TO_CHAR(begin_path_time, 'YYYY-MM') = ANY(CAST(:touched_months AS text[])))
 ),
 
 -- Group 1 + 2 + 6a: everything from fact_trip

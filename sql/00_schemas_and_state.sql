@@ -99,5 +99,8 @@ VALUES
   ('warehouse', 'fact_stop',               NULL, 'Incremental on stop_start'),
   ('warehouse', 'fact_speed_notification', NULL, 'Incremental on created_at, SPEED% only'),
   ('warehouse', 'fact_daily_activity',     NULL, 'Incremental on activity_start_time'),
-  ('marts',     'mart_device_monthly_behavior', NULL, 'Recomputed for touched months only')
+  ('warehouse', 'fact_harsh_event',        NULL, 'Incremental on date (staging.archive); accelerometer-derived events'),
+  ('warehouse', 'fact_telemetry_daily',    NULL, 'Incremental on date::DATE (staging.archive); per-day aggregates'),
+  ('marts',     'mart_device_monthly_behavior', NULL, 'Recomputed for touched months only'),
+  ('marts',     'mart_device_monthly_telemetry', NULL, 'Recomputed for touched months only; archive-side companion mart')
 ON CONFLICT (layer, table_name) DO NOTHING;

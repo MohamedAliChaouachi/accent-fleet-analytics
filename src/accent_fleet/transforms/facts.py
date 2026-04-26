@@ -33,7 +33,34 @@ FACT_SQL: dict[str, str] = {
     "fact_stop":               "12_fact_stop_incremental.sql",
     "fact_speed_notification": "13_fact_speed_notification_incr.sql",
     "fact_daily_activity":     "14_fact_daily_activity_incr.sql",
+    # Archive-derived facts (Project 1: Driver Behavior Scoring)
+    "fact_harsh_event":        "15_fact_harsh_event_incremental.sql",
+    "fact_telemetry_daily":    "16_fact_telemetry_daily_incr.sql",
 }
+
+
+def _extra_params_for_fact(fact_name: str, cfg: dict) -> dict:
+    """
+    Per-fact extra named parameters bound to the SQL file. Defaults come
+    from `config/pipeline.yaml` under `archive_thresholds:` and
+    `archive_telemetry:` keys (see those YAMLs for documentation).
+    """
+    if fact_name == "fact_harsh_event":
+        thr = cfg.get("archive_thresholds", {})
+        return {
+            "thresh_brake":   int(thr.get("brake", 40)),
+            "thresh_accel":   int(thr.get("accel", 40)),
+            "thresh_corner":  int(thr.get("corner", 40)),
+            "thresh_high":    int(thr.get("high", 60)),
+            "thresh_extreme": int(thr.get("extreme", 80)),
+        }
+    if fact_name == "fact_telemetry_daily":
+        tel = cfg.get("archive_telemetry", {})
+        return {
+            "ping_seconds":       int(tel.get("ping_seconds", 30)),
+            "rpm_high_threshold": int(tel.get("rpm_high_threshold", 3000)),
+        }
+    return {}
 
 
 @dataclass
@@ -93,14 +120,17 @@ def load_fact_incremental(
         log.info("fact_load.start", fact=fact_name,
                  start=window.start, end=window.end, run_id=run_id)
 
+        params = {
+            "window_start": window.start,
+            "window_end": window.end,
+            "etl_run_id": run_id,
+        }
+        params.update(_extra_params_for_fact(fact_name, cfg))
+
         result = run_sql_file(
             conn,
             sql_file,
-            params={
-                "window_start": window.start,
-                "window_end": window.end,
-                "etl_run_id": run_id,
-            },
+            params=params,
         )
         rows = result.rowcount or 0
 
