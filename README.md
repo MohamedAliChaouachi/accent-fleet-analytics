@@ -34,25 +34,34 @@ Stream mode (`scripts/run_streaming.py`, `pipeline/flow_stream.py`, `ingestion/s
 ## Architecture
 
 ```
-  staging (bronze)           warehouse (silver)          marts (gold)
-  ─────────────────          ──────────────────          ──────────────
-  path                ┐      dim_tenant                  mart_device_
-  stop                │      dim_vehicle                 monthly_behavior
-  rep_overspeed       ├──► { dim_device      } ──────►  v_device_risk_profile
-  notification        │      dim_driver                  v_ml_features_
-  rep_activity_daily  │      dim_date                     driver_behavior
-  vehicule / device   │      dim_hour_band                v_fleet_risk_dashboard
-  driver / assignment ┘      fact_trip
-                             fact_overspeed
-                             fact_stop
-                             fact_speed_notification
-                             fact_daily_activity
-                             fact_harsh_event       (from staging.archive)
-                             fact_telemetry_daily   (from staging.archive)
-                             etl_watermark ◄───── drives incremental loads
+  staging (bronze)           warehouse (silver)              marts (gold)
+  ─────────────────          ──────────────────              ─────────────────────
+  path                ┐      dim_tenant                ┌──► mart_device_monthly_behavior   (ML)
+  stop                │      dim_vehicle               │    mart_device_monthly_telemetry  (ML)
+  rep_overspeed       │      dim_device                ├──► mart_fleet_daily               (BI day)
+  rep_activity_daily  │      dim_driver                │    mart_vehicle_monthly           (BI vehicle)
+  notification        │      dim_date / dim_hour_band  │    mart_tenant_monthly_summary    (BI rollup)
+  archive             │      bridge_device_driver      │
+  vehicule / device   ├──►   fact_trip                 │    Views — ML
+  driver / assignment │      fact_overspeed            │      v_device_risk_profile
+  maintenance         │      fact_stop                 │      v_ml_features
+  offense / sinistre  │      fact_speed_notification ──┤      v_ml_features_full
+  reparation          │      fact_daily_activity       │      v_fleet_risk_dashboard
+  document / fueling  │      fact_harsh_event          │
+                      │      fact_telemetry_daily      │    Views — BI
+                      │      fact_notification         │      v_executive_dashboard
+                      │      fact_maintenance          │      v_operational_dashboard
+                      │      fact_maintenance_line     │      v_maintenance_dashboard
+                      │      fact_fueling              │
+                      └►     etl_watermark ◄────── drives incremental loads
                              etl_run_log
                              quarantine_rejected
 ```
+
+Two consumer projects feed off the same warehouse:
+
+- **Project 1 — Driver Behavior Scoring (ML).** Uses the device-grain monthly marts.
+- **Project 2 — Fleet BI Dashboard.** Uses the day-/vehicle-/tenant-grain BI marts and views.
 
 Every arrow is an **incremental, idempotent, watermark-driven transformation**. Running the pipeline twice on the same window produces the same output; running it once extends the watermark forward.
 
@@ -70,14 +79,25 @@ accent-fleet-analytics/
 │   ├── 00_schemas_and_state.sql
 │   ├── 01_dim_tenant.sql … 05_dim_date_hour.sql
 │   ├── 10_fact_trip_incremental.sql … 14_fact_daily_activity_incr.sql
-│   ├── 15_fact_harsh_event_incremental.sql        # NEW (archive accelerometer)
-│   ├── 16_fact_telemetry_daily_incr.sql           # NEW (archive aggregates)
+│   ├── 07_bridge_device_driver_load.sql           # NEW (driver↔device SCD)
+│   ├── 15_fact_harsh_event_incremental.sql        # archive accelerometer
+│   ├── 16_fact_telemetry_daily_incr.sql           # archive aggregates
+│   ├── 17_fact_notification_incr.sql              # NEW (BI: full notifications)
+│   ├── 18_fact_maintenance_incr.sql               # NEW (BI: maintenance header)
+│   ├── 19_fact_maintenance_line_incr.sql          # NEW (BI: offense/sinistre/reparation)
 │   ├── 20_mart_device_monthly_behavior.sql
 │   ├── 21_v_device_risk_profile.sql
 │   ├── 22_v_ml_features.sql
 │   ├── 23_v_fleet_risk_dashboard.sql
-│   ├── 25_mart_device_monthly_telemetry.sql       # NEW (archive-side mart)
-│   ├── 26_v_ml_features_full.sql                  # NEW (unified ML view)
+│   ├── 24_fact_fueling_incr.sql                   # NEW (BI: fueling events)
+│   ├── 25_mart_device_monthly_telemetry.sql       # archive-side mart
+│   ├── 26_v_ml_features_full.sql                  # unified ML view
+│   ├── 30_mart_fleet_daily.sql                    # NEW (BI mart: day-grain)
+│   ├── 31_mart_vehicle_monthly.sql                # NEW (BI mart: vehicle-month)
+│   ├── 32_mart_tenant_monthly_summary.sql         # NEW (BI mart: tenant-month)
+│   ├── 33_v_executive_dashboard.sql               # NEW (BI view: exec)
+│   ├── 34_v_operational_dashboard.sql             # NEW (BI view: ops)
+│   ├── 35_v_maintenance_dashboard.sql             # NEW (BI view: maintenance)
 │   └── 99_validation_suite.sql
 ├── src/accent_fleet/      # The Python package (reused by both scripts and notebooks)
 │   ├── config.py          # Pydantic settings + YAML loading

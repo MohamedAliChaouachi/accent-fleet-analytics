@@ -67,6 +67,36 @@ sources:
     target_fact: fact_telemetry_daily
     priority: 7
 
+  # ---------------------------------------------------------------------------
+  # BI-coverage facts (Project 2: Fleet BI Dashboard)
+  # ---------------------------------------------------------------------------
+  # Full notification coverage (superset of fact_speed_notification — we keep
+  # both: speed-only for the stable ML feature contract, full for BI).
+  - name: notification
+    time_column: created_at
+    target_fact: fact_notification
+    priority: 8
+
+  # Maintenance header (work-order grain). Vehicle-grain, not device-grain.
+  - name: maintenance
+    time_column: date_operation
+    target_fact: fact_maintenance
+    priority: 9
+
+  # Maintenance line items (offense / sinistre / reparation), keyed off the
+  # parent maintenance.date_operation watermark.
+  - name: maintenance
+    time_column: date_operation
+    target_fact: fact_maintenance_line
+    priority: 10
+
+  # Fueling events from staging.document JOIN staging.fueling.
+  - name: document
+    time_column: date_operation
+    target_fact: fact_fueling
+    filter: "doc_type = 'Fueling'"
+    priority: 11
+
 # ---------------------------------------------------------------------------
 # Archive-derived fact parameters
 # ---------------------------------------------------------------------------
@@ -103,6 +133,37 @@ marts:
     recompute_scope: touched_months
     upsert_strategy: merge
     dependent_facts: [fact_harsh_event, fact_telemetry_daily]
+
+  # -------------------------------------------------------------------------
+  # BI marts (Project 2: Fleet BI Dashboard)
+  # -------------------------------------------------------------------------
+  fleet_daily:
+    # Day-grain executive KPIs — uses :touched_dates not :touched_months.
+    recompute_scope: touched_dates
+    upsert_strategy: merge
+    dependent_facts:
+      - fact_trip
+      - fact_overspeed
+      - fact_stop
+      - fact_harsh_event
+      - fact_notification
+      - fact_maintenance
+      - fact_fueling
+
+  vehicle_monthly:
+    recompute_scope: touched_months
+    upsert_strategy: merge
+    dependent_facts:
+      - fact_trip
+      - fact_maintenance
+      - fact_maintenance_line
+      - fact_fueling
+
+  tenant_monthly_summary:
+    # Roll-up of vehicle_monthly + fleet_daily — must run after both.
+    recompute_scope: touched_months
+    upsert_strategy: merge
+    depends_on_marts: [vehicle_monthly, fleet_daily]
 
 # ---------------------------------------------------------------------------
 # Monitoring thresholds
