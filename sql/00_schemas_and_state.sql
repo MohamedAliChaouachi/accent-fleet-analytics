@@ -101,6 +101,11 @@ VALUES
   ('warehouse', 'fact_daily_activity',     NULL, 'Incremental on activity_start_time'),
   ('warehouse', 'fact_harsh_event',        NULL, 'Incremental on date (staging.archive); accelerometer-derived events'),
   ('warehouse', 'fact_telemetry_daily',    NULL, 'Incremental on date::DATE (staging.archive); per-day aggregates'),
+  ('warehouse', 'fact_notification',       NULL, 'Incremental on created_at; all alert categories'),
+  ('warehouse', 'fact_maintenance',        NULL, 'Incremental on date_operation; maintenance/work-order headers'),
+  ('warehouse', 'fact_maintenance_line',   NULL, 'Incremental on parent maintenance date_operation; maintenance line detail'),
+  ('warehouse', 'fact_fueling',            NULL, 'Incremental on fueling_at; fueling document events'),
   ('marts',     'mart_device_monthly_behavior', NULL, 'Recomputed for touched months only'),
-  ('marts',     'mart_device_monthly_telemetry', NULL, 'Recomputed for touched months only; archive-side companion mart')
+  ('marts',     'mart_device_monthly_telemetry', NULL, 'Recomputed for touched months only; archive-side companion mart'),
+  ('marts',     'mart_fleet_daily',              NULL, 'Recomputed for touched dates only; BI dashboard daily mart')
 ON CONFLICT (layer, table_name) DO NOTHING;
