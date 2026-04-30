@@ -25,13 +25,13 @@ SELECT
   s.panic_alerts,
   s.total_overspeed,
   s.total_harsh_events,
-  -- MoM deltas (NULL for the earliest row per tenant)
-  s.total_distance_km - LAG(s.total_distance_km) OVER w        AS distance_km_mom_delta,
-  s.total_operating_cost - LAG(s.total_operating_cost) OVER w  AS operating_cost_mom_delta,
-  s.total_alerts - LAG(s.total_alerts) OVER w                  AS alerts_mom_delta,
+  -- MoM deltas (0 for the earliest row per tenant — no prior month to compare)
+  COALESCE(s.total_distance_km - LAG(s.total_distance_km) OVER w, 0)        AS distance_km_mom_delta,
+  COALESCE(s.total_operating_cost - LAG(s.total_operating_cost) OVER w, 0)  AS operating_cost_mom_delta,
+  COALESCE(s.total_alerts - LAG(s.total_alerts) OVER w, 0)                  AS alerts_mom_delta,
   -- 3-month rolling averages (smooth out monthly noise)
-  AVG(s.total_distance_km) OVER w_roll                          AS distance_km_3mo_avg,
-  AVG(s.cost_per_km) OVER w_roll                                AS cost_per_km_3mo_avg
+  COALESCE(AVG(s.total_distance_km) OVER w_roll, 0)                          AS distance_km_3mo_avg,
+  COALESCE(AVG(s.cost_per_km) OVER w_roll, 0)                                AS cost_per_km_3mo_avg
 FROM marts.mart_tenant_monthly_summary s
 WINDOW
   w      AS (PARTITION BY s.tenant_id ORDER BY s.year_month),

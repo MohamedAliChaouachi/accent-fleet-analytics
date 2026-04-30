@@ -41,13 +41,13 @@ SELECT
   CASE WHEN (mv.maintenance_cost_total + mv.fuel_cost_total) > 0
        THEN mv.maintenance_cost_total
             / (mv.maintenance_cost_total + mv.fuel_cost_total) * 100
-       ELSE NULL END                                          AS maintenance_share_pct,
-  -- Per-km efficiency (NULL when no driving)
+       ELSE 0 END                                             AS maintenance_share_pct,
+  -- Per-km efficiency (0 when no driving — BI-friendly default)
   mv.cost_per_km,
   mv.fuel_l_per_100km,
-  -- Repair turnaround for the month (avg hours)
-  rep.avg_repair_hours,
-  rep.max_repair_hours,
+  -- Repair turnaround for the month (avg hours; 0 when no repairs)
+  COALESCE(rep.avg_repair_hours, 0)                            AS avg_repair_hours,
+  COALESCE(rep.max_repair_hours, 0)                            AS max_repair_hours,
   -- "Money pit" rank within tenant for the month
   RANK() OVER (
     PARTITION BY mv.tenant_id, mv.year_month

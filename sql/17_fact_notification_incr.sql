@@ -8,15 +8,16 @@
 -- The existing `fact_speed_notification` (sql/13) is preserved for the
 -- baseline ML mart's stable feature contract. This file is a SUPERSET.
 --
--- Categorization is derived from `description` so the BI layer can group
--- alerts without parsing strings:
---   speed_alert     : description LIKE 'SPEED%'
---   geofence_alert  : description LIKE 'GEOFENCE%' OR LIKE '%FENCE%'
---   idle_alert      : description LIKE '%IDLE%'
---   panic_alert     : description LIKE '%PANIC%' OR LIKE '%SOS%'
---   maintenance     : description LIKE '%MAINTENANCE%'
---   route_alert     : description LIKE 'ROUTE%' OR LIKE '%DEVIATION%'
---   other           : everything else (still kept for completeness)
+-- Categorization is derived from `name` (the alert kind, e.g. 'SPEED',
+-- 'SPEED_NOT_HIGHWAY', 'VIDANGE'). `description` is 100% NULL in the source
+-- so the prior derivation produced 'other' for every row. `name` is always
+-- populated and uses a small fixed vocabulary:
+--   speed_alert        : name LIKE 'SPEED%'   (SPEED, SPEED_HIGHWAY, SPEED_NOT_HIGHWAY)
+--   geofence_alert     : name = 'POI' OR name = 'ZONE'
+--   maintenance_alert  : name IN ('VIDANGE','DOC')   (oil change, doc reminder)
+--   ignition_alert     : name = 'INGNITION_V0'        (sic — source typo)
+--   fuel_theft_alert   : name = 'SIPHONAGE'
+--   other              : anything else
 --
 -- Contract:
 --   :window_start, :window_end, :etl_run_id (standard incremental)
@@ -57,16 +58,15 @@ SELECT
   n.device_id,
   n.created_at,
   n.created_at::DATE,
-  n.description,
+  -- Keep `name` in the description column for downstream readability
+  -- (raw `description` is 100% NULL at source).
+  n.name                    AS description,
   CASE
-    WHEN n.description LIKE 'SPEED%'                                 THEN 'speed_alert'
-    WHEN n.description LIKE 'GEOFENCE%' OR n.description LIKE '%FENCE%' THEN 'geofence_alert'
-    WHEN n.description LIKE '%IDLE%'                                  THEN 'idle_alert'
-    WHEN n.description LIKE '%PANIC%' OR n.description LIKE '%SOS%'   THEN 'panic_alert'
-    WHEN n.description LIKE '%MAINTENANCE%' OR n.description LIKE 'MAINT%' THEN 'maintenance_alert'
-    WHEN n.description LIKE 'ROUTE%'  OR n.description LIKE '%DEVIATION%' THEN 'route_alert'
-    WHEN n.description LIKE '%TOW%'   OR n.description LIKE '%TOWING%' THEN 'tow_alert'
-    WHEN n.description LIKE '%BATTERY%' OR n.description LIKE '%POWER%' THEN 'power_alert'
+    WHEN n.name LIKE 'SPEED%'                THEN 'speed_alert'
+    WHEN n.name IN ('POI','ZONE')            THEN 'geofence_alert'
+    WHEN n.name IN ('VIDANGE','DOC')         THEN 'maintenance_alert'
+    WHEN n.name = 'INGNITION_V0'             THEN 'ignition_alert'
+    WHEN n.name = 'SIPHONAGE'                THEN 'fuel_theft_alert'
     ELSE 'other'
   END                       AS alert_category,
   n.alert_value,

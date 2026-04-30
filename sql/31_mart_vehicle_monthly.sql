@@ -129,8 +129,8 @@ SELECT
   COALESCE(t.active_days, 0),
   COALESCE(t.total_trips, 0),
   COALESCE(t.total_distance_km, 0),
-  t.total_driving_hours,
-  t.trip_fuel_used_l,
+  COALESCE(t.total_driving_hours, 0),
+  COALESCE(t.trip_fuel_used_l, 0),
   COALESCE(m.maintenance_events, 0),
   COALESCE(m.maintenance_cost_total, 0),
   COALESCE(m.maintenance_labor_total, 0),
@@ -141,15 +141,16 @@ SELECT
   COALESCE(f.fueling_events, 0),
   COALESCE(f.fuel_litres, 0),
   COALESCE(f.fuel_cost_total, 0),
-  f.avg_cost_per_litre,
+  COALESCE(f.avg_cost_per_litre, 0),
   -- cost_per_km = (maintenance_total + fuel_total) / total_distance_km
+  -- Defaults to 0 (not NULL) so BI cards render cleanly when there is no signal.
   CASE WHEN COALESCE(t.total_distance_km, 0) > 0
        THEN (COALESCE(m.maintenance_cost_total, 0) + COALESCE(f.fuel_cost_total, 0))
             / t.total_distance_km
-       ELSE NULL END                                            AS cost_per_km,
+       ELSE 0 END                                               AS cost_per_km,
   CASE WHEN COALESCE(t.total_distance_km, 0) > 0 AND f.fuel_litres IS NOT NULL
        THEN f.fuel_litres / t.total_distance_km * 100.0
-       ELSE NULL END                                            AS fuel_l_per_100km,
+       ELSE 0 END                                               AS fuel_l_per_100km,
   :etl_run_id
 FROM all_keys k
 LEFT JOIN trip_agg  t USING (tenant_id, vehicle_id, year_month)

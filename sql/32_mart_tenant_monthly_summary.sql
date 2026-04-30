@@ -90,10 +90,11 @@ SELECT
   COALESCE(d.active_devices, 0),
   COALESCE(v.total_trips, 0),
   COALESCE(v.total_distance_km, 0),
-  v.total_driving_hours,
+  COALESCE(v.total_driving_hours, 0),
+  -- Defaults to 0 (not NULL) so BI cards/charts render cleanly.
   CASE WHEN COALESCE(v.active_vehicles, 0) > 0
        THEN v.total_distance_km / v.active_vehicles
-       ELSE NULL END                                              AS avg_distance_per_vehicle,
+       ELSE 0 END                                                 AS avg_distance_per_vehicle,
   COALESCE(d.total_overspeed, 0),
   COALESCE(d.total_harsh_events, 0),
   COALESCE(d.total_alerts, 0),
@@ -105,7 +106,7 @@ SELECT
   CASE WHEN COALESCE(v.total_distance_km, 0) > 0
        THEN (COALESCE(v.total_maintenance_cost, 0) + COALESCE(v.total_fuel_cost, 0))
             / v.total_distance_km
-       ELSE NULL END                                              AS cost_per_km,
+       ELSE 0 END                                                 AS cost_per_km,
   :etl_run_id
 FROM all_keys k
 LEFT JOIN veh v USING (tenant_id, year_month)

@@ -133,15 +133,20 @@ overspeed_agg AS (
 ),
 
 -- Group 4: alerts
+-- Re-sourced from fact_notification (filtered to alert_category='speed_alert')
+-- because the legacy fact_speed_notification is empty (no source table).
+-- The original `alert_type` discriminator now lives in fact_notification.description
+-- where it stores the raw `name` value (SPEED, SPEED_HIGHWAY, SPEED_NOT_HIGHWAY).
 alert_agg AS (
   SELECT
     fn.tenant_id, fn.device_id,
     TO_CHAR(fn.created_at, 'YYYY-MM')          AS year_month,
     COUNT(*)::INTEGER                           AS speed_alert_count,
-    COUNT(*) FILTER (WHERE fn.alert_type = 'SPEED_HIGHWAY')::INTEGER     AS highway_alert_count,
-    COUNT(*) FILTER (WHERE fn.alert_type = 'SPEED_NOT_HIGHWAY')::INTEGER AS non_highway_alert_count
-  FROM warehouse.fact_speed_notification fn
+    COUNT(*) FILTER (WHERE fn.description = 'SPEED_HIGHWAY')::INTEGER     AS highway_alert_count,
+    COUNT(*) FILTER (WHERE fn.description = 'SPEED_NOT_HIGHWAY')::INTEGER AS non_highway_alert_count
+  FROM warehouse.fact_notification fn
   JOIN target_months tm ON TO_CHAR(fn.created_at, 'YYYY-MM') = tm.year_month
+  WHERE fn.alert_category = 'speed_alert'
   GROUP BY fn.tenant_id, fn.device_id, TO_CHAR(fn.created_at, 'YYYY-MM')
 ),
 
@@ -186,31 +191,49 @@ INSERT INTO marts.mart_device_monthly_behavior (
   night_trip_ratio, weekend_trip_ratio, rush_hour_trip_ratio, active_days, avg_working_hours,
   _etl_run_id
 )
+-- BI/ML defaults: missing aggregates are coerced to 0 so dashboards don't
+-- render blanks and so feature pipelines can rely on numeric columns. Cases:
+--   - STDDEV with n=1 -> 0 (a single trip has no variance from itself)
+--   - per_100km / per_trip ratios with zero denominator -> 0 (no driving = 0 rate)
+--   - avg_speed_over_limit when there were no overspeeds -> 0 (no overage)
+--   - in_path_stop_ratio with no stops -> 0
+--   - avg_working_hours when no activity rows -> 0
 SELECT
   t.tenant_id, t.device_id, t.year_month,
   t.total_trips, t.total_distance_km, t.avg_trip_distance_km, t.avg_trip_duration_minutes,
-  t.avg_fuel_used_l, t.stddev_trip_distance, t.short_trip_ratio,
+  t.avg_fuel_used_l,
+  COALESCE(t.stddev_trip_distance, 0),
+  t.short_trip_ratio,
   t.avg_max_speed_kmh, t.p95_max_speed, t.avg_speed_ratio, t.high_speed_trip_ratio,
   COALESCE(o.overspeed_count, 0),
-  CASE WHEN t.total_distance_km > 0 THEN COALESCE(o.overspeed_count, 0) / t.total_distance_km * 100 END,
-  CASE WHEN t.total_trips > 0 THEN COALESCE(o.overspeed_count, 0)::DOUBLE PRECISION / t.total_trips END,
+  CASE WHEN t.total_distance_km > 0
+       THEN COALESCE(o.overspeed_count, 0) / t.total_distance_km * 100
+       ELSE 0 END,
+  CASE WHEN t.total_trips > 0
+       THEN COALESCE(o.overspeed_count, 0)::DOUBLE PRECISION / t.total_trips
+       ELSE 0 END,
   COALESCE(o.overspeed_severity_low, 0),
   COALESCE(o.overspeed_severity_medium, 0),
   COALESCE(o.overspeed_severity_high, 0),
   COALESCE(o.overspeed_severity_extreme, 0),
-  o.avg_speed_over_limit,
+  COALESCE(o.avg_speed_over_limit, 0),
   COALESCE(a.speed_alert_count, 0),
-  CASE WHEN t.total_distance_km > 0 THEN COALESCE(a.speed_alert_count, 0) / t.total_distance_km * 100 END,
+  CASE WHEN t.total_distance_km > 0
+       THEN COALESCE(a.speed_alert_count, 0) / t.total_distance_km * 100
+       ELSE 0 END,
   COALESCE(a.highway_alert_count, 0),
   COALESCE(a.non_highway_alert_count, 0),
-  COALESCE(s.total_stops, 0), s.in_path_stop_ratio,
-  CASE WHEN t.total_trips > 0 THEN COALESCE(s.total_stops, 0)::DOUBLE PRECISION / t.total_trips END,
+  COALESCE(s.total_stops, 0),
+  COALESCE(s.in_path_stop_ratio, 0),
+  CASE WHEN t.total_trips > 0
+       THEN COALESCE(s.total_stops, 0)::DOUBLE PRECISION / t.total_trips
+       ELSE 0 END,
   COALESCE(s.micro_stop_count, 0),
   COALESCE(s.short_stop_count, 0),
   COALESCE(s.medium_stop_count, 0),
   COALESCE(s.long_stop_count, 0),
   t.night_trip_ratio, t.weekend_trip_ratio, t.rush_hour_trip_ratio, t.active_days,
-  act.avg_working_hours,
+  COALESCE(act.avg_working_hours, 0),
   :etl_run_id
 FROM trip_agg t
 LEFT JOIN overspeed_agg o USING (tenant_id, device_id, year_month)

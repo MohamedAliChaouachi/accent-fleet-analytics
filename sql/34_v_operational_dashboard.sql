@@ -37,17 +37,17 @@ SELECT
   -- Defensive ratios
   CASE WHEN d.total_distance_km > 0
        THEN d.total_alerts::DOUBLE PRECISION / d.total_distance_km * 100
-       ELSE NULL END                                              AS alerts_per_100km,
+       ELSE 0 END                                                 AS alerts_per_100km,
   CASE WHEN d.total_distance_km > 0
        THEN d.overspeed_events::DOUBLE PRECISION / d.total_distance_km * 100
-       ELSE NULL END                                              AS overspeed_per_100km,
+       ELSE 0 END                                                 AS overspeed_per_100km,
   CASE WHEN d.total_distance_km > 0
        THEN (d.harsh_brake_events + d.harsh_accel_events + d.harsh_corner_events)::DOUBLE PRECISION
             / d.total_distance_km * 100
-       ELSE NULL END                                              AS harsh_events_per_100km,
+       ELSE 0 END                                                 AS harsh_events_per_100km,
   CASE WHEN d.total_alerts > 0
        THEN d.panic_alerts::DOUBLE PRECISION / d.total_alerts * 100
-       ELSE NULL END                                              AS panic_share_pct,
+       ELSE 0 END                                                 AS panic_share_pct,
   -- 7-day rolling for trendlines
   AVG(d.total_distance_km) OVER w7                                AS distance_km_7d_avg,
   AVG(d.total_alerts) OVER w7                                     AS alerts_7d_avg
