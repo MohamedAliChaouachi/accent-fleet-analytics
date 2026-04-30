@@ -1,6 +1,7 @@
 # CRISP-DM Phase 3 — Refactor Rationale
 
-**Project:** P1 Driver Behavior Scoring & Risk Classification — Accent Fleet Analytics
+**Project:** P1 Device Behavior Scoring & Risk Classification — Accent Fleet Analytics
+*(Renamed from "Driver Behavior Scoring" on 2026-04-30 — see §6 below.)*
 **Refactor Date:** April 2026
 **Refactor Scope:** Replace the batch-only, monolithic T&L pipeline with a stream-ready, incremental architecture.
 
@@ -112,7 +113,7 @@ Nothing is lost. Everything is made incremental, testable, and stream-ready.
 
 ## 5b. April 2026 — BI dashboard expansion (Project 2)
 
-**Trigger:** the warehouse will feed not only the ML pipeline (Project 1: Driver Behavior Scoring) but also a future BI dashboard. The BI layer needs every operationally meaningful staging table cleaned and persisted in the warehouse, not just the trip/overspeed/stop subset that the ML mart needs.
+**Trigger:** the warehouse will feed not only the ML pipeline (Project 1: Device Behavior Scoring) but also a future BI dashboard. The BI layer needs every operationally meaningful staging table cleaned and persisted in the warehouse, not just the trip/overspeed/stop subset that the ML mart needs.
 
 ### Scope (curated BI, not raw mirror)
 
@@ -176,8 +177,49 @@ All follow the established 4-section template (Setup / Inputs / Execute / Inspec
 
 ---
 
-## 6. Open items for Phase 4 hand-off
+## 6. EDA verdict (2026-04-30) — project re-scoped from "Driver" to "Device" Behavior Scoring
 
-- `marts.v_ml_features_driver_behavior` is the single contract Phase 4 (modelling) consumes. Its column list is **frozen** for the duration of modelling to avoid breaking feature drift.
+A full EDA against the live warehouse + marts (see plan
+`cheerful-herding-crown.md`) found three structural realities the original
+project description did not anticipate:
+
+1. **Driver attribution is unrecoverable at fleet scale.** `staging.assignment`
+   has 12 rows mapping 12 of 633 devices to 10 of 294 drivers. The bridge
+   correctly reflects the source. No driver-level scoring is possible
+   without an updated assignment feed. → Project unit changed from
+   `driver` to `device-month`.
+
+2. **The supervised proxy-label hypothesis is contradicted by the data.**
+   In the modeling window (≥ 2025-01), devices with harsh events show
+   3.5× *lower* mean overspeed than devices without harsh events. The
+   project's `>0.7 correlation` success criterion is unreachable on the
+   current data because harsh-detecting and overspeed-detecting devices
+   belong to different sub-fleets / hardware revisions. → Phase 4 path
+   pivoted from supervised classification to **per-tenant unsupervised
+   clustering + Isolation Forest** (notebooks `04_modeling/01` and `02`).
+
+3. **Modeling window must be ≥ 2025-01.** Of 1.88M `fact_harsh_event`
+   rows, 99.5% are 2025+. Of 62k `fact_telemetry_daily` rows, 98.7% are
+   2025+. Pre-2025 is trip-only. → All Phase 4 notebooks filter
+   `WHERE year_month >= '2025-01'`.
+
+Two ETL fixes were also required (silent bugs found by the EDA):
+- **F1** sql/17_fact_notification_incr.sql — `alert_category` was derived
+  from `description` (100% NULL); now uses `name`. Unlocks 585k speed
+  alerts.
+- **F2** sql/20_mart_device_monthly_behavior.sql — alert CTE re-sourced
+  from `fact_notification` (was reading from empty
+  `fact_speed_notification`).
+
+Apply via `notebooks/02_data_preparation/facts/11_fix_alert_categories.ipynb`.
+
+---
+
+## 7. Open items for Phase 4 hand-off
+
+- `marts.v_ml_features_full` is the single contract Phase 4 (modelling) consumes. Its column list is **frozen** for the duration of modelling to avoid breaking feature drift. (The legacy `v_ml_features_driver_behavior` view is preserved as a shim.)
+- Phase 4 notebooks live in `notebooks/04_modeling/`:
+  - `01_device_behavior_clustering.ipynb` — per-tenant K-Means archetypes
+  - `02_anomaly_risk_score.ipynb` — per-tenant Isolation Forest risk score
 - The `warehouse.quarantine_rejected` table should be reviewed weekly during Phase 4 — if rule C4 (fuel overflow) is rejecting >2 % of rows, the rule threshold needs tuning before it distorts model training data.
 - TimescaleDB migration is **recommended but not required** for Phase 4 modelling. It becomes required once live streaming begins in Phase 6.

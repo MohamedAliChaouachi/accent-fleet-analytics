@@ -1,6 +1,8 @@
 # Accent Fleet Analytics — CRISP-DM Phase 3 (Refactored)
 
-Stream-ready data preparation pipeline for **Project P1: Driver Behavior Scoring & Risk Classification**.
+Stream-ready data preparation pipeline for **Project P1: Device Behavior Scoring & Risk Classification**.
+
+> **Renamed from "Driver Behavior Scoring" on 2026-04-30** after the EDA revealed that `staging.assignment` covers only 12 of 633 devices (1.9%) — driver-level attribution is unrecoverable at fleet scale. The unit of analysis is the **device-month**. See `REFACTOR_RATIONALE.md` §6 for details.
 
 > This is the refactored Phase 3 deliverable. It replaces the batch-only SQL-script pipeline from v1 with an incremental, watermark-driven, testable Python + SQL pipeline that is ready for streaming ingestion.
 >
@@ -60,7 +62,7 @@ Stream mode (`scripts/run_streaming.py`, `pipeline/flow_stream.py`, `ingestion/s
 
 Two consumer projects feed off the same warehouse:
 
-- **Project 1 — Driver Behavior Scoring (ML).** Uses the device-grain monthly marts.
+- **Project 1 — Device Behavior Scoring (ML).** Uses the device-grain monthly marts. (Originally scoped as "Driver Behavior" — re-scoped 2026-04-30 because driver attribution is sparse in source.)
 - **Project 2 — Fleet BI Dashboard.** Uses the day-/vehicle-/tenant-grain BI marts and views.
 
 Every arrow is an **incremental, idempotent, watermark-driven transformation**. Running the pipeline twice on the same window produces the same output; running it once extends the watermark forward.
