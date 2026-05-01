@@ -1,6 +1,7 @@
 # CRISP-DM Phase 3 — Refactor Rationale
 
-**Project:** P1 Driver Behavior Scoring & Risk Classification — Accent Fleet Analytics
+**Project:** P1 Device Behavior Scoring & Risk Classification — Accent Fleet Analytics
+*(Renamed from "Driver Behavior Scoring" on 2026-04-30 — see §6 below.)*
 **Refactor Date:** April 2026
 **Refactor Scope:** Replace the batch-only, monolithic T&L pipeline with a stream-ready, incremental architecture.
 
@@ -110,8 +111,115 @@ Nothing is lost. Everything is made incremental, testable, and stream-ready.
 
 ---
 
-## 6. Open items for Phase 4 hand-off
+## 5b. April 2026 — BI dashboard expansion (Project 2)
 
-- `marts.v_ml_features_driver_behavior` is the single contract Phase 4 (modelling) consumes. Its column list is **frozen** for the duration of modelling to avoid breaking feature drift.
+**Trigger:** the warehouse will feed not only the ML pipeline (Project 1: Device Behavior Scoring) but also a future BI dashboard. The BI layer needs every operationally meaningful staging table cleaned and persisted in the warehouse, not just the trip/overspeed/stop subset that the ML mart needs.
+
+### Scope (curated BI, not raw mirror)
+
+We deliberately did **not** mirror all ~110 staging tables. Most are configuration, junction, lookup, or admin noise (`alert_config*`, `cal_*`, `user*`, `authority`, `point_client_*`, etc.) and add zero BI value. We brought across only true business facts and dimension extensions:
+
+| Source | Target | SQL | Watermark | Strategy |
+|---|---|---|---|---|
+| `staging.notification` (all rows) | `warehouse.fact_notification` | sql/17 | `created_at` | UPSERT on (tenant, notif_id) |
+| `staging.maintenance` | `warehouse.fact_maintenance` | sql/18 | `date_operation` | UPSERT on (tenant, id_maintenance) |
+| `staging.offense` ∪ `sinistre` ∪ `reparation` | `warehouse.fact_maintenance_line` | sql/19 | parent's `date_operation` | DELETE-INSERT-on-window |
+| `staging.document` ⨝ `staging.fueling` (`doc_type='Fueling'`) | `warehouse.fact_fueling` | sql/24 | `document.date_operation` | DELETE-INSERT-on-window |
+| `staging.assignment` → bridge | `warehouse.bridge_device_driver` | sql/07 | n/a (full reload, ~12 rows) | TRUNCATE+INSERT |
+
+Design decisions:
+
+- **`fact_notification` is a SUPERSET, not a replacement, of `fact_speed_notification`.** The ML feature contract depends on the speed-only table, so we keep it untouched. The new fact buckets `description` into nine `alert_category` values for BI grouping.
+- **Maintenance line items are a single union table, not three sub-facts.** `offense`, `sinistre`, `reparation` all FK on `id_maintenance` and have no own date or PK — modelling them as one `fact_maintenance_line` with a `line_type` discriminator is cleaner than three near-empty tables. DELETE-INSERT-on-window is used because `reference_unique` is sparse and non-unique.
+- **`fact_fueling` joins document + fueling.** `staging.fueling.date` is fully NULL; the only reliable timestamp is `staging.document.date_operation`. We filter `doc_type='Fueling'` and exclude `'FuelingMonthly'` aggregates.
+- **Skipped from this refactor:** `staging.alert` (superseded by `notification`), `staging.mileage` (overlaps `fact_trip`), `staging.events` (low BI value without lookup tables), `staging.fiche_vehicule` and `staging.leasing` (both empty as of profile — defer until populated), `staging.mission` (empty).
+
+### BI marts (gold layer)
+
+Three new marts power the dashboard, with strict dependency order:
+
+| Mart | Grain | Driven by | SQL |
+|---|---|---|---|
+| `marts.mart_fleet_daily` | (tenant_id, fleet_date) | `:touched_dates[]` | sql/30 |
+| `marts.mart_vehicle_monthly` | (tenant_id, vehicle_id, year_month) | `:touched_months[]` | sql/31 |
+| `marts.mart_tenant_monthly_summary` | (tenant_id, year_month) | rolls up the above two | sql/32 |
+
+`mart_fleet_daily` is the only **day-grain** mart. It needs a new `touched_dates_from_windows()` helper (added to `src/accent_fleet/transforms/facts.py`) — symmetrical to the existing `touched_months_from_windows()`.
+
+### BI dashboard views
+
+Three `CREATE OR REPLACE VIEW`s, idempotent on every bootstrap:
+
+| View | Purpose | SQL |
+|---|---|---|
+| `marts.v_executive_dashboard` | Tenant-month KPIs + MoM deltas + 3-mo rolling | sql/33 |
+| `marts.v_operational_dashboard` | Daily KPIs + per-100km ratios + 7d rolling | sql/34 |
+| `marts.v_maintenance_dashboard` | Vehicle-month maintenance leaderboard with cost rank | sql/35 |
+
+### Orchestration changes
+
+- `FACT_SQL` registry (`src/accent_fleet/transforms/facts.py`) now lists all 11 facts (was 7).
+- New tasks in `flow_batch.py`: `task_recompute_fleet_daily`, `task_recompute_vehicle_monthly`, `task_recompute_tenant_summary`.
+- `bootstrap_flow` ensures DDL for the three new marts and the three new views.
+- `incremental_flow` recomputes all five marts in one window: ML marts on touched-months, BI day-mart on touched-dates, then the tenant rollup last (depends on the others).
+- `pipeline.yaml` now declares 11 sources (was 7) and the three new mart entries.
+- `dim_driver` loader file (sql/04) defines the bridge schema; sql/07 populates it after dim_vehicle and dim_device are loaded.
+
+### Notebooks added
+
+- `02_data_preparation/facts/08_load_fact_notification.ipynb`
+- `02_data_preparation/facts/09_load_fact_maintenance.ipynb` (loads header + lines in order)
+- `02_data_preparation/facts/10_load_fact_fueling.ipynb`
+- `02_data_preparation/marts/05_build_bi_marts.ipynb`
+- `02_data_preparation/marts/06_build_bi_views.ipynb`
+
+All follow the established 4-section template (Setup / Inputs / Execute / Inspect).
+
+---
+
+## 6. EDA verdict (2026-04-30) — project re-scoped from "Driver" to "Device" Behavior Scoring
+
+A full EDA against the live warehouse + marts (see plan
+`cheerful-herding-crown.md`) found three structural realities the original
+project description did not anticipate:
+
+1. **Driver attribution is unrecoverable at fleet scale.** `staging.assignment`
+   has 12 rows mapping 12 of 633 devices to 10 of 294 drivers. The bridge
+   correctly reflects the source. No driver-level scoring is possible
+   without an updated assignment feed. → Project unit changed from
+   `driver` to `device-month`.
+
+2. **The supervised proxy-label hypothesis is contradicted by the data.**
+   In the modeling window (≥ 2025-01), devices with harsh events show
+   3.5× *lower* mean overspeed than devices without harsh events. The
+   project's `>0.7 correlation` success criterion is unreachable on the
+   current data because harsh-detecting and overspeed-detecting devices
+   belong to different sub-fleets / hardware revisions. → Phase 4 path
+   pivoted from supervised classification to **per-tenant unsupervised
+   clustering + Isolation Forest** (notebooks `04_modeling/01` and `02`).
+
+3. **Modeling window must be ≥ 2025-01.** Of 1.88M `fact_harsh_event`
+   rows, 99.5% are 2025+. Of 62k `fact_telemetry_daily` rows, 98.7% are
+   2025+. Pre-2025 is trip-only. → All Phase 4 notebooks filter
+   `WHERE year_month >= '2025-01'`.
+
+Two ETL fixes were also required (silent bugs found by the EDA):
+- **F1** sql/17_fact_notification_incr.sql — `alert_category` was derived
+  from `description` (100% NULL); now uses `name`. Unlocks 585k speed
+  alerts.
+- **F2** sql/20_mart_device_monthly_behavior.sql — alert CTE re-sourced
+  from `fact_notification` (was reading from empty
+  `fact_speed_notification`).
+
+Apply via `notebooks/02_data_preparation/facts/11_fix_alert_categories.ipynb`.
+
+---
+
+## 7. Open items for Phase 4 hand-off
+
+- `marts.v_ml_features_full` is the single contract Phase 4 (modelling) consumes. Its column list is **frozen** for the duration of modelling to avoid breaking feature drift. (The legacy `v_ml_features_driver_behavior` view is preserved as a shim.)
+- Phase 4 notebooks live in `notebooks/04_modeling/`:
+  - `01_device_behavior_clustering.ipynb` — per-tenant K-Means archetypes
+  - `02_anomaly_risk_score.ipynb` — per-tenant Isolation Forest risk score
 - The `warehouse.quarantine_rejected` table should be reviewed weekly during Phase 4 — if rule C4 (fuel overflow) is rejecting >2 % of rows, the rule threshold needs tuning before it distorts model training data.
 - TimescaleDB migration is **recommended but not required** for Phase 4 modelling. It becomes required once live streaming begins in Phase 6.

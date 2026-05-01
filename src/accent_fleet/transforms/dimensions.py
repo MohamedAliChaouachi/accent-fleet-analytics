@@ -21,6 +21,9 @@ DIMENSION_FILES = [
     "03_dim_device.sql",
     "04_dim_driver.sql",
     "05_dim_date_hour.sql",
+    # Bridge: depends on dim_vehicle + dim_device, populated from
+    # staging.assignment. Full-reload — small (~12 rows).
+    "07_bridge_device_driver_load.sql",
 ]
 
 

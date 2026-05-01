@@ -58,12 +58,28 @@ CREATE TABLE IF NOT EXISTS warehouse.fact_harsh_event (
   UNIQUE (tenant_id, device_id, event_time, event_type)
 );
 
-CREATE INDEX IF NOT EXISTS idx_fact_harsh_event_event_time
-  ON warehouse.fact_harsh_event (event_time DESC);
-CREATE INDEX IF NOT EXISTS idx_fact_harsh_event_device_month
-  ON warehouse.fact_harsh_event (tenant_id, device_id, event_date);
-CREATE INDEX IF NOT EXISTS idx_fact_harsh_event_type_sev
-  ON warehouse.fact_harsh_event (event_type, severity);
+-- Index DDL needs table ownership in PostgreSQL. The loader role may only have
+-- DML privileges on an already-provisioned warehouse, so create these optional
+-- indexes only when this session owns the table.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'warehouse'
+      AND c.relname = 'fact_harsh_event'
+      AND c.relkind IN ('r', 'p')
+      AND pg_get_userbyid(c.relowner) = current_user
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_fact_harsh_event_event_time
+      ON warehouse.fact_harsh_event (event_time DESC);
+    CREATE INDEX IF NOT EXISTS idx_fact_harsh_event_device_month
+      ON warehouse.fact_harsh_event (tenant_id, device_id, event_date);
+    CREATE INDEX IF NOT EXISTS idx_fact_harsh_event_type_sev
+      ON warehouse.fact_harsh_event (event_type, severity);
+  END IF;
+END $$;
 
 -- -----------------------------------------------------------------------------
 -- The INCREMENTAL LOAD

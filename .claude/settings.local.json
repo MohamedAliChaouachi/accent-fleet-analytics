@@ -4,7 +4,10 @@
       "Bash(python notebooks/_build_notebooks.py)",
       "Bash(python -c \":*)",
       "mcp__postgres_database__query",
-      "Bash(python notebooks/_build_archive_notebooks.py)"
+      "Bash(python notebooks/_build_archive_notebooks.py)",
+      "Bash(ls *.md notebooks/04_modeling/ notebooks/03_feature_engineering/)",
+      "Bash(python -c \"import json; json.load\\(open\\(''D:/accent-fleet-analytics/notebooks/04_modeling/01_device_behavior_clustering.ipynb'', encoding=''utf-8''\\)\\); print\\(''valid JSON''\\)\")",
+      "Bash(python -c \"import json; json.load\\(open\\(''D:/accent-fleet-analytics/notebooks/04_modeling/02_anomaly_risk_score.ipynb'', encoding=''utf-8''\\)\\); print\\(''valid JSON''\\)\")"
     ]
   }
 }

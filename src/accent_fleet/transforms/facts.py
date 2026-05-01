@@ -28,14 +28,19 @@ log = structlog.get_logger()
 
 # SQL file per fact target
 FACT_SQL: dict[str, str] = {
-    "fact_trip":               "10_fact_trip_incremental.sql",
-    "fact_overspeed":          "11_fact_overspeed_incremental.sql",
-    "fact_stop":               "12_fact_stop_incremental.sql",
-    "fact_speed_notification": "13_fact_speed_notification_incr.sql",
-    "fact_daily_activity":     "14_fact_daily_activity_incr.sql",
+    "fact_trip":                  "10_fact_trip_incremental.sql",
+    "fact_overspeed":             "11_fact_overspeed_incremental.sql",
+    "fact_stop":                  "12_fact_stop_incremental.sql",
+    "fact_speed_notification":    "13_fact_speed_notification_incr.sql",
+    "fact_daily_activity":        "14_fact_daily_activity_incr.sql",
     # Archive-derived facts (Project 1: Driver Behavior Scoring)
-    "fact_harsh_event":        "15_fact_harsh_event_incremental.sql",
-    "fact_telemetry_daily":    "16_fact_telemetry_daily_incr.sql",
+    "fact_harsh_event":           "15_fact_harsh_event_incremental.sql",
+    "fact_telemetry_daily":       "16_fact_telemetry_daily_incr.sql",
+    # BI-coverage facts (Project 2: Fleet BI Dashboard)
+    "fact_notification":          "17_fact_notification_incr.sql",
+    "fact_maintenance":           "18_fact_maintenance_incr.sql",
+    "fact_maintenance_line":      "19_fact_maintenance_line_incr.sql",
+    "fact_fueling":               "24_fact_fueling_incr.sql",
 }
 
 
@@ -154,6 +159,28 @@ def load_fact_incremental(
             window_end=window.end,
             new_max_event_time=window.end,
         )
+
+
+def touched_dates_from_windows(
+    results: list[FactLoadResult],
+) -> list[str]:
+    """
+    Day-grain version of touched_months_from_windows. Returns ISO date
+    strings ('YYYY-MM-DD') for every day overlapped by any non-empty
+    fact-load window. Used to drive marts.mart_fleet_daily recompute.
+    """
+    from datetime import timedelta
+
+    dates: set[str] = set()
+    for r in results:
+        if r.new_max_event_time is None or r.rows_loaded == 0:
+            continue
+        cursor = r.window_start.replace(hour=0, minute=0, second=0, microsecond=0).date()
+        end = r.window_end.date()
+        while cursor <= end:
+            dates.add(cursor.isoformat())
+            cursor = cursor + timedelta(days=1)
+    return sorted(dates)
 
 
 def touched_months_from_windows(

@@ -106,7 +106,7 @@ def strip_sql_comments(sql: str) -> str:
 def split_sql_statements(sql: str) -> list[str]:
     """
     Split a multi-statement SQL blob on top-level semicolons, preserving
-    semicolons inside string literals and dollar-quoted blocks.
+    semicolons inside string literals, dollar-quoted blocks, and comments.
 
     Used for bootstrap/DDL files like 00_schemas_and_state.sql that
     contain multiple CREATE statements and a final INSERT.
@@ -115,16 +115,39 @@ def split_sql_statements(sql: str) -> list[str]:
     buf: list[str] = []
     in_single = False
     in_dollar = False
+    in_line_comment = False
+    in_block_comment = False
     i = 0
     while i < len(sql):
         ch = sql[i]
         nxt = sql[i + 1] if i + 1 < len(sql) else ""
-        if ch == "'" and not in_dollar:
+
+        if in_line_comment:
+            buf.append(ch)
+            if ch == "\n":
+                in_line_comment = False
+        elif in_block_comment:
+            buf.append(ch)
+            if ch == "*" and nxt == "/":
+                buf.append(nxt)
+                in_block_comment = False
+                i += 1
+        elif ch == "'" and not in_dollar:
             in_single = not in_single
             buf.append(ch)
         elif ch == "$" and nxt == "$" and not in_single:
             in_dollar = not in_dollar
             buf.append("$$")
+            i += 1
+        elif ch == "-" and nxt == "-" and not in_single and not in_dollar:
+            in_line_comment = True
+            buf.append(ch)
+            buf.append(nxt)
+            i += 1
+        elif ch == "/" and nxt == "*" and not in_single and not in_dollar:
+            in_block_comment = True
+            buf.append(ch)
+            buf.append(nxt)
             i += 1
         elif ch == ";" and not in_single and not in_dollar:
             stmt = "".join(buf).strip()
