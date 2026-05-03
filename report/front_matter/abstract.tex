@@ -1,0 +1,23 @@
+% =====================================================================
+%  Abstract --- English & French
+% =====================================================================
+\chapter*{Abstract}
+\addcontentsline{toc}{chapter}{Abstract}
+\thispagestyle{plain}
+
+This thesis describes the design, the implementation and the deployment of an end-to-end data engineering and machine learning platform for the telematics fleet of \hostorg{}. The project replaces a legacy batch pipeline by an incremental, watermark-driven architecture that processes 54.7 million telemetry pings and 7.4 million trip records, structured around a three-layer warehouse (staging, warehouse, marts) hosted on Microsoft Azure. Following the CRISP-DM methodology, the work covers business understanding, data understanding through PostgreSQL profiling, data preparation through an explicit cleaning rule engine, feature engineering of 35 behavioural indicators at the device-month grain, the training of a per-tenant K-Means segmentation and an Isolation Forest risk score, and finally the production deployment on an Azure virtual machine through a Prefect flow scheduled by cron, served through a Python API and a business intelligence dashboard. The thesis details the secure remote collaboration setup --- SSH tunnelling, IP allowlisting, service-account credentials --- that supports the day-to-day operations of the platform.
+
+\noindent\textbf{Keywords:} CRISP-DM, telematics, fleet analytics, PostgreSQL, data engineering, ETL, feature engineering, K-Means, Isolation Forest, Microsoft Azure, SSH tunnelling, monitoring.
+
+\bigskip
+\hrule
+\bigskip
+
+\begin{otherlanguage}{french}
+\noindent\textbf{Résumé.}
+Ce mémoire présente la conception, la mise en œuvre et le déploiement d'une plateforme complète d'ingénierie de données et d'apprentissage automatique pour la flotte télématique de \hostorg{}. Le projet remplace un pipeline batch hérité par une architecture incrémentale pilotée par filigranes, traitant 54{,}7~millions de pings et 7{,}4~millions de trajets, structurée autour d'un entrepôt à trois couches (staging, warehouse, marts) hébergé sur Microsoft Azure. En suivant la méthodologie CRISP-DM, le travail couvre la compréhension métier, la compréhension des données par profilage PostgreSQL, la préparation des données par un moteur de règles de nettoyage explicite, l'ingénierie de 35~indicateurs comportementaux mensuels par appareil, l'entraînement d'une segmentation K-Means et d'un score de risque par forêt d'isolement par client, puis le déploiement en production sur une machine virtuelle Azure à travers un flux Prefect ordonnancé par cron, exposé via une API Python et un tableau de bord décisionnel. Le mémoire détaille également la collaboration distante sécurisée --- tunnels SSH, listes blanches d'adresses IP, comptes de service --- qui soutient l'exploitation quotidienne de la plateforme.
+
+\noindent\textbf{Mots-clés :} CRISP-DM, télématique, analyse de flotte, PostgreSQL, ingénierie de données, ETL, ingénierie de variables, K-Means, forêt d'isolement, Microsoft Azure, tunnel SSH, supervision.
+\end{otherlanguage}
+
+\cleardoublepage

@@ -1,0 +1,213 @@
+\babel@toc {english}{}\relax 
+\contentsline {chapter}{Acknowledgments}{ii}{chapter*.1}%
+\contentsline {chapter}{Abstract}{iii}{chapter*.2}%
+\babel@toc {french}{}\relax 
+\babel@toc {english}{}\relax 
+\contentsline {chapter}{List of Acronyms}{xiv}{chapter*.6}%
+\contentsline {chapter}{General Introduction}{1}{chapter*.7}%
+\contentsline {chapter}{\numberline {1}General Context of the Project}{3}{chapter.1}%
+\contentsline {section}{\numberline {1.1}Introduction}{3}{section.1.1}%
+\contentsline {section}{\numberline {1.2}Industrial and academic context}{3}{section.1.2}%
+\contentsline {section}{\numberline {1.3}Host organization}{4}{section.1.3}%
+\contentsline {subsection}{\numberline {1.3.1}Presentation of Accent Tunisie}{4}{subsection.1.3.1}%
+\contentsline {subsection}{\numberline {1.3.2}Activities and business areas}{4}{subsection.1.3.2}%
+\contentsline {subsection}{\numberline {1.3.3}Organizational structure of the internship}{4}{subsection.1.3.3}%
+\contentsline {section}{\numberline {1.4}Analysis of the existing system}{4}{section.1.4}%
+\contentsline {subsection}{\numberline {1.4.1}Description of the legacy pipeline}{4}{subsection.1.4.1}%
+\contentsline {subsection}{\numberline {1.4.2}Identified limitations}{5}{subsection.1.4.2}%
+\contentsline {subsection}{\numberline {1.4.3}Synthesis of the diagnostic}{5}{subsection.1.4.3}%
+\contentsline {section}{\numberline {1.5}Problem statement}{5}{section.1.5}%
+\contentsline {section}{\numberline {1.6}Proposed solution}{6}{section.1.6}%
+\contentsline {subsection}{\numberline {1.6.1}Functional outline}{6}{subsection.1.6.1}%
+\contentsline {subsection}{\numberline {1.6.2}Architectural outline}{6}{subsection.1.6.2}%
+\contentsline {subsection}{\numberline {1.6.3}Expected benefits}{6}{subsection.1.6.3}%
+\contentsline {section}{\numberline {1.7}Project management methodology}{7}{section.1.7}%
+\contentsline {subsection}{\numberline {1.7.1}Comparison of candidate methodologies}{7}{subsection.1.7.1}%
+\contentsline {subsection}{\numberline {1.7.2}Justification of the choice of CRISP-DM}{7}{subsection.1.7.2}%
+\contentsline {subsection}{\numberline {1.7.3}Project plan along the six CRISP-DM phases}{7}{subsection.1.7.3}%
+\contentsline {section}{\numberline {1.8}Conclusion}{8}{section.1.8}%
+\contentsline {chapter}{\numberline {2}Business Understanding, Requirements and Architecture}{9}{chapter.2}%
+\contentsline {section}{\numberline {2.1}Introduction}{9}{section.2.1}%
+\contentsline {section}{\numberline {2.2}Business objectives}{9}{section.2.2}%
+\contentsline {subsection}{\numberline {2.2.1}Strategic objectives of the host organization}{9}{subsection.2.2.1}%
+\contentsline {subsection}{\numberline {2.2.2}Operational objectives of the project}{9}{subsection.2.2.2}%
+\contentsline {section}{\numberline {2.3}Research questions}{10}{section.2.3}%
+\contentsline {section}{\numberline {2.4}Requirements analysis}{10}{section.2.4}%
+\contentsline {subsection}{\numberline {2.4.1}Functional requirements}{10}{subsection.2.4.1}%
+\contentsline {subsection}{\numberline {2.4.2}Non-functional requirements}{10}{subsection.2.4.2}%
+\contentsline {subsection}{\numberline {2.4.3}User profiles}{10}{subsection.2.4.3}%
+\contentsline {section}{\numberline {2.5}Target architecture}{11}{section.2.5}%
+\contentsline {subsection}{\numberline {2.5.1}Logical view}{11}{subsection.2.5.1}%
+\contentsline {subsection}{\numberline {2.5.2}Physical view on Microsoft Azure}{11}{subsection.2.5.2}%
+\contentsline {subsection}{\numberline {2.5.3}Data flow}{12}{subsection.2.5.3}%
+\contentsline {subsection}{\numberline {2.5.4}Layered storage}{13}{subsection.2.5.4}%
+\contentsline {section}{\numberline {2.6}Technology stack}{13}{section.2.6}%
+\contentsline {subsection}{\numberline {2.6.1}Storage and database}{13}{subsection.2.6.1}%
+\contentsline {subsection}{\numberline {2.6.2}Processing and orchestration}{13}{subsection.2.6.2}%
+\contentsline {subsection}{\numberline {2.6.3}Modeling and machine learning}{13}{subsection.2.6.3}%
+\contentsline {subsection}{\numberline {2.6.4}Serving, API and dashboard}{13}{subsection.2.6.4}%
+\contentsline {subsection}{\numberline {2.6.5}Cloud and operations}{14}{subsection.2.6.5}%
+\contentsline {subsection}{\numberline {2.6.6}Justification of the technology choices}{14}{subsection.2.6.6}%
+\contentsline {section}{\numberline {2.7}Conclusion}{14}{section.2.7}%
+\contentsline {chapter}{\numberline {3}Data Understanding through PostgreSQL Profiling}{15}{chapter.3}%
+\contentsline {section}{\numberline {3.1}Introduction}{15}{section.3.1}%
+\contentsline {section}{\numberline {3.2}Source database presentation}{15}{section.3.2}%
+\contentsline {subsection}{\numberline {3.2.1}Operational PostgreSQL of Accent Tunisie}{15}{subsection.3.2.1}%
+\contentsline {subsection}{\numberline {3.2.2}Tables of interest}{15}{subsection.3.2.2}%
+\contentsline {section}{\numberline {3.3}Extraction strategy}{16}{section.3.3}%
+\contentsline {subsection}{\numberline {3.3.1}Connection setup}{16}{subsection.3.3.1}%
+\contentsline {subsection}{\numberline {3.3.2}MCP-driven exploration}{16}{subsection.3.3.2}%
+\contentsline {subsection}{\numberline {3.3.3}Automated extraction to CSV}{16}{subsection.3.3.3}%
+\contentsline {section}{\numberline {3.4}Schema analysis}{17}{section.3.4}%
+\contentsline {subsection}{\numberline {3.4.1}Schema inspection queries}{17}{subsection.3.4.1}%
+\contentsline {subsection}{\numberline {3.4.2}Schema map}{17}{subsection.3.4.2}%
+\contentsline {section}{\numberline {3.5}Data dictionary}{17}{section.3.5}%
+\contentsline {subsection}{\numberline {3.5.1}Methodology}{17}{subsection.3.5.1}%
+\contentsline {subsection}{\numberline {3.5.2}Excerpt of the data dictionary}{18}{subsection.3.5.2}%
+\contentsline {section}{\numberline {3.6}Data quality assessment}{18}{section.3.6}%
+\contentsline {subsection}{\numberline {3.6.1}Row count profile}{18}{subsection.3.6.1}%
+\contentsline {subsection}{\numberline {3.6.2}Null-rate analysis}{19}{subsection.3.6.2}%
+\contentsline {subsection}{\numberline {3.6.3}Referential integrity}{20}{subsection.3.6.3}%
+\contentsline {subsection}{\numberline {3.6.4}Outlier detection}{20}{subsection.3.6.4}%
+\contentsline {section}{\numberline {3.7}Exploratory Data Analysis}{21}{section.3.7}%
+\contentsline {subsection}{\numberline {3.7.1}Univariate distributions}{21}{subsection.3.7.1}%
+\contentsline {subsection}{\numberline {3.7.2}Bivariate analysis}{21}{subsection.3.7.2}%
+\contentsline {subsection}{\numberline {3.7.3}Per-tenant signatures}{21}{subsection.3.7.3}%
+\contentsline {subsection}{\numberline {3.7.4}Temporal coverage}{22}{subsection.3.7.4}%
+\contentsline {section}{\numberline {3.8}Synthesis of identified issues}{22}{section.3.8}%
+\contentsline {section}{\numberline {3.9}Conclusion}{22}{section.3.9}%
+\contentsline {chapter}{\numberline {4}Data Preparation and ETL Pipeline}{23}{chapter.4}%
+\contentsline {section}{\numberline {4.1}Introduction}{23}{section.4.1}%
+\contentsline {section}{\numberline {4.2}Pipeline architecture}{23}{section.4.2}%
+\contentsline {subsection}{\numberline {4.2.1}Pipeline stages}{23}{subsection.4.2.1}%
+\contentsline {subsection}{\numberline {4.2.2}Watermark-driven incremental processing}{23}{subsection.4.2.2}%
+\contentsline {subsection}{\numberline {4.2.3}Idempotency and replay}{24}{subsection.4.2.3}%
+\contentsline {section}{\numberline {4.3}Cleaning rule engine}{24}{section.4.3}%
+\contentsline {subsection}{\numberline {4.3.1}Rule catalogue}{24}{subsection.4.3.1}%
+\contentsline {subsection}{\numberline {4.3.2}Implementation pattern}{24}{subsection.4.3.2}%
+\contentsline {subsection}{\numberline {4.3.3}Quarantine table}{25}{subsection.4.3.3}%
+\contentsline {section}{\numberline {4.4}Dimensional modeling of the warehouse}{25}{section.4.4}%
+\contentsline {subsection}{\numberline {4.4.1}Dimensions}{25}{subsection.4.4.1}%
+\contentsline {subsection}{\numberline {4.4.2}Facts}{26}{subsection.4.4.2}%
+\contentsline {subsection}{\numberline {4.4.3}UPSERT pattern}{26}{subsection.4.4.3}%
+\contentsline {section}{\numberline {4.5}Analytical marts}{27}{section.4.5}%
+\contentsline {subsection}{\numberline {4.5.1}Behaviour mart}{27}{subsection.4.5.1}%
+\contentsline {subsection}{\numberline {4.5.2}Telemetry mart}{27}{subsection.4.5.2}%
+\contentsline {subsection}{\numberline {4.5.3}BI marts}{27}{subsection.4.5.3}%
+\contentsline {subsection}{\numberline {4.5.4}Unified ML view}{27}{subsection.4.5.4}%
+\contentsline {section}{\numberline {4.6}Feature engineering}{27}{section.4.6}%
+\contentsline {subsection}{\numberline {4.6.1}Feature registry}{27}{subsection.4.6.1}%
+\contentsline {subsection}{\numberline {4.6.2}Aggregation strategy}{27}{subsection.4.6.2}%
+\contentsline {subsection}{\numberline {4.6.3}Transformations}{28}{subsection.4.6.3}%
+\contentsline {section}{\numberline {4.7}Validation of the prepared dataset}{28}{section.4.7}%
+\contentsline {subsection}{\numberline {4.7.1}Validation suite design}{28}{subsection.4.7.1}%
+\contentsline {subsection}{\numberline {4.7.2}Final dataset summary}{28}{subsection.4.7.2}%
+\contentsline {section}{\numberline {4.8}Conclusion}{29}{section.4.8}%
+\contentsline {chapter}{\numberline {5}Modeling, Evaluation and Final Justification}{30}{chapter.5}%
+\contentsline {section}{\numberline {5.1}Introduction}{30}{section.5.1}%
+\contentsline {section}{\numberline {5.2}Test design}{30}{section.5.2}%
+\contentsline {subsection}{\numberline {5.2.1}Temporal split}{30}{subsection.5.2.1}%
+\contentsline {subsection}{\numberline {5.2.2}Per-tenant fitting protocol}{30}{subsection.5.2.2}%
+\contentsline {subsection}{\numberline {5.2.3}Reproducibility}{31}{subsection.5.2.3}%
+\contentsline {section}{\numberline {5.3}Baseline models}{31}{section.5.3}%
+\contentsline {subsection}{\numberline {5.3.1}Statistical baseline}{31}{subsection.5.3.1}%
+\contentsline {subsection}{\numberline {5.3.2}Linear baseline}{31}{subsection.5.3.2}%
+\contentsline {section}{\numberline {5.4}Machine learning candidates}{31}{section.5.4}%
+\contentsline {subsection}{\numberline {5.4.1}K-Means clustering}{31}{subsection.5.4.1}%
+\contentsline {subsection}{\numberline {5.4.2}Hierarchical clustering}{31}{subsection.5.4.2}%
+\contentsline {subsection}{\numberline {5.4.3}DBSCAN}{32}{subsection.5.4.3}%
+\contentsline {subsection}{\numberline {5.4.4}Isolation Forest for anomaly detection}{32}{subsection.5.4.4}%
+\contentsline {subsection}{\numberline {5.4.5}One-Class SVM and Local Outlier Factor}{32}{subsection.5.4.5}%
+\contentsline {section}{\numberline {5.5}Deep learning baseline}{32}{section.5.5}%
+\contentsline {subsection}{\numberline {5.5.1}Autoencoder}{32}{subsection.5.5.1}%
+\contentsline {subsection}{\numberline {5.5.2}Multi-Layer Perceptron}{32}{subsection.5.5.2}%
+\contentsline {subsection}{\numberline {5.5.3}Comparison with classical ML}{32}{subsection.5.5.3}%
+\contentsline {section}{\numberline {5.6}Evaluation metrics}{33}{section.5.6}%
+\contentsline {subsection}{\numberline {5.6.1}Internal clustering metrics}{33}{subsection.5.6.1}%
+\contentsline {subsection}{\numberline {5.6.2}Anomaly metrics}{33}{subsection.5.6.2}%
+\contentsline {subsection}{\numberline {5.6.3}Business proxies}{33}{subsection.5.6.3}%
+\contentsline {section}{\numberline {5.7}Model comparison and final justification}{33}{section.5.7}%
+\contentsline {subsection}{\numberline {5.7.1}Comparative table}{33}{subsection.5.7.1}%
+\contentsline {subsection}{\numberline {5.7.2}Per-tenant K-Means results}{33}{subsection.5.7.2}%
+\contentsline {subsection}{\numberline {5.7.3}Justification of the final choice}{34}{subsection.5.7.3}%
+\contentsline {section}{\numberline {5.8}Results interpretation}{34}{section.5.8}%
+\contentsline {subsection}{\numberline {5.8.1}Behavioural profiles}{34}{subsection.5.8.1}%
+\contentsline {subsection}{\numberline {5.8.2}Risk score distribution}{34}{subsection.5.8.2}%
+\contentsline {subsection}{\numberline {5.8.3}Confusion matrix against the rule baseline}{35}{subsection.5.8.3}%
+\contentsline {subsection}{\numberline {5.8.4}Feature importance}{35}{subsection.5.8.4}%
+\contentsline {section}{\numberline {5.9}Dashboards and analytical artefacts}{36}{section.5.9}%
+\contentsline {section}{\numberline {5.10}Conclusion}{36}{section.5.10}%
+\contentsline {chapter}{\numberline {6}Deployment, API, Dashboard and Azure Operations}{37}{chapter.6}%
+\contentsline {section}{\numberline {6.1}Introduction}{37}{section.6.1}%
+\contentsline {section}{\numberline {6.2}Deployment strategy}{37}{section.6.2}%
+\contentsline {subsection}{\numberline {6.2.1}Industrialization principles}{37}{subsection.6.2.1}%
+\contentsline {subsection}{\numberline {6.2.2}Operating modes}{37}{subsection.6.2.2}%
+\contentsline {section}{\numberline {6.3}Microsoft Azure infrastructure}{38}{section.6.3}%
+\contentsline {subsection}{\numberline {6.3.1}Azure Virtual Machine}{38}{subsection.6.3.1}%
+\contentsline {subsection}{\numberline {6.3.2}Network Security Group and IP allowlist}{38}{subsection.6.3.2}%
+\contentsline {subsection}{\numberline {6.3.3}Secure remote collaboration via SSH tunnelling}{38}{subsection.6.3.3}%
+\contentsline {subsection}{\numberline {6.3.4}Service accounts}{39}{subsection.6.3.4}%
+\contentsline {section}{\numberline {6.4}PostgreSQL integration}{39}{section.6.4}%
+\contentsline {subsection}{\numberline {6.4.1}Local PostgreSQL on the VM}{39}{subsection.6.4.1}%
+\contentsline {subsection}{\numberline {6.4.2}Connection management}{39}{subsection.6.4.2}%
+\contentsline {subsection}{\numberline {6.4.3}Backups and snapshots}{39}{subsection.6.4.3}%
+\contentsline {section}{\numberline {6.5}API and backend}{39}{section.6.5}%
+\contentsline {subsection}{\numberline {6.5.1}API design}{39}{subsection.6.5.1}%
+\contentsline {subsection}{\numberline {6.5.2}Backend architecture}{40}{subsection.6.5.2}%
+\contentsline {subsection}{\numberline {6.5.3}Reverse proxy and TLS}{40}{subsection.6.5.3}%
+\contentsline {section}{\numberline {6.6}Dashboard and frontend}{40}{section.6.6}%
+\contentsline {subsection}{\numberline {6.6.1}Dashboard implementation}{40}{subsection.6.6.1}%
+\contentsline {subsection}{\numberline {6.6.2}Pages and visualizations}{40}{subsection.6.6.2}%
+\contentsline {section}{\numberline {6.7}Automation}{41}{section.6.7}%
+\contentsline {subsection}{\numberline {6.7.1}Cron entry}{41}{subsection.6.7.1}%
+\contentsline {subsection}{\numberline {6.7.2}Prefect flow}{41}{subsection.6.7.2}%
+\contentsline {subsection}{\numberline {6.7.3}Backfill orchestration}{41}{subsection.6.7.3}%
+\contentsline {section}{\numberline {6.8}Monitoring and alerting}{42}{section.6.8}%
+\contentsline {subsection}{\numberline {6.8.1}Run log and lineage}{42}{subsection.6.8.1}%
+\contentsline {subsection}{\numberline {6.8.2}Data quality monitoring}{42}{subsection.6.8.2}%
+\contentsline {subsection}{\numberline {6.8.3}Model drift monitoring}{42}{subsection.6.8.3}%
+\contentsline {subsection}{\numberline {6.8.4}Alerting}{42}{subsection.6.8.4}%
+\contentsline {subsection}{\numberline {6.8.5}Operations runbook}{42}{subsection.6.8.5}%
+\contentsline {section}{\numberline {6.9}Production deployment workflow}{42}{section.6.9}%
+\contentsline {subsection}{\numberline {6.9.1}Code deployment}{42}{subsection.6.9.1}%
+\contentsline {subsection}{\numberline {6.9.2}Database migrations}{43}{subsection.6.9.2}%
+\contentsline {subsection}{\numberline {6.9.3}Model deployment}{43}{subsection.6.9.3}%
+\contentsline {subsection}{\numberline {6.9.4}Diagram of the deployment pipeline}{43}{subsection.6.9.4}%
+\contentsline {section}{\numberline {6.10}Conclusion}{43}{section.6.10}%
+\contentsline {chapter}{General Conclusion}{44}{chapter*.28}%
+\contentsline {chapter}{Bibliography}{46}{chapter*.28}%
+\contentsline {chapter}{\numberline {A}SQL Exploration Scripts}{46}{appendix.A}%
+\contentsline {section}{\numberline {A.1}Schema inspection}{46}{section.A.1}%
+\contentsline {section}{\numberline {A.2}Data profiling}{46}{section.A.2}%
+\contentsline {section}{\numberline {A.3}Null analysis}{46}{section.A.3}%
+\contentsline {section}{\numberline {A.4}Distributions}{46}{section.A.4}%
+\contentsline {section}{\numberline {A.5}KPI extraction}{47}{section.A.5}%
+\contentsline {section}{\numberline {A.6}Metadata analysis}{47}{section.A.6}%
+\contentsline {section}{\numberline {A.7}Validation suite}{47}{section.A.7}%
+\contentsline {chapter}{\numberline {B}Python Scripts and Figure Generation}{48}{appendix.B}%
+\contentsline {section}{\numberline {B.1}Automated extraction to CSV}{48}{section.B.1}%
+\contentsline {section}{\numberline {B.2}Figure generation}{48}{section.B.2}%
+\contentsline {section}{\numberline {B.3}Modeling scripts}{49}{section.B.3}%
+\contentsline {chapter}{\numberline {C}Azure Operations Runbook}{50}{appendix.C}%
+\contentsline {section}{\numberline {C.1}VM provisioning}{50}{section.C.1}%
+\contentsline {subsection}{\numberline {C.1.1}VM specification}{50}{subsection.C.1.1}%
+\contentsline {subsection}{\numberline {C.1.2}Network Security Group}{50}{subsection.C.1.2}%
+\contentsline {subsection}{\numberline {C.1.3}IP allowlist management}{50}{subsection.C.1.3}%
+\contentsline {section}{\numberline {C.2}SSH access}{51}{section.C.2}%
+\contentsline {subsection}{\numberline {C.2.1}Account types}{51}{subsection.C.2.1}%
+\contentsline {subsection}{\numberline {C.2.2}SSH tunnel}{51}{subsection.C.2.2}%
+\contentsline {subsection}{\numberline {C.2.3}Key rotation}{51}{subsection.C.2.3}%
+\contentsline {section}{\numberline {C.3}Pipeline operations}{51}{section.C.3}%
+\contentsline {subsection}{\numberline {C.3.1}Cron entry}{51}{subsection.C.3.1}%
+\contentsline {subsection}{\numberline {C.3.2}Inspecting the run log}{51}{subsection.C.3.2}%
+\contentsline {subsection}{\numberline {C.3.3}Triggering a backfill}{52}{subsection.C.3.3}%
+\contentsline {section}{\numberline {C.4}Database operations}{52}{section.C.4}%
+\contentsline {subsection}{\numberline {C.4.1}Backup}{52}{subsection.C.4.1}%
+\contentsline {subsection}{\numberline {C.4.2}Credential rotation}{52}{subsection.C.4.2}%
+\contentsline {section}{\numberline {C.5}API and dashboard operations}{52}{section.C.5}%
+\contentsline {subsection}{\numberline {C.5.1}Service management}{52}{subsection.C.5.1}%
+\contentsline {subsection}{\numberline {C.5.2}TLS certificate renewal}{53}{subsection.C.5.2}%
+\contentsline {section}{\numberline {C.6}Monitoring and alerting}{53}{section.C.6}%
+\contentsline {subsection}{\numberline {C.6.1}Pipeline alerts}{53}{subsection.C.6.1}%
+\contentsline {subsection}{\numberline {C.6.2}Data quality alerts}{53}{subsection.C.6.2}%
+\contentsline {subsection}{\numberline {C.6.3}Drift alerts}{53}{subsection.C.6.3}%

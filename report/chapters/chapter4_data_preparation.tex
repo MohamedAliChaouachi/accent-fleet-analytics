@@ -1,0 +1,205 @@
+% =====================================================================
+%  Chapter 4 --- Data Preparation
+% =====================================================================
+\chapter{Data Preparation and ETL Pipeline}
+\label{chap:prep}
+
+\section{Introduction}
+Building on the data understanding of Chapter~\ref{chap:data}, the present chapter formalizes the data preparation phase of CRISP-DM. The chapter organizes the work into six sections: the construction of the ETL pipeline, the eleven-rule cleaning engine, the dimensional modeling of the warehouse, the materialization of the analytical marts, the engineering of the feature registry, and the validation of the prepared dataset. Each section is illustrated by SQL or Python excerpts, the full versions of which are listed in the appendices.
+
+\section{Pipeline architecture}
+
+\subsection{Pipeline stages}
+The pipeline is decomposed into seven sequential stages, each idempotent: \emph{extraction} from the source tables to staging; \emph{cleaning} of the staging slice; \emph{loading} of the dimensions; \emph{loading} of the facts; \emph{materialization} of the marts; \emph{materialization} of the views; and \emph{validation} of the prepared dataset.
+
+\subsection{Watermark-driven incremental processing}
+The pipeline is driven by a watermark stored in \texttt{warehouse.etl\_watermark}. Each cycle reads the latest watermark per source--target pair, processes only the slice strictly after that watermark (with a configurable overlap), and updates the watermark at the end of the successful run. Listing~\ref{lst:watermark} shows a representative implementation.
+
+\begin{lstlisting}[style=sql,caption={Reading and updating a watermark.},label={lst:watermark}]
+-- Read the watermark
+SELECT last_event_ts
+FROM warehouse.etl_watermark
+WHERE source_table = 'staging.path' AND target_table = 'warehouse.fact_trip';
+
+-- Update the watermark at the end of the run
+INSERT INTO warehouse.etl_watermark (source_table, target_table, last_event_ts)
+VALUES ('staging.path', 'warehouse.fact_trip', :max_event_ts)
+ON CONFLICT (source_table, target_table)
+DO UPDATE SET last_event_ts = EXCLUDED.last_event_ts;
+\end{lstlisting}
+
+\subsection{Idempotency and replay}
+Idempotency is guaranteed by an \texttt{INSERT~\dots~ON~CONFLICT~DO~UPDATE} pattern on the natural key of every fact and dimension. A replay of the same window therefore produces the same final state, regardless of the number of repetitions.
+
+\section{Cleaning rule engine}
+
+\subsection{Rule catalogue}
+Eleven cleaning rules, identified \texttt{C1}--\texttt{C11}, are formalized at the entry of the warehouse layer. The rules are grouped into two families: \texttt{C1}--\texttt{C7} apply to the trip-related sources, and \texttt{C8}--\texttt{C11} apply to the archive (telemetry) source. Each rule specifies a name, a severity level (critical, high, medium, low), a corrective action (reject, nullify, clamp) and a logical condition. Table~\ref{tab:rules-prep} reproduces the catalogue.
+
+\begin{table}[h]
+\centering
+\caption{Cleaning rule catalogue applied at the warehouse boundary.}
+\label{tab:rules-prep}
+\begin{tabular}{|l|l|l|l|p{5.4cm}|}
+\hline
+\textbf{ID} & \textbf{Name} & \textbf{Sev.} & \textbf{Action} & \textbf{Condition} \\
+\hline
+C1 & temporal\_epoch\_error\_filter & critical & reject & \texttt{begin\_path\_time} $<$ 2019-10-01 \\
+C2 & trip\_duration\_positive & critical & reject & \texttt{path\_duration} $\le 0$ \\
+C3 & trip\_distance\_positive & high & reject & \texttt{distance\_driven} $\le 0$ \\
+C4 & fuel\_used\_sanitize & critical & nullify & \texttt{fuel\_used} $\notin [0, 500]$ \\
+C5 & speed\_cap & high & clamp & \texttt{max\_speed} $>$ 200 \\
+C6 & stop\_duration\_bounds & medium & reject & duration $\le 0$ or $> 1$ year \\
+C7 & device\_vehicle\_tenant\_chain & high & reject & device without vehicle link \\
+C8 & archive\_ignition\_on\_for\_events & high & reject & \texttt{ignition} $\ne 1$ \\
+C9 & archive\_accelerometer\_int8\_sanity & medium & reject & $|x|, |y|, |z| > 127$ \\
+C10 & archive\_speed\_clamp & medium & clamp & speed $\notin [0, 250]$ \\
+C11 & archive\_rpm\_clamp & low & clamp & rpm $\notin [0, 8000]$ \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Implementation pattern}
+Each rule is implemented through an explicit SQL clause executed during the load of the corresponding fact table. Rejected rows are sent to a quarantine table \texttt{warehouse.quarantine\_rejected}, with the rule identifier, the rejection timestamp and the offending row payload. Listing~\ref{lst:rule-c2} shows the implementation of rule \texttt{C2}.
+
+\begin{lstlisting}[style=sql,caption={Implementation of cleaning rule \texttt{C2} (positive trip duration).},label={lst:rule-c2}]
+-- C2: reject trips with non-positive duration
+WITH cleaned AS (
+    SELECT *
+    FROM staging.path
+    WHERE path_duration > 0
+),
+rejected AS (
+    INSERT INTO warehouse.quarantine_rejected (rule_id, rejected_at, payload)
+    SELECT 'C2', NOW(), to_jsonb(p)
+    FROM staging.path p
+    WHERE p.path_duration <= 0
+    RETURNING 1
+)
+SELECT COUNT(*) FROM cleaned;
+\end{lstlisting}
+
+\subsection{Quarantine table}
+The quarantine table is structured as \texttt{(rule\_id, rejected\_at, payload~JSONB)}. The \texttt{JSONB} payload preserves the full content of the offending row, allowing the audit team to reconstruct the violation context without accessing the staging layer.
+
+\section{Dimensional modeling of the warehouse}
+
+\subsection{Dimensions}
+The warehouse layer hosts five dimensions and one bridge:
+
+\begin{itemize}
+    \item \texttt{dim\_tenant} --- billing entities;
+    \item \texttt{dim\_vehicle} --- vehicles, with normalized manufacturer and class;
+    \item \texttt{dim\_device} --- GPS devices, restricted to the 616 devices linked to a vehicle;
+    \item \texttt{dim\_driver} --- drivers (294 individuals);
+    \item \texttt{dim\_date} --- calendar from 2019-10-01;
+    \item \texttt{bridge\_device\_driver} --- SCD~Type~2 mapping between devices and drivers.
+\end{itemize}
+
+\subsection{Facts}
+Eleven facts are produced from the cleaned staging data, summarized in Table~\ref{tab:facts-prep}.
+
+\begin{table}[h]
+\centering
+\caption{Fact tables produced by the warehouse layer.}
+\label{tab:facts-prep}
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Fact table} & \textbf{Grain} & \textbf{Source} \\
+\hline
+\texttt{fact\_trip} & (tenant, device, begin\_time) & \texttt{staging.path} \\
+\texttt{fact\_overspeed} & (tenant, device, begin\_time) & \texttt{staging.rep\_overspeed} \\
+\texttt{fact\_stop} & (tenant, device, stop\_start) & \texttt{staging.stop} \\
+\texttt{fact\_speed\_notification} & (tenant, device, created\_at) & \texttt{staging.notification} \\
+\texttt{fact\_daily\_activity} & (tenant, device, day) & \texttt{staging.rep\_activity\_daily} \\
+\texttt{fact\_harsh\_event} & (tenant, device, event\_ts) & \texttt{staging.archive} \\
+\texttt{fact\_telemetry\_daily} & (tenant, device, date) & \texttt{staging.archive} \\
+\texttt{fact\_maintenance} & (tenant, id\_maintenance) & \texttt{staging.maintenance} \\
+\texttt{fact\_fueling} & (tenant, doc\_id) & fueling sources \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{UPSERT pattern}
+The loading of every fact relies on the canonical PostgreSQL \texttt{INSERT~\dots~ON~CONFLICT~DO~UPDATE} pattern shown in Listing~\ref{lst:upsert}.
+
+\begin{lstlisting}[style=sql,caption={Idempotent upsert into \texttt{fact\_trip}.},label={lst:upsert}]
+INSERT INTO warehouse.fact_trip (
+    tenant_id, device_id, begin_path_time,
+    end_path_time, distance_km, max_speed_kmh, duration_seconds
+)
+SELECT tenant_id, device_id, begin_path_time, end_path_time,
+       distance_driven, LEAST(max_speed, 200) AS max_speed_kmh,
+       path_duration
+FROM staging.path
+WHERE begin_path_time > :watermark
+  AND path_duration > 0
+  AND distance_driven > 0
+  AND begin_path_time >= '2019-10-01'
+ON CONFLICT (tenant_id, device_id, begin_path_time) DO UPDATE
+SET end_path_time   = EXCLUDED.end_path_time,
+    distance_km     = EXCLUDED.distance_km,
+    max_speed_kmh   = EXCLUDED.max_speed_kmh,
+    duration_seconds= EXCLUDED.duration_seconds;
+\end{lstlisting}
+
+\section{Analytical marts}
+
+\subsection{Behaviour mart}
+The mart \texttt{marts.mart\_device\_monthly\_behavior} carries the 35 behavioural features at the (\texttt{tenant\_id}, \texttt{device\_id}, \texttt{year\_month}) grain and is rebuilt incrementally from the trip-related facts and the archive-derived facts. Its schema is the principal contract of the ML serving layer.
+
+\subsection{Telemetry mart}
+The mart \texttt{marts.mart\_device\_monthly\_telemetry} is the archive-derived companion of the behaviour mart, with engine-on time, idle ratio, average and high RPM indicators.
+
+\subsection{BI marts}
+Three additional marts feed the BI layer: \texttt{mart\_fleet\_daily}, \texttt{mart\_vehicle\_monthly} and \texttt{mart\_tenant\_monthly\_summary}. They are exposed through dedicated views (\texttt{v\_executive\_dashboard}, \texttt{v\_operational\_dashboard}, \texttt{v\_maintenance\_dashboard}) consumed by the BI dashboard.
+
+\subsection{Unified ML view}
+The view \texttt{v\_ml\_features\_full} unifies the behaviour and the telemetry marts into a single contract for the modeling notebooks; the companion view \texttt{v\_device\_risk\_profile} computes the weighted risk score and its categorical band.
+
+\section{Feature engineering}
+
+\subsection{Feature registry}
+The catalogue of features is declared in \texttt{config/feature\_definitions.yaml}. Each feature is described by its name, its type, its unit, its formula and the fact tables it depends on. A typed Python wrapper exposes the registry to the notebooks. Table~\ref{tab:features-sample} shows a sample of the registry.
+
+\begin{table}[h]
+\centering
+\caption{Sample of the 35-feature registry (selected groups).}
+\label{tab:features-sample}
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Group} & \textbf{Feature} & \textbf{Definition} \\
+\hline
+Volume & \texttt{total\_trips} & Count of trips in month \\
+Volume & \texttt{total\_distance\_km} & Sum of distances \\
+Volume & \texttt{stddev\_trip\_distance} & Std.\ dev.\ of trip distances \\
+Speed & \texttt{avg\_max\_speed\_kmh} & Mean of per-trip max speed \\
+Speed & \texttt{p95\_max\_speed} & 95\textsuperscript{th} percentile of max speed \\
+Speed & \texttt{high\_speed\_trip\_ratio} & Trips with max speed $>$ 100 \\
+Overspeed & \texttt{overspeed\_per\_100km} & Events / total\_distance $\times$ 100 \\
+Harsh & \texttt{harsh\_brake\_per\_100km} & Brake events / 100~km \\
+Harsh & \texttt{harsh\_accel\_per\_100km} & Acceleration events / 100~km \\
+Temporal & \texttt{night\_trip\_ratio} & Trips between 20:00--06:00 \\
+Temporal & \texttt{rush\_hour\_trip\_ratio} & Trips during peak hours \\
+Telemetry & \texttt{monthly\_idle\_ratio} & Idle / engine-on minutes \\
+Telemetry & \texttt{avg\_rpm} & Mean RPM across day \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Aggregation strategy}
+The aggregation strategy follows three principles: \emph{normalization by exposure} (most counters are divided by 100~km of distance), \emph{operational interpretability} (each feature corresponds to an indicator that a fleet manager recognizes) and \emph{declarative specification} (the registry is the single source of truth between the SQL transformations and the Python feature consumption).
+
+\subsection{Transformations}
+The categorical features (vehicle class, manufacturer family) are encoded with a one-hot scheme; the ordinal features (vehicle class) are encoded with an explicit ordinal scheme; the quantitative features used by the unsupervised models are standardized per tenant by means of \texttt{StandardScaler}. An exploratory supervised track applies SMOTE to neutralize an anticipated class imbalance.
+
+\section{Validation of the prepared dataset}
+
+\subsection{Validation suite design}
+The validation suite is implemented in \texttt{sql/99\_validation\_suite.sql} and gathers eight check categories \texttt{V1}--\texttt{V8}: dimension population (V1), referential integrity (V2), enforcement of \texttt{C1} (V3), enforcement of \texttt{C2}--\texttt{C3} (V4), enforcement of \texttt{C5} (V5), null-rate budgets on critical columns (V6), mart grain coverage (V7) and risk score distribution sanity (V8).
+
+\subsection{Final dataset summary}
+At the conclusion of the data preparation phase, the modeling-ready dataset comprises approximately \textbf{1{,}723 device-month observations} on the period 2025-01--2026-04, after applying the threshold of 100~km of total distance and a minimum number of trips per device-month. This dataset feeds the modeling experiments of Chapter~\ref{chap:model}.
+
+\section{Conclusion}
+This chapter has described the construction of the ETL pipeline, the explicit eleven-rule cleaning engine, the dimensional modeling of the warehouse, the materialization of the analytical marts, the engineering of the feature registry and the validation of the prepared dataset. The next chapter exploits the ML-ready dataset to train and to evaluate the unsupervised models that produce the behavioural segmentation and the risk score.

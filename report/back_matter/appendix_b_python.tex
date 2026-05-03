@@ -1,0 +1,42 @@
+% =====================================================================
+%  Appendix B --- Python scripts (extraction + figures)
+% =====================================================================
+\chapter{Python Scripts and Figure Generation}
+\label{app:python}
+
+This appendix references the Python scripts used in the project. The full versions are stored under \texttt{scripts/python/}.
+
+\section{Automated extraction to CSV}
+\label{sec:app-py-extract}
+The script \texttt{extract\_to\_csv.py} reads a manifest of SQL queries from \texttt{config/queries.yaml}, executes each query through a SQLAlchemy engine and writes the result as a timestamped CSV in \texttt{exports/}. The script accepts a \texttt{--dry-run} flag for unit-testing purposes.
+
+\section{Figure generation}
+The figures of the thesis are produced by self-contained Python scripts located in \texttt{scripts/python/figures/}. Each script reads its input either from the database (read-only credentials) or from a CSV produced by \texttt{extract\_to\_csv.py}, and writes a publication-quality PDF in \texttt{report/figures/}. The scripts and the figures they produce are listed in Table~\ref{tab:figures}.
+
+\begin{table}[h]
+\centering
+\caption{Figure-generation scripts referenced in the thesis.}
+\label{tab:figures}
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Script} & \textbf{Figure produced} \\
+\hline
+\texttt{fig\_crispdm\_workflow.py} & Diagram of the CRISP-DM workflow. \\
+\texttt{fig\_architecture.py} & Logical architecture of the platform. \\
+\texttt{fig\_schema\_map.py} & Schema map of the source tables. \\
+\texttt{fig\_missing\_heatmap.py} & Missing-value heatmap. \\
+\texttt{fig\_distributions.py} & Distribution plots of the principal variables. \\
+\texttt{fig\_feature\_importance.py} & Surrogate feature importance. \\
+\texttt{fig\_model\_comparison.py} & Comparative dashboard of the candidate models. \\
+\texttt{fig\_confusion\_matrix.py} & Confusion matrix between rule and Isolation Forest. \\
+\texttt{fig\_api\_architecture.py} & Architecture of the API. \\
+\texttt{fig\_deployment\_pipeline.py} & End-to-end deployment pipeline. \\
+\texttt{fig\_azure\_topology.py} & Azure VM topology with NSG and SSH tunnel. \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{Modeling scripts}
+The modeling notebooks are stored under \texttt{notebooks/04\_modeling/}. The notebook \texttt{01\_device\_behavior\_clustering.ipynb} fits the per-tenant K-Means models and exports the artefacts; the notebook \texttt{02\_anomaly\_risk\_score.ipynb} fits the per-tenant Isolation Forest models and computes the rescaled risk scores.
+
+\cleardoublepage

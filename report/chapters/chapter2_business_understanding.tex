@@ -1,0 +1,137 @@
+% =====================================================================
+%  Chapter 2 --- Business Understanding, Requirements & Architecture
+% =====================================================================
+\chapter{Business Understanding, Requirements and Architecture}
+\label{chap:business}
+
+\section{Introduction}
+Building on the strategic outline of Chapter~\ref{chap:context}, the present chapter formalizes the first phase of the CRISP-DM methodology: the \emph{business understanding}. The chapter restates the business objectives of the project in operational terms, formulates the research questions that drive the analytical work, derives the functional and non-functional requirements of the platform, presents the target software architecture and concludes by justifying the technology stack adopted for the implementation.
+
+\section{Business objectives}
+
+\subsection{Strategic objectives of the host organization}
+At the strategic level, three priorities of \hostorg{} converge towards the present project. The first one is the reduction of the operational risk of customer fleets, by surfacing devices and vehicles whose behavioural pattern significantly deviates from the fleet baseline. The second one is the differentiation of the SaaS offering by adding a predictive analytics layer on top of the descriptive dashboards already exposed to customers. The third one is the consolidation of the technical platform on Microsoft Azure, in order to benefit from elastic compute and managed networking.
+
+\subsection{Operational objectives of the project}
+The project decomposes the strategic priorities above into four operational objectives:
+
+\begin{enumerate}
+    \item replace the legacy full-refresh pipeline by an incremental, watermark-driven architecture with sub-ten-minute freshness;
+    \item materialize a clean dimensional warehouse and a family of marts dedicated respectively to machine learning and to business intelligence;
+    \item train an unsupervised behavioural segmentation and a continuous risk score per device-month, exposed through an API and a dashboard;
+    \item industrialize the pipeline on the Azure VM through Prefect orchestration, cron scheduling and an explicit monitoring layer.
+\end{enumerate}
+
+\section{Research questions}
+Three research questions structure the analytical investigation:
+
+\begin{enumerate}
+    \item[\textbf{RQ1}] \emph{Can the heterogeneous behavioural signals of a multi-tenant telematics fleet be condensed into a small set of interpretable indicators at the device-month grain, without losing operational meaning?}
+    \item[\textbf{RQ2}] \emph{Can these indicators be exploited by an unsupervised model in order to produce an actionable behavioural segmentation and a continuous risk score, in the absence of a labelled incident feed?}
+    \item[\textbf{RQ3}] \emph{Can the resulting analytical outputs be served to fleet managers through a low-latency API and an interactive dashboard, without compromising the idempotency, the observability and the cost profile of the production pipeline?}
+\end{enumerate}
+
+\section{Requirements analysis}
+
+\subsection{Functional requirements}
+The functional requirements of the platform are summarized in Table~\ref{tab:fr}. Each requirement is identified by a code (\texttt{FR-x}), a short description and a priority level on a three-tier scale (high, medium, low).
+
+\begin{table}[h]
+\centering
+\caption{Functional requirements.}
+\label{tab:fr}
+\begin{tabular}{|l|p{9cm}|c|}
+\hline
+\textbf{ID} & \textbf{Description} & \textbf{Priority} \\
+\hline
+FR-1 & Ingest the operational tables from PostgreSQL into the staging schema. & High \\
+FR-2 & Apply the eleven cleaning rules and quarantine rejected rows. & High \\
+FR-3 & Materialize five dimensions and eleven facts with idempotent upserts. & High \\
+FR-4 & Build the device-month behavioural mart and the telemetry mart. & High \\
+FR-5 & Train the per-tenant K-Means and Isolation Forest models. & High \\
+FR-6 & Expose the cluster assignments and risk scores through a REST API. & High \\
+FR-7 & Provide an interactive BI dashboard for fleet managers. & High \\
+FR-8 & Run the pipeline incrementally every five minutes via cron. & High \\
+FR-9 & Persist a run log and a data-quality measurement at every cycle. & Medium \\
+FR-10 & Support full backfill and bootstrap modes for historical loads. & Medium \\
+FR-11 & Support secure remote operations via SSH tunnelling and IP allowlist. & High \\
+FR-12 & Document the feature registry and the validation suite. & Medium \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Non-functional requirements}
+The non-functional requirements are summarized in Table~\ref{tab:nfr}.
+
+\begin{table}[h]
+\centering
+\caption{Non-functional requirements.}
+\label{tab:nfr}
+\begin{tabular}{|l|p{9cm}|c|}
+\hline
+\textbf{ID} & \textbf{Description} & \textbf{Target} \\
+\hline
+NFR-1 & End-to-end pipeline latency. & $\le 10$ minutes \\
+NFR-2 & Idempotency on full re-runs. & 100\% \\
+NFR-3 & Pipeline availability on the Azure VM. & $\ge 99\%$ \\
+NFR-4 & Mean cycle time for incremental mode. & $\le 60$ seconds \\
+NFR-5 & Coverage of the validation suite (V1--V8). & 100\% per run \\
+NFR-6 & Secure access (SSH key + IP allowlist). & Mandatory \\
+NFR-7 & Reproducibility (random seed, pinned versions). & Mandatory \\
+NFR-8 & Per-tenant fairness of the model quality. & Silhouette $\ge 0.15$ \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{User profiles}
+Three user profiles consume the outputs of the platform:
+
+\begin{itemize}
+    \item \emph{Fleet managers} consult the BI dashboard, filter by tenant and device, and act on the risk score and on the cluster assignments.
+    \item \emph{Data engineers} maintain the pipeline, monitor the run log, replay backfills and adjust the cleaning rules and the feature registry.
+    \item \emph{Data scientists} consume the ML view, retrain the models on extended windows and propose iterations of the feature set.
+\end{itemize}
+
+\section{Target architecture}
+
+\subsection{Logical view}
+At the logical level, the platform is organized as a four-tier architecture: a \emph{source tier} represented by the operational PostgreSQL of \hostorg, a \emph{processing tier} composed of Python and SQL transformations orchestrated by Prefect, a \emph{storage tier} composed of the staging, warehouse and marts schemas of the analytical PostgreSQL, and a \emph{serving tier} composed of the API, the BI dashboard and the model artefact store.
+
+\subsection{Physical view on Microsoft Azure}
+At the physical level, the platform is hosted on a Microsoft Azure virtual machine running a recent Linux distribution. The analytical PostgreSQL instance, the Python virtual environment, the Prefect flow, the cron entry and the API are co-located on this VM. A controlled remote access is granted to the team through SSH key authentication, with an explicit IP allowlist enforced by an Azure Network Security Group attached to the VM. Database access from local notebooks of the team passes through an SSH tunnel terminating on \texttt{localhost:5432} of the VM, so that the PostgreSQL port is not exposed to the public internet.
+
+\subsection{Data flow}
+The data flow is represented in Figure~\ref{fig:dataflow}. Raw events are extracted from the source PostgreSQL into the staging schema, processed by the cleaning engine into the warehouse layer, condensed into the marts and finally consumed either by the API and the dashboard or by the offline modeling notebooks.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.95\textwidth]{figures/architecture_dataflow.pdf}
+\caption{Logical data flow of the platform.}
+\label{fig:dataflow}
+\end{figure}
+
+\subsection{Layered storage}
+The storage tier is organized as a three-layer warehouse: the \emph{bronze} layer (\texttt{staging}) hosts a faithful replica of the source schema, the \emph{silver} layer (\texttt{warehouse}) hosts the dimensional model with deduplicated facts and dimensions, and the \emph{gold} layer (\texttt{marts}) hosts the business-ready aggregates. State tables (\texttt{etl\_watermark}, \texttt{etl\_run\_log}, \texttt{quarantine\_rejected}) live alongside the warehouse layer and support the operational concerns of the pipeline.
+
+\section{Technology stack}
+
+\subsection{Storage and database}
+The relational storage layer is implemented in PostgreSQL~16, chosen for its reliability, its mature support of windowing and \texttt{INSERT~\dots~ON~CONFLICT}, and its compatibility with the operational platform of \hostorg. PostgreSQL is hosted on the Azure VM with a dedicated service account, with public ports closed and access mediated by SSH tunnelling.
+
+\subsection{Processing and orchestration}
+The processing layer is written in Python~3.11. Database access is implemented through SQLAlchemy and \texttt{psycopg2}; analytical transformations rely on \texttt{pandas} and \texttt{numpy}; the modeling layer relies on \texttt{scikit-learn}; the orchestration uses Prefect~2 to chain the tasks of the batch flow. A test suite is implemented with \texttt{pytest}.
+
+\subsection{Modeling and machine learning}
+The unsupervised modeling layer relies on \texttt{scikit-learn} (StandardScaler, KMeans, IsolationForest), with seed control and per-tenant fitting. A deep-learning baseline (PyTorch autoencoder) has been examined for comparison purposes (cf.\ Chapter~\ref{chap:model}).
+
+\subsection{Serving, API and dashboard}
+The API is implemented with FastAPI, exposed through Uvicorn behind an Nginx reverse proxy. The dashboard is implemented either with Streamlit or with Plotly Dash, embedded in the same VM and connected to the marts schema. Both components are deployed as systemd services.
+
+\subsection{Cloud and operations}
+The cloud platform is Microsoft Azure. The VM is provisioned with a Linux image, a managed disk, an attached Network Security Group with an IP allowlist for SSH, and a static public IP. The git repository of the project is cloned into \texttt{/opt/accent-fleet-analytics}, the Python virtual environment is provisioned locally, and the cron entry under \texttt{/etc/cron.d/} triggers the incremental runs. The system journal collects the structured logs.
+
+\subsection{Justification of the technology choices}
+The technology choices are justified by three criteria: alignment with the operational stack of \hostorg{} (PostgreSQL, Linux, Azure), maturity of the Python data ecosystem (\texttt{scikit-learn}, \texttt{pandas}, Prefect), and minimality of the operational footprint (every component runs on a single VM, with no managed Kubernetes nor managed Spark cluster, in order to control the cost during the internship).
+
+\section{Conclusion}
+This chapter has formalized the business understanding of the project, derived the functional and non-functional requirements, presented the logical and physical architecture --- with explicit attention to the Azure hosting, the SSH tunnelling and the IP allowlisting --- and justified the technology stack adopted for the implementation. The next chapter exploits this architectural blueprint to conduct the data understanding phase on the operational PostgreSQL database.

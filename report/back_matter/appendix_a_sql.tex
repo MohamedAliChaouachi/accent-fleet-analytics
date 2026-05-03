@@ -1,0 +1,36 @@
+% =====================================================================
+%  Appendix A --- SQL exploration scripts
+% =====================================================================
+\chapter{SQL Exploration Scripts}
+\label{app:sql}
+
+This appendix references the SQL scripts used during the data understanding and the data preparation phases. The full versions are stored in the project repository under \texttt{scripts/sql/}.
+
+\section{Schema inspection}
+\label{sec:app-sql-schema}
+The script \texttt{01\_schema\_inspection.sql} returns the column-level metadata of every table in the staging and warehouse schemas, by querying \texttt{information\_schema.columns}, \texttt{information\_schema.table\_constraints} and \texttt{information\_schema.key\_column\_usage}. The result feeds the data dictionary and the schema map.
+
+\section{Data profiling}
+\label{sec:app-sql-profile}
+The script \texttt{02\_data\_profiling.sql} computes, for every column, descriptive statistics: row count, distinct count, null count, minimum, maximum, mean, standard deviation, and the 5\textsuperscript{th}, 50\textsuperscript{th}, 95\textsuperscript{th} percentiles. The script is parametrized by the table and the column name and is invoked through a shell wrapper that iterates over the catalogue.
+
+\section{Null analysis}
+\label{sec:app-sql-null}
+The script \texttt{03\_null\_analysis.sql} produces the null rates of every column of the principal source tables, in a format directly consumable by the missing-value heatmap rendered by \texttt{fig\_missing\_heatmap.py}.
+
+\section{Distributions}
+\label{sec:app-sql-distrib}
+The script \texttt{04\_distributions.sql} computes per-column histograms with a configurable number of bins, using the \texttt{width\_bucket} function of PostgreSQL. The result feeds the distribution plots produced in Chapter~\ref{chap:data}.
+
+\section{KPI extraction}
+\label{sec:app-sql-kpi}
+The script \texttt{05\_kpi\_extraction.sql} computes the principal business KPIs at the tenant-month grain (total trips, total distance, average max speed, overspeed-per-100km, harsh-event-per-100km, idle ratio) directly from the marts. The result is consumed by the executive dashboard and by the figures of Chapter~\ref{chap:model}.
+
+\section{Metadata analysis}
+\label{sec:app-sql-meta}
+The script \texttt{06\_metadata\_analysis.sql} returns the size, the row count and the last analyse-timestamp of every table, by querying \texttt{pg\_class}, \texttt{pg\_stat\_user\_tables} and \texttt{pg\_stat\_all\_indexes}. The script is used during the operational reviews of the platform.
+
+\section{Validation suite}
+The validation suite \texttt{99\_validation\_suite.sql} aggregates the eight checks \texttt{V1}--\texttt{V8} described in Chapter~\ref{chap:prep} and writes a synthetic report into a dedicated table consumed by the monitoring layer.
+
+\cleardoublepage

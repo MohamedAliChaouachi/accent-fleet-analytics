@@ -1,0 +1,49 @@
+% =====================================================================
+%  Accent Fleet Analytics --- PFE Final-Year Thesis
+%  Device Behavior Scoring & Risk Classification on Azure
+%  Master document --- compile with pdflatex + biber
+% =====================================================================
+\documentclass[12pt,a4paper,oneside]{report}
+
+\input{preamble}
+
+\begin{document}
+
+% --------------------------- Front matter ---------------------------
+\pagenumbering{roman}
+\input{front_matter/title_page}
+\input{front_matter/dedication}
+\input{front_matter/acknowledgments}
+\input{front_matter/abstract}
+
+\tableofcontents
+\listoffigures
+\listoftables
+\input{front_matter/acronyms}
+
+% --------------------------- Body ---------------------------
+\cleardoublepage
+\pagenumbering{arabic}
+
+\input{front_matter/general_introduction}
+
+\input{chapters/chapter1_general_context}
+\input{chapters/chapter2_business_understanding}
+\input{chapters/chapter3_data_understanding}
+\input{chapters/chapter4_data_preparation}
+\input{chapters/chapter5_modeling}
+\input{chapters/chapter6_deployment}
+
+\input{back_matter/general_conclusion}
+
+% --------------------------- Bibliography ---------------------------
+\printbibliography[title={Bibliography}]
+\addcontentsline{toc}{chapter}{Bibliography}
+
+% --------------------------- Appendices ---------------------------
+\appendix
+\input{back_matter/appendix_a_sql}
+\input{back_matter/appendix_b_python}
+\input{back_matter/appendix_c_azure}
+
+\end{document}

@@ -1,0 +1,112 @@
+# queries.yaml
+# =============
+# Manifest of SQL queries executed by scripts/python/extract_to_csv.py.
+# Each entry produces one timestamped CSV under exports/.
+#
+# Run on a workstation with an open SSH tunnel to the Azure VM:
+#     python scripts/python/extract_to_csv.py --manifest config/queries.yaml
+# Or validate the manifest without touching the database:
+#     python scripts/python/extract_to_csv.py --manifest config/queries.yaml --dry-run
+
+queries:
+
+  # --- Schema and metadata --------------------------------------------------
+  - name: schema_inventory
+    sql: |
+      SELECT table_schema, table_name, table_type
+      FROM information_schema.tables
+      WHERE table_schema IN ('staging', 'warehouse', 'marts')
+      ORDER BY table_schema, table_name;
+
+  - name: column_inventory
+    sql: |
+      SELECT table_schema, table_name, column_name, data_type, is_nullable
+      FROM information_schema.columns
+      WHERE table_schema IN ('staging', 'warehouse', 'marts')
+      ORDER BY table_schema, table_name, ordinal_position;
+
+  # --- Data quality ---------------------------------------------------------
+  - name: null_analysis
+    sql: |
+      WITH staging_path AS (
+        SELECT 'staging.path' AS table_name, 'distance_driven' AS column_name,
+               100.0 * AVG((distance_driven IS NULL)::int) AS null_pct
+        FROM staging.path
+        UNION ALL
+        SELECT 'staging.path', 'max_speed',
+               100.0 * AVG((max_speed IS NULL)::int) FROM staging.path
+        UNION ALL
+        SELECT 'staging.path', 'path_duration',
+               100.0 * AVG((path_duration IS NULL)::int) FROM staging.path
+      )
+      SELECT * FROM staging_path;
+
+  - name: row_counts
+    sql: |
+      SELECT 'staging.path'           AS table_name, COUNT(*) AS rows FROM staging.path
+      UNION ALL
+      SELECT 'staging.tracking_data', COUNT(*) FROM staging.tracking_data
+      UNION ALL
+      SELECT 'staging.device',        COUNT(*) FROM staging.device
+      UNION ALL
+      SELECT 'staging.event_log',     COUNT(*) FROM staging.event_log
+      ORDER BY table_name;
+
+  # --- Behavioural KPIs -----------------------------------------------------
+  - name: tenant_month_kpi
+    sql: |
+      SELECT tenant_id, year_month,
+             SUM(distance_km)                   AS distance_km,
+             SUM(overspeed_events)              AS overspeed_events,
+             SUM(harsh_brake_events)            AS harsh_brake_events,
+             SUM(harsh_accel_events)            AS harsh_accel_events,
+             AVG(p95_max_speed)                 AS p95_max_speed_avg
+      FROM marts.mart_device_monthly_behavior
+      GROUP BY tenant_id, year_month
+      ORDER BY tenant_id, year_month;
+
+  # --- Modelling outputs ----------------------------------------------------
+  - name: device_risk_profile
+    sql: |
+      SELECT tenant_id, device_id, year_month,
+             cluster_label, risk_score, risk_band
+      FROM marts.v_device_risk_profile
+      ORDER BY tenant_id, year_month, device_id;
+
+  - name: cluster_summary
+    sql: |
+      SELECT tenant_id, cluster_label,
+             COUNT(*)                                         AS device_months,
+             AVG(overspeed_per_100km)                         AS overspeed_per_100km,
+             AVG(harsh_brake_per_100km)                       AS harsh_brake_per_100km,
+             AVG(harsh_accel_per_100km)                       AS harsh_accel_per_100km,
+             AVG(p95_max_speed)                               AS p95_max_speed
+      FROM marts.v_device_risk_profile
+      GROUP BY tenant_id, cluster_label
+      ORDER BY tenant_id, cluster_label;
+
+  # --- Operational health ---------------------------------------------------
+  - name: etl_run_log_recent
+    sql: |
+      SELECT run_id, started_at, finished_at, status,
+             rows_extracted, rows_loaded, rows_rejected
+      FROM warehouse.etl_run_log
+      WHERE started_at >= NOW() - INTERVAL '30 days'
+      ORDER BY started_at DESC;
+
+  - name: watermark_status
+    sql: |
+      SELECT source_table, watermark_value, updated_at,
+             EXTRACT(EPOCH FROM (NOW() - updated_at)) / 60.0 AS minutes_since_update
+      FROM warehouse.etl_watermark
+      ORDER BY source_table;
+
+  - name: quarantine_summary
+    sql: |
+      SELECT source_table, rule_id, severity,
+             COUNT(*) AS rejected_rows,
+             MIN(rejected_at) AS first_rejection,
+             MAX(rejected_at) AS last_rejection
+      FROM warehouse.quarantine_rejected
+      GROUP BY source_table, rule_id, severity
+      ORDER BY source_table, rule_id;

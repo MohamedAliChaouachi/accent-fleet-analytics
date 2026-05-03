@@ -1,0 +1,107 @@
+% =====================================================================
+%  Appendix C --- Azure operations runbook
+% =====================================================================
+\chapter{Azure Operations Runbook}
+\label{app:azure}
+
+This appendix collects the operational procedures of the Microsoft Azure environment hosting the platform. It is intended as a quick reference for the operations team of \hostorg.
+
+\section{VM provisioning}
+
+\subsection{VM specification}
+The platform runs on an Azure Linux virtual machine sized for a moderate analytical workload. The VM is provisioned in a Tunisian-or-European region of the Azure cloud, with a managed OS disk and an additional managed data disk dedicated to the PostgreSQL data directory. A static public IP address is associated with the VM.
+
+\subsection{Network Security Group}
+The Network Security Group (NSG) attached to the VM applies the following rules:
+
+\begin{itemize}
+    \item \textbf{Inbound 22/tcp} (SSH): allowed only from the IP allowlist of the team and of the office network of \hostorg.
+    \item \textbf{Inbound 443/tcp} (HTTPS): allowed for the API and the dashboard, behind Nginx with a Let's Encrypt certificate.
+    \item \textbf{Inbound 80/tcp} (HTTP): allowed only for the ACME challenge of Let's Encrypt; redirected to HTTPS otherwise.
+    \item \textbf{Inbound 5432/tcp} (PostgreSQL): denied. PostgreSQL listens only on \texttt{localhost} and is reachable through SSH tunnels.
+\end{itemize}
+
+\subsection{IP allowlist management}
+The IP allowlist is maintained as an explicit \texttt{ipset} attached to the NSG. Adding or removing a member of the team is a privileged operation that requires the approval of the platform owner. The history of the allowlist changes is preserved in the operations journal.
+
+\section{SSH access}
+
+\subsection{Account types}
+Three account categories share the VM: personal accounts (one per team member, with SSH key authentication only and no shell password), an automation account (\texttt{azureuser}) used by cron and by the systemd services, and the database service account (\texttt{accent\_pipeline}) used internally by the pipeline.
+
+\subsection{SSH tunnel}
+The SSH tunnel for PostgreSQL is opened by the team members on their workstation as shown in Listing~\ref{lst:ssh-tunnel-app}. Once the tunnel is open, a notebook or a database client connecting to \texttt{localhost:5432} reaches the analytical PostgreSQL on the VM.
+
+\begin{lstlisting}[style=bash,caption={SSH tunnel for PostgreSQL access.},label={lst:ssh-tunnel-app}]
+ssh -i ~/.ssh/azure_id_ed25519 \
+    -L 5432:localhost:5432 \
+    -N \
+    azureuser@<vm-public-ip>
+\end{lstlisting}
+
+\subsection{Key rotation}
+The SSH keys are rotated annually or upon departure of a team member, whichever comes first. The rotation procedure is recorded in the operations journal.
+
+\section{Pipeline operations}
+
+\subsection{Cron entry}
+The cron entry under \texttt{/etc/cron.d/accent-fleet} triggers the incremental pipeline every five minutes (cf.\ Listing~\ref{lst:cron} of Chapter~\ref{chap:deploy}). The output of the run is piped to the system journal under the tag \texttt{accent-fleet}.
+
+\subsection{Inspecting the run log}
+The history of the pipeline runs is observed through the SQL query of Listing~\ref{lst:run-log}.
+
+\begin{lstlisting}[style=sql,caption={Inspecting the run log.},label={lst:run-log}]
+SELECT run_id, mode, status, started_at, ended_at, rows_processed, error_message
+FROM warehouse.etl_run_log
+ORDER BY started_at DESC
+LIMIT 20;
+\end{lstlisting}
+
+\subsection{Triggering a backfill}
+A backfill is triggered manually under operator control by Listing~\ref{lst:backfill}. The backfill runs in a \texttt{tmux} session so that the operator can disconnect without interrupting the run.
+
+\begin{lstlisting}[style=bash,caption={Triggering a chunked backfill.},label={lst:backfill}]
+tmux new -s backfill
+cd /opt/accent-fleet-analytics
+.venv/bin/python scripts/run_batch.py --mode backfill --chunk-days 30
+# Detach with Ctrl-b, d
+\end{lstlisting}
+
+\section{Database operations}
+
+\subsection{Backup}
+A nightly logical backup is exported through \texttt{pg\_dump} to \texttt{/opt/backups/}, rotated through a seven-day retention policy. A weekly full snapshot of the data disk is configured at the Azure infrastructure level and retained for four weeks.
+
+\subsection{Credential rotation}
+The credentials of the service account \texttt{accent\_pipeline} are rotated quarterly. The rotation procedure updates the password in PostgreSQL, in the \texttt{.env} file of the VM, and restarts the API and the dashboard systemd units to reload the connection pool.
+
+\section{API and dashboard operations}
+
+\subsection{Service management}
+The API and the dashboard are managed as systemd units \texttt{accent-api.service} and \texttt{accent-dashboard.service}. Listing~\ref{lst:systemd} shows the canonical commands to inspect, restart and follow the logs of these services.
+
+\begin{lstlisting}[style=bash,caption={Managing the API and dashboard systemd units.},label={lst:systemd}]
+sudo systemctl status  accent-api.service
+sudo systemctl restart accent-api.service
+sudo journalctl -u accent-api.service -f
+
+sudo systemctl status  accent-dashboard.service
+sudo systemctl restart accent-dashboard.service
+sudo journalctl -u accent-dashboard.service -f
+\end{lstlisting}
+
+\subsection{TLS certificate renewal}
+The TLS certificate of Nginx is provisioned by Let's Encrypt and is renewed automatically by a daily timer. The renewal status is verified through \texttt{certbot certificates}.
+
+\section{Monitoring and alerting}
+
+\subsection{Pipeline alerts}
+A failure of the pipeline (status \texttt{ERROR} in \texttt{etl\_run\_log}) triggers a notification on the operations channel. The notification carries the run identifier, the operating mode and the error message.
+
+\subsection{Data quality alerts}
+A failure of any critical check of the validation suite triggers a notification, with a link to the corresponding row of the validation table.
+
+\subsection{Drift alerts}
+A statistically significant deviation of the cluster proportions or of the risk band proportions, computed against a one-month baseline, triggers a notification accompanied by a link to the dashboard tile that visualizes the drift.
+
+\cleardoublepage

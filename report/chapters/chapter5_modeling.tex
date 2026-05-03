@@ -1,0 +1,157 @@
+% =====================================================================
+%  Chapter 5 --- Modeling and Evaluation
+% =====================================================================
+\chapter{Modeling, Evaluation and Final Justification}
+\label{chap:model}
+
+\section{Introduction}
+The data preparation work of Chapter~\ref{chap:prep} has produced a curated device-month dataset of 1{,}723 observations enriched with 35 behavioural features. The present chapter executes the modeling and the evaluation phases of CRISP-DM. The chapter compares baseline approaches against more sophisticated machine-learning and deep-learning candidates, justifies the final adoption of an unsupervised pair (K-Means + Isolation Forest), reports the experimental metrics, presents the operational interpretation of the resulting clusters and risk scores, and previews the model-driven dashboards that are deployed in Chapter~\ref{chap:deploy}.
+
+\section{Test design}
+
+\subsection{Temporal split}
+Given the unsupervised setting and the natural temporal structure of the data, the dataset is partitioned along time. The fitting window covers 2025-01--2026-01 and the holdout window covers 2026-02--2026-04. The fitting window is used to fit the models; the holdout window is used to assess the temporal stability of the assignments and of the risk scores.
+
+\subsection{Per-tenant fitting protocol}
+A single global model would be dominated by the most active tenant. To avoid this bias, a separate model is fitted for each tenant. The features are standardized per tenant before the fitting and the risk score is rescaled per tenant after the inference.
+
+\subsection{Reproducibility}
+All stochastic operations are seeded with \texttt{random\_state~=~42}. The package versions are pinned in \texttt{requirements.txt}. The model artefacts are exported with the seed, the dataset hash and the package versions, allowing any run to be reproduced byte for byte.
+
+\section{Baseline models}
+
+\subsection{Statistical baseline}
+A first baseline is provided by a simple rule: a device-month is flagged as \emph{high risk} if at least two of the four indicators (\texttt{overspeed\_per\_100km}, \texttt{harsh\_brake\_per\_100km}, \texttt{harsh\_accel\_per\_100km}, \texttt{p95\_max\_speed}) exceed their tenant-specific 90\textsuperscript{th} percentile. This baseline is fast to deploy and easy to communicate; it serves as a reference against which the value added by the more sophisticated models is measured.
+
+\subsection{Linear baseline}
+A second baseline relies on a Principal Component Analysis: the first principal component, computed on the standardized features, is used as a continuous score; its sign is interpreted post hoc through the loadings. This baseline captures the dominant axis of variability of the features without committing to any clustering structure.
+
+\section{Machine learning candidates}
+
+\subsection{K-Means clustering}
+The K-Means algorithm partitions the observations by minimizing the within-cluster sum of squares. The number of clusters $k$ is chosen per tenant by sweeping $k \in \{3,4,5,6\}$ and selecting the value that maximizes the silhouette coefficient. The fitting uses \texttt{n\_init~=~10} initializations.
+
+\subsection{Hierarchical clustering}
+A hierarchical agglomerative variant has been examined for cross-validation purposes. The Ward linkage is used. The dendrogram is cut at the height that produces the same number of clusters as the K-Means optimum; the resulting partition is compared with the K-Means partition through the adjusted Rand index, which has been observed to remain above 0.8 for every tenant. This corroborates the stability of the K-Means partitions.
+
+\subsection{DBSCAN}
+The DBSCAN algorithm has also been assessed. On the device-month dataset, it produces highly imbalanced partitions (one dominant cluster and a long tail of singletons), which limits its operational usefulness in this context.
+
+\subsection{Isolation Forest for anomaly detection}
+The Isolation Forest algorithm constructs an ensemble of randomly built trees and produces an anomaly score from the average path length of each observation across the ensemble. The model is configured with \texttt{n\_estimators~=~200}, \texttt{contamination~=~"auto"}, \texttt{random\_state~=~42} and \texttt{n\_jobs~=~-1}. The raw \texttt{decision\_function} score is rescaled per tenant to the unit interval and discretized into three bands (\emph{low}, \emph{medium}, \emph{high}).
+
+\subsection{One-Class SVM and Local Outlier Factor}
+A One-Class SVM and a Local Outlier Factor model have also been examined. The One-Class SVM is sensitive to the kernel bandwidth and exhibits a poor scaling behaviour; the Local Outlier Factor is sensitive to the number of neighbours and produces unstable scores on the smaller tenants. Neither has been retained.
+
+\section{Deep learning baseline}
+
+\subsection{Autoencoder}
+A deep-learning baseline has been implemented as an autoencoder. The network is composed of an encoder ($35 \rightarrow 16 \rightarrow 8$) and a symmetric decoder, trained with the mean squared error and the Adam optimizer. The reconstruction error of every device-month is interpreted as an anomaly score.
+
+\subsection{Multi-Layer Perceptron}
+A supervised Multi-Layer Perceptron has also been prepared, with the proxy label produced by the statistical baseline as the target. The exercise is interesting from a methodological standpoint but inherits the limitations of the proxy label and is therefore not retained as the final model.
+
+\subsection{Comparison with classical ML}
+The deep-learning baselines are compared with the classical ML candidates in Section~\ref{sec:model-compare}. They have not been retained as the final model because they require a training corpus that is two orders of magnitude larger than the present dataset to outperform the classical approaches.
+
+\section{Evaluation metrics}
+
+\subsection{Internal clustering metrics}
+The clustering quality is assessed by three internal metrics: the silhouette coefficient~\cite{rousseeuw1987silhouettes}, the Davies--Bouldin index~\cite{davies1979cluster} and the Calinski--Harabasz index~\cite{calinski1974dendrite}. Higher silhouette and Calinski--Harabasz, lower Davies--Bouldin indicate a better clustering.
+
+\subsection{Anomaly metrics}
+For the anomaly detection layer, the distribution of the rescaled risk score has been plotted per tenant, the proportion of device-months falling into each band has been measured both on the fitting window and on the holdout window, and the rank correlation of the score between two consecutive months has been monitored as a stability proxy.
+
+\subsection{Business proxies}
+In the absence of a labelled incident feed, three business-oriented proxies are used: the cluster persistence between two consecutive months, the score persistence (Spearman rank correlation), and the alignment of the high-risk band with independently flagged operational events (overspeed alerts above threshold, severe maintenance interventions).
+
+\section{Model comparison and final justification}
+\label{sec:model-compare}
+
+\subsection{Comparative table}
+Table~\ref{tab:model-compare} summarizes the experimental performance of the candidate models on the dataset.
+
+\begin{table}[h]
+\centering
+\caption{Comparative performance of the candidate models.}
+\label{tab:model-compare}
+\begin{tabular}{|l|c|c|c|c|}
+\hline
+\textbf{Model} & \textbf{Silhouette} & \textbf{Stability} & \textbf{Interpretability} & \textbf{Cost} \\
+\hline
+Rule baseline      & N/A   & High    & High   & Very low \\
+PCA component      & N/A   & High    & Medium & Low \\
+K-Means (per tenant) & 0.17--0.36 & High & High & Low \\
+Hierarchical (Ward) & 0.18--0.34 & Medium & High & Medium \\
+DBSCAN             & N/A   & Low    & Low    & Low \\
+Isolation Forest   & N/A   & High   & Medium & Low \\
+One-Class SVM      & N/A   & Medium & Low    & High \\
+LOF                & N/A   & Medium & Low    & High \\
+Autoencoder        & N/A   & Medium & Low    & High \\
+MLP (proxy)        & N/A   & Medium & Medium & Medium \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Per-tenant K-Means results}
+Table~\ref{tab:kmeans-final} reports the K-Means results obtained per tenant.
+
+\begin{table}[h]
+\centering
+\caption{Per-tenant K-Means results on the modeling window.}
+\label{tab:kmeans-final}
+\begin{tabular}{|c|r|c|c|}
+\hline
+\textbf{Tenant} & \textbf{n} & \textbf{Optimal $k$} & \textbf{Silhouette} \\
+\hline
+235 & 613 & 3 & 0.355 \\
+238 & 339 & 6 & 0.237 \\
+264 & 354 & 6 & 0.174 \\
+1787 & 417 & 6 & 0.278 \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Justification of the final choice}
+The final choice of the pair K-Means + Isolation Forest is justified by four considerations: (i)~the operational interpretability of the segmentation, which exposes labels recognized by the fleet managers; (ii)~the stability of the assignments and of the score across the holdout window; (iii)~the absence of a labelled incident feed, which forbids the deployment of a fully supervised model; and (iv)~the modesty of the operational cost of the inference, which fits inside the five-minute incremental cycle.
+
+\section{Results interpretation}
+
+\subsection{Behavioural profiles}
+The K-Means clusters expose a small number of recurrent behavioural profiles: \emph{prudent / low-mileage}, \emph{regular}, \emph{aggressive-speed} (high overspeed-per-100~km), \emph{aggressive-harsh} (high harsh-brake/accel-per-100~km) and, on some tenants, \emph{long-haul} (high distances, low harsh ratios, high night-trip ratio).
+
+\subsection{Risk score distribution}
+The distribution of the rescaled risk score is plotted in Figure~\ref{fig:risk-dist}. The distribution exhibits a dominant mode in the lower part of the score range, a thinner mode around the medium band and a long tail in the high band, consistent with the operational hypothesis that critical risk situations are by construction rare.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.85\textwidth]{figures/risk_score_distribution.pdf}
+\caption{Distribution of the rescaled risk score per tenant.}
+\label{fig:risk-dist}
+\end{figure}
+
+\subsection{Confusion matrix against the rule baseline}
+A confusion matrix between the high-risk band of the Isolation Forest and the high-risk flag of the rule baseline (Figure~\ref{fig:confusion}) shows a substantial overlap on the extremes (clear high and clear low) and a richer behaviour in the intermediate band, where the Isolation Forest discriminates more finely than the rule.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.7\textwidth]{figures/confusion_matrix.pdf}
+\caption{Confusion matrix between the rule baseline and the Isolation Forest.}
+\label{fig:confusion}
+\end{figure}
+
+\subsection{Feature importance}
+Although both K-Means and Isolation Forest are not directly equipped with a notion of feature importance, two surrogate measures have been computed: the per-feature variance of the cluster centroids (importance for K-Means) and the per-feature mean depth in the isolation trees (importance for Isolation Forest). The two measures converge on a small set of features: \texttt{overspeed\_per\_100km}, \texttt{harsh\_brake\_per\_100km}, \texttt{harsh\_accel\_per\_100km}, \texttt{p95\_max\_speed}, \texttt{monthly\_idle\_ratio} and \texttt{high\_speed\_trip\_ratio}.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.85\textwidth]{figures/feature_importance.pdf}
+\caption{Surrogate feature importance for the unsupervised models.}
+\label{fig:feature-imp}
+\end{figure}
+
+\section{Dashboards and analytical artefacts}
+The model outputs feed three families of dashboards delivered in Chapter~\ref{chap:deploy}: the executive dashboard (\texttt{v\_executive\_dashboard}, tenant-month KPIs and rolling deltas), the operational dashboard (\texttt{v\_operational\_dashboard}, daily KPIs and seven-day rolling) and the maintenance dashboard (\texttt{v\_maintenance\_dashboard}, vehicle-month maintenance leaderboard with cost rank). The model-specific risk view (\texttt{v\_device\_risk\_profile}) is the principal entry point for the fleet manager.
+
+\section{Conclusion}
+This chapter has compared a range of baseline, classical machine learning and deep learning candidates, and has motivated the adoption of an unsupervised pair (K-Means + Isolation Forest) fitted per tenant. The internal metrics, the stability proxies and the operational interpretation of the outputs converge towards a positive assessment of the chosen models. The next chapter industrializes these models and exposes them to the consumer applications.

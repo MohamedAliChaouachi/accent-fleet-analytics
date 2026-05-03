@@ -1,0 +1,21 @@
+\babel@toc {english}{}\relax 
+\babel@toc {french}{}\relax 
+\babel@toc {english}{}\relax 
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {2.1}{\ignorespaces Logical data flow of the platform.}}{12}{figure.caption.11}%
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {3.1}{\ignorespaces Logical schema map of the source tables of interest.}}{18}{figure.caption.12}%
+\contentsline {figure}{\numberline {3.2}{\ignorespaces Null-rate heatmap on the principal source tables.}}{20}{figure.caption.14}%
+\contentsline {figure}{\numberline {3.3}{\ignorespaces Histogram of the per-trip distance in \texttt {staging.path} (log scale).}}{21}{figure.caption.15}%
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {5.1}{\ignorespaces Distribution of the rescaled risk score per tenant.}}{35}{figure.caption.22}%
+\contentsline {figure}{\numberline {5.2}{\ignorespaces Confusion matrix between the rule baseline and the Isolation Forest.}}{35}{figure.caption.23}%
+\contentsline {figure}{\numberline {5.3}{\ignorespaces Surrogate feature importance for the unsupervised models.}}{36}{figure.caption.24}%
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {6.1}{\ignorespaces Architecture of the BI dashboard.}}{41}{figure.caption.26}%
+\contentsline {figure}{\numberline {6.2}{\ignorespaces End-to-end deployment pipeline of the platform.}}{43}{figure.caption.27}%
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }

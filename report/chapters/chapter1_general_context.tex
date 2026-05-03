@@ -1,0 +1,96 @@
+% =====================================================================
+%  Chapter 1 --- General Context of the Project
+% =====================================================================
+\chapter{General Context of the Project}
+\label{chap:context}
+
+\section{Introduction}
+The objective of this chapter is to situate the present graduation project in its industrial and academic context. The chapter introduces the host organization, describes the existing analytical system and identifies its principal limitations, formalizes the problem statement and the project objectives, sketches the proposed solution, and concludes by comparing three candidate project-management methodologies before justifying the adoption of CRISP-DM. The chapter therefore establishes the foundations on which all subsequent technical work is grounded.
+
+\section{Industrial and academic context}
+The economic relevance of fleet analytics has grown steadily over the past decade. The combined drop in the price of GPS trackers, the densification of mobile coverage, and the emergence of cloud-native data platforms have made it economically viable for medium-sized fleet operators to instrument every vehicle and to retain the resulting telemetry. The competitive advantage no longer comes from collecting data --- this is essentially a commodity --- but from \emph{processing} it into reliable, low-latency analytical signals.
+
+In parallel, academic research on industrial data science has converged on a small set of structured methodologies that align project-management practice with the iterative nature of analytics. Among them, CRISP-DM has remained the most adopted framework for two complementary reasons: it is vendor-neutral, and its six phases (business understanding, data understanding, data preparation, modeling, evaluation, deployment) match the natural decomposition of a graduation project of this kind.
+
+\section{Host organization}
+
+\subsection{Presentation of \hostorg}
+\hostorg{} is a Tunisian operator of a multi-tenant telematics platform. The company designs, integrates and operates GPS tracking solutions for logistics fleets, distributing physical devices, ingesting their telemetry, and offering a software portal through which fleet managers monitor their vehicles in real time. The platform supports several customer fleets, denoted \emph{tenants}, each one comprising tens to hundreds of vehicles.
+
+\subsection{Activities and business areas}
+The activities of \hostorg{} cover four complementary segments:
+
+\begin{itemize}
+    \item the integration of GPS hardware on customer vehicles and the management of the SIM-card connectivity required for telemetry uplink;
+    \item the operation of a multi-tenant SaaS platform exposing live tracking, geofencing, alerts and reports;
+    \item the production of operational and managerial reports for fleet managers (mileage, fuel, alerts, maintenance);
+    \item the exploitation of the historical archive for value-added analytical use cases, of which the present project is an example.
+\end{itemize}
+
+\subsection{Organizational structure of the internship}
+The internship has been hosted in the technical division of \hostorg, working closely with the data engineering and software engineering teams. The infrastructure underlying the customer-facing platform and the analytical workloads is hosted on Microsoft Azure, and the development and integration activities have been conducted partly on a developer workstation and partly through a controlled SSH access to the production virtual machine.
+
+\section{Analysis of the existing system}
+
+\subsection{Description of the legacy pipeline}
+The analytical layer of the platform was historically implemented as a monolithic batch pipeline composed of a set of SQL scripts executed in sequence by a cron entry on the production server. The pipeline executed every fifteen to forty-five minutes and \emph{rebuilt the analytical tables in full at every cycle}, regardless of the volume of new data, by performing complete \texttt{TRUNCATE/INSERT} operations on the targets.
+
+\subsection{Identified limitations}
+A diagnostic conducted at the start of the internship identified six structural limitations of the legacy pipeline:
+
+\begin{enumerate}
+    \item \emph{Scaling cost}: the full-refresh strategy required, at every cycle, the recomputation of all historical aggregates, including the fifty-four million telemetry pings of the archive table; the cycle time grew super-linearly with the size of the archive.
+    \item \emph{Lack of incrementality}: there was no watermark mechanism, no notion of \emph{since the last successful run}; consequently, the pipeline could not be made cheaper by ignoring untouched data.
+    \item \emph{Absence of layering}: the staging, warehouse and mart layers were not separated; intermediate computations were materialized directly into the consumer-facing tables.
+    \item \emph{Implicit cleaning rules}: the data quality logic was scattered across the SQL scripts, often through silent \texttt{WHERE} clauses, with neither catalogue nor audit trail.
+    \item \emph{No machine learning surface}: the pipeline did not expose any feature contract suitable for a behavioural segmentation or for a risk-scoring model; it only produced descriptive aggregates.
+    \item \emph{Limited observability}: failures were detected only on the next manual inspection; there was no run log, no quality check and no drift indicator.
+\end{enumerate}
+
+\subsection{Synthesis of the diagnostic}
+The legacy pipeline therefore fulfilled the descriptive needs for which it had been designed but constituted a structural obstacle to the deployment of any predictive analytical use case, and especially to the \emph{Device Behavior Scoring \& Risk Classification} workstream which was the explicit objective of the internship.
+
+\section{Problem statement}
+The problem addressed in this thesis can be formulated as follows. Given the operational telematics database of \hostorg{}, hosted on a Microsoft Azure virtual machine, and given the inability of the legacy pipeline to support predictive analytical workloads, how can a transparent, incremental, watermark-driven data engineering pipeline be designed in order to (i) ingest cleanly the heterogeneous source tables, (ii) materialize a dimensional warehouse and a family of analytical marts, (iii) feed an unsupervised model that produces an interpretable risk score per device-month, and (iv) expose the resulting artefacts through an API and a business intelligence dashboard, while preserving idempotency, observability and low operational cost?
+
+\section{Proposed solution}
+
+\subsection{Functional outline}
+The proposed solution consists of an end-to-end CRISP-DM-aligned platform deployed on Microsoft Azure. The platform ingests the operational telematics tables into a bronze \emph{staging} schema, applies an explicit eleven-rule cleaning engine, materializes a silver \emph{warehouse} schema composed of five dimensions and eleven facts, derives a gold \emph{marts} schema with an ML-ready device-month behavioural mart and a family of BI-ready dashboards, and trains a per-tenant K-Means segmentation together with an Isolation Forest risk score. The trained models are persisted, exposed via a Python API and served to the operations team through an analytical dashboard.
+
+\subsection{Architectural outline}
+At the architectural level, the solution adopts a three-layer warehouse pattern, a watermark-driven incremental processing model, a Prefect orchestration of the batch flow, a five-minute cron schedule on the Azure VM, and an explicit monitoring layer. A controlled SSH access to the VM, combined with an IP allowlist on the Azure Network Security Group, supports the secure remote collaboration between the internship team and the production environment.
+
+\subsection{Expected benefits}
+The expected benefits, measured against the limitations of the legacy pipeline, are: a substantial reduction of the per-cycle processing time (the incremental strategy processes only a five-minute window per cycle), an explicit and auditable cleaning rule engine, the availability of a versioned ML feature contract, an explicit run log, a layered data quality monitoring, and a stable consumption surface (marts and views) for the BI and ML downstream consumers.
+
+\section{Project management methodology}
+
+\subsection{Comparison of candidate methodologies}
+Three candidate methodologies have been compared at the start of the project: CRISP-DM, GIMSI and Scrum. The first one is a domain-specific data-mining methodology, the second is a methodology for the design of management dashboards, and the third is a generic agile software-development framework. Table~\ref{tab:method-compare} summarizes the comparison along five criteria: scope, granularity of the phases, alignment with data science deliverables, support for iterative refinement, and operational maturity in the industrial setting of \hostorg.
+
+\begin{table}[h]
+\centering
+\caption{Comparison of the candidate project-management methodologies.}
+\label{tab:method-compare}
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{Criterion} & \textbf{CRISP-DM} & \textbf{GIMSI} & \textbf{Scrum} \\
+\hline
+Domain orientation & Data mining & Management dashboards & Generic software \\
+Phase decomposition & 6 phases & 10 steps & Sprints, no phases \\
+Data science alignment & Strong & Partial & Weak \\
+Iterative refinement & Native & Limited & Native \\
+Industrial maturity & High & Medium & High \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Justification of the choice of CRISP-DM}
+CRISP-DM has been retained for three reasons. First, its six phases match the natural decomposition of the project deliverables (business understanding, data, preparation, modeling, evaluation, deployment), avoiding any artificial mapping between the methodology and the work. Second, CRISP-DM places explicit weight on the \emph{business understanding} and the \emph{evaluation} phases, both of which are critical in an industrial context where misalignment between the model and the operational reality is the principal cause of failure. Third, CRISP-DM coexists peacefully with agile software practices for the engineering bricks (the orchestration, the API, the dashboard), in the sense that each CRISP-DM phase can be delivered through one or several Scrum-flavoured iterations without conflict.
+
+\subsection{Project plan along the six CRISP-DM phases}
+The project plan has been organized as a sequence of six CRISP-DM phases, with explicit deliverables at the end of each one: a business understanding document and a target architecture (Phase~1), a data understanding report (Phase~2), a curated warehouse and a feature mart (Phase~3), a trained per-tenant K-Means and Isolation Forest model (Phase~4), an evaluation report (Phase~5) and an industrialized pipeline with API, dashboard and monitoring on Azure (Phase~6).
+
+\section{Conclusion}
+This first chapter has positioned the project in its industrial and academic context, presented \hostorg{}, characterized the legacy pipeline and its structural limitations, formulated the problem and the proposed solution, and motivated the adoption of CRISP-DM as the project-management methodology. The next chapter operationalizes this strategic outline by formalizing the business understanding, the research questions, the requirements, the target architecture and the technology stack of the solution.

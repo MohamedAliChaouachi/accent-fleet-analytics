@@ -1,0 +1,89 @@
+% =====================================================================
+%  preamble.tex --- Packages, layout, theme, macros
+% =====================================================================
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[english]{babel}
+\usepackage{microtype}
+
+% --- Layout ---
+\usepackage[a4paper,top=2.5cm,bottom=2.5cm,left=3cm,right=2.5cm]{geometry}
+\usepackage{setspace}
+\onehalfspacing
+\usepackage{parskip}
+
+% --- Graphics & colour ---
+\usepackage{graphicx}
+\graphicspath{{figures/}}
+\usepackage{xcolor}
+\definecolor{accentblue}{HTML}{1F4E79}
+\definecolor{accentgrey}{HTML}{595959}
+\definecolor{accentlight}{HTML}{D9E1F2}
+
+% --- Tables ---
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{multirow}
+\usepackage{caption}
+\captionsetup{font=small,labelfont=bf}
+
+% --- Math ---
+\usepackage{amsmath,amssymb,amsthm}
+
+% --- Code listings ---
+\usepackage{listings}
+\lstset{
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{accentblue}\bfseries,
+  commentstyle=\color{accentgrey}\itshape,
+  stringstyle=\color{teal},
+  showstringspaces=false,
+  breaklines=true,
+  frame=single,
+  rulecolor=\color{accentgrey},
+  numbers=left,
+  numberstyle=\tiny\color{accentgrey},
+  captionpos=b
+}
+\lstdefinestyle{sql}{language=SQL}
+\lstdefinestyle{python}{language=Python}
+\lstdefinestyle{bash}{language=bash}
+
+% --- Hyperlinks ---
+\usepackage[colorlinks=true,linkcolor=accentblue,citecolor=accentblue,urlcolor=accentblue]{hyperref}
+
+% --- Bibliography ---
+\usepackage[backend=biber,style=numeric,sorting=none]{biblatex}
+\addbibresource{bibliography.bib}
+
+% --- Headers & footers ---
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\nouppercase{\leftmark}}
+\fancyhead[R]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% --- Chapter heading style ---
+\usepackage{titlesec}
+\titleformat{\chapter}[display]
+  {\normalfont\huge\bfseries\color{accentblue}}
+  {\chaptertitlename\ \thechapter}{20pt}{\Huge}
+\titlespacing*{\chapter}{0pt}{-30pt}{20pt}
+
+% --- Acronyms ---
+\usepackage[acronym,nomain,nonumberlist]{glossaries}
+\makeglossaries
+
+% --- Custom macros ---
+\newcommand{\projectname}{Accent Fleet Analytics}
+\newcommand{\projecttitle}{Device Behavior Scoring \& Risk Classification}
+\newcommand{\hostorg}{Accent Tunisie}
+\newcommand{\authorname}{Amine \textsc{[Last Name]}}
+\newcommand{\supervisor}{[Academic Supervisor]}
+\newcommand{\industrysupervisor}{[Industry Supervisor]}
+\newcommand{\institution}{[University / Institute Name]}
+\newcommand{\academicyear}{2025--2026}
