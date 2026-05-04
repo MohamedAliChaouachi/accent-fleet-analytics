@@ -1,26 +1,31 @@
 % =====================================================================
 %  Chapter 3 --- Data Understanding (PostgreSQL-driven)
 % =====================================================================
-\chapter{Data Understanding through PostgreSQL Profiling}
+\chapter{Data Understanding through Source Profiling}
 \label{chap:data}
 
 \section{Introduction}
-The previous chapter has defined the architectural target and the technology stack. The present chapter executes the second phase of the CRISP-DM methodology: the \emph{data understanding}. The chapter describes the operational PostgreSQL database that supplies the project, formalizes the extraction protocol, presents the schema of the staging layer through a data dictionary, audits the quality of the data with explicit SQL queries, profiles the missing values, and concludes with the exploratory data analysis that informs the feature engineering of Chapter~\ref{chap:prep}. All scripts referenced here are listed in Appendix~\ref{app:sql} and are available in the repository under \texttt{scripts/sql/}.
+The previous chapter has defined the architectural target and the technology stack of the platform. The present chapter executes the second phase of the CRISP-DM methodology: the \emph{data understanding}. The chapter describes the three operational MySQL databases of \hostorg{} that supply the project, formalizes the dump-based extraction protocol used to bring their content into the analytical environment, presents the schema of the resulting staging layer through a data dictionary, audits the quality of the data with explicit SQL queries on PostgreSQL, profiles the missing values, and concludes with the exploratory data analysis that informs the feature engineering of Chapter~\ref{chap:prep}. All scripts referenced here are listed in Appendix~\ref{app:sql} and are available in the repository under \texttt{scripts/sql/} and \texttt{scripts/python/}.
 
-\section{Source database presentation}
+\section{Source databases of \hostorg}
 
-\subsection{Operational PostgreSQL of \hostorg}
-The source database is a PostgreSQL~16 instance hosting the operational data of the telematics platform. The instance is reachable from the analytical Azure VM through a secured connection. The schema of interest comprises about a dozen tables, the most voluminous of which are the trip table (\texttt{path}) and the telemetry archive (\texttt{archive}), with respectively 7.4~million and 54.7~million rows over the available history.
+\subsection{Three operational MySQL databases}
+As described in Chapter~\ref{chap:context}, the operational ecosystem of \hostorg{} relies on three MySQL databases that fulfil complementary roles. The first one --- denoted \emph{raw telemetry} --- collects the binary frames pushed by the GPS/IoT devices through SIM-card connectivity and persists them as \emph{hexadecimal} payloads. The second one --- denoted \emph{decoded archive} --- hosts the readable representation of the telemetry produced by an internal decoding toolchain; its tables follow the naming convention \texttt{arch\_xxxxx} and retain approximately the most recent six months of data. The third one --- denoted \emph{master data} --- carries the customers, drivers, vehicles, contracts and per-tenant configuration; its tables follow the convention \texttt{user\_xxxxx}, with one logical subgroup per tenant.
+
+The present project consumes the second and third databases, namely the decoded \texttt{arch\_xxxxx} archive and the \texttt{user\_xxxxx} master data. The first database --- the raw hexadecimal stream --- is documented for completeness but is not exploited directly: its content has already been transformed by the internal decoding scripts of \hostorg{} before it enters the archive, and the project consumes the result of that transformation rather than re-implementing it.
 
 \subsection{Tables of interest}
-Five families of tables have been retained for the project: the trip-related family (\texttt{path}, \texttt{rep\_overspeed}, \texttt{stop}), the alert family (\texttt{notification}), the daily aggregate family (\texttt{rep\_activity\_daily}), the telemetry family (\texttt{archive}) and the master-data family (\texttt{vehicule}, \texttt{driver}, \texttt{maintenance}, \texttt{document}, fueling tables).
+Within the two consumed databases, five families of tables have been retained for the analytical scope of the project. The trip-related family in the archive (\texttt{path}, \texttt{rep\_overspeed}, \texttt{stop}); the alert family (\texttt{notification}); the daily-aggregate family (\texttt{rep\_activity\_daily}); the high-resolution telemetry family in the archive (\texttt{archive}, with about 54.7~million rows over the available history); and the master-data family in the user database (\texttt{vehicule}, \texttt{driver}, \texttt{maintenance}, \texttt{document}, fueling tables). After conversion, these tables populate the staging schema of the analytical PostgreSQL with a faithful one-to-one correspondence.
 
-\section{Extraction strategy}
+\section{Acquisition strategy}
 
-\subsection{Connection setup}
-The connection to the source database follows the standard Python toolchain (\texttt{psycopg2} or SQLAlchemy). The connection parameters are externalized in a \texttt{.env} file, with credentials of a read-only service account dedicated to analytical extraction. Listing~\ref{lst:psycopg-connect} shows the canonical connection snippet.
+\subsection{Dump-based extraction from MySQL}
+Because the operational databases run on MySQL and are not directly reachable from the analytical environment, the data is acquired through a dump-based protocol. The engineering team of \hostorg{} produces \texttt{.sql} dump files of the relevant slices of the \texttt{arch\_xxxxx} archive and of the \texttt{user\_xxxxx} master data, which are then transferred to the analytical environment. The dumps are converted to a PostgreSQL-compatible representation by the conversion bridge documented in Chapter~\ref{chap:prep}, and finally loaded into the staging schema. This extraction protocol guarantees that the operational MySQL workload is not perturbed by the analytical activity: the load on the production system is bounded to the duration of the dump itself, which is scheduled outside customer-facing peak hours.
 
-\begin{lstlisting}[style=python,caption={Read-only connection from Python to PostgreSQL.},label={lst:psycopg-connect}]
+\subsection{Connection to the analytical PostgreSQL}
+Once the converted dump has been loaded, all subsequent profiling and exploration is performed directly on the analytical PostgreSQL. The connection from a developer notebook to the database follows the standard Python toolchain (\texttt{psycopg2} or SQLAlchemy), through an SSH tunnel terminating on \texttt{localhost:5432} of the Azure VM. The connection parameters are externalized in a \texttt{.env} file, with credentials of a read-only service account dedicated to analytical extraction. Listing~\ref{lst:psycopg-connect} shows the canonical connection snippet.
+
+\begin{lstlisting}[style=python,caption={Read-only connection from Python to the analytical PostgreSQL.},label={lst:psycopg-connect}]
 import os
 from sqlalchemy import create_engine
 
@@ -32,15 +37,15 @@ engine = create_engine(PG_DSN, pool_pre_ping=True, future=True)
 \end{lstlisting}
 
 \subsection{MCP-driven exploration}
-During the data understanding phase, the Model Context Protocol (MCP) PostgreSQL server has been used as a programmable interface for ad-hoc exploration. Each exploratory question (row counts, null rates, distinct values, distributions) is expressed as an SQL query and submitted to the MCP server, which returns a structured result that is then post-processed in the notebooks. This setup substantially accelerates the iteration cycle and standardizes the queries.
+During the data understanding phase, the Model Context Protocol (MCP) PostgreSQL server has been used as a programmable interface for ad-hoc exploration. Each exploratory question (row counts, null rates, distinct values, distributions) is expressed as an SQL query and submitted to the MCP server, which returns a structured result that is post-processed in the notebooks. This setup substantially accelerates the iteration cycle and standardizes the queries between the two members of the binomial.
 
-\subsection{Automated extraction to CSV}
-For reproducibility purposes, the principal exploratory queries are also exported as CSV through a dedicated Python script (\texttt{scripts/python/extract\_to\_csv.py}, Appendix~\ref{app:python}). The script reads a manifest of queries, executes them and writes the results to a versioned \texttt{exports/} directory.
+\subsection{Reproducible export to CSV}
+For reproducibility purposes, the principal exploratory queries are also exported as CSV through a dedicated Python script (\texttt{scripts/python/extract\_to\_csv.py}, Appendix~\ref{app:python}). The script reads a manifest of queries, executes them against the analytical PostgreSQL and writes the results to a versioned \texttt{exports/} directory, allowing the binomial to share intermediate datasets without re-running the whole pipeline.
 
-\section{Schema analysis}
+\section{Schema analysis of the staging layer}
 
 \subsection{Schema inspection queries}
-The schema of the source tables is inspected through the standard catalogue queries of PostgreSQL on \texttt{information\_schema}. Listing~\ref{lst:schema-columns} shows the canonical inspection query, which retrieves, for every column of every table, its name, its data type, its nullability, its default and its ordinal position.
+Once the converted dumps have been loaded into the staging schema, the schema is inspected through the standard catalogue queries of PostgreSQL on \texttt{information\_schema}. Listing~\ref{lst:schema-columns} shows the canonical inspection query, which retrieves, for every column of every table, its name, its data type, its nullability, its default and its ordinal position.
 
 \begin{lstlisting}[style=sql,caption={Schema inspection query against \texttt{information\_schema}.},label={lst:schema-columns}]
 SELECT
@@ -57,19 +62,19 @@ ORDER BY table_schema, table_name, ordinal_position;
 \end{lstlisting}
 
 \subsection{Schema map}
-The full schema map of the tables of interest is reproduced in Figure~\ref{fig:schema-map}, generated by the Python script \texttt{scripts/python/figures/fig\_schema\_map.py}. The map highlights the foreign-key relationships between the trip-related tables, the master-data tables and the archive.
+The full schema map of the tables of interest is reproduced in Figure~\ref{fig:schema-map}, generated by the Python script \texttt{scripts/python/figures/fig\_schema\_map.py}. The map highlights the foreign-key relationships between the trip-related tables of the archive, the master-data tables of the user database and the high-resolution telemetry table.
 
 \begin{figure}[h]
 \centering
 \includegraphics[width=0.95\textwidth]{figures/schema_map.pdf}
-\caption{Logical schema map of the source tables of interest.}
+\caption{Logical schema map of the staging tables, after conversion of the MySQL dumps.}
 \label{fig:schema-map}
 \end{figure}
 
 \section{Data dictionary}
 
 \subsection{Methodology}
-The data dictionary has been constructed by joining the schema inspection above with manual annotations contributed by the engineering team of \hostorg. Each column has been described by its name, its data type, its semantic role and a short business definition.
+The data dictionary has been constructed by joining the schema inspection above with manual annotations contributed by the engineering team of \hostorg, which knows the original semantics of each MySQL column and can disambiguate the cases where a column name has drifted between historical iterations of the operational system. Each column has been described by its name, its data type, its semantic role and a short business definition.
 
 \subsection{Excerpt of the data dictionary}
 Table~\ref{tab:dict-path} shows the data dictionary excerpt for the principal columns of \texttt{staging.path}; an extended dictionary covering the other tables is provided in Appendix~\ref{app:python}.
@@ -82,7 +87,7 @@ Table~\ref{tab:dict-path} shows the data dictionary excerpt for the principal co
 \hline
 \textbf{Column} & \textbf{Type} & \textbf{Role} & \textbf{Definition} \\
 \hline
-\texttt{tenant\_id} & integer & FK & Customer fleet identifier. \\
+\texttt{tenant\_id} & integer & FK & Customer fleet identifier (master data). \\
 \texttt{device\_id} & integer & FK & GPS device identifier. \\
 \texttt{begin\_path\_time} & timestamp & event-time & Trip start timestamp. \\
 \texttt{end\_path\_time} & timestamp & metric & Trip end timestamp. \\
@@ -97,9 +102,9 @@ Table~\ref{tab:dict-path} shows the data dictionary excerpt for the principal co
 \section{Data quality assessment}
 
 \subsection{Row count profile}
-A first quality indicator is the row count per table, computed by Listing~\ref{lst:row-count}. The result of the query is stored as a baseline against which subsequent runs can be compared in order to detect any abnormal contraction or expansion of the source.
+A first quality indicator is the row count per staging table, computed by Listing~\ref{lst:row-count}. The result of the query is stored as a baseline against which subsequent runs can be compared in order to detect any abnormal contraction or expansion of the staging layer between two dump cycles.
 
-\begin{lstlisting}[style=sql,caption={Row counts per table of interest.},label={lst:row-count}]
+\begin{lstlisting}[style=sql,caption={Row counts per staging table of interest.},label={lst:row-count}]
 SELECT 'path' AS table_name, COUNT(*) AS rows FROM staging.path
 UNION ALL
 SELECT 'rep_overspeed',         COUNT(*) FROM staging.rep_overspeed
@@ -115,7 +120,7 @@ ORDER BY rows DESC;
 \end{lstlisting}
 
 \subsection{Null-rate analysis}
-For every column of every table of interest, the null rate is computed by Listing~\ref{lst:null-rate}. The null rates are then post-processed into a heatmap rendered by the Python script \texttt{fig\_missing\_heatmap.py}, reproduced in Figure~\ref{fig:missing-heatmap}.
+For every column of every table of interest, the null rate is computed by Listing~\ref{lst:null-rate}. The null rates are then post-processed into a heatmap rendered by the Python script \texttt{fig\_missing\_heatmap.py}, reproduced in Figure~\ref{fig:missing-heatmap}. Beyond their intrinsic descriptive value, the null rates also act as an indirect monitor of the conversion bridge: an unexpected drift of the null share for a column suggests an issue in the MySQL-to-PostgreSQL conversion of that column.
 
 \begin{lstlisting}[style=sql,caption={Null-rate analysis for \texttt{staging.path}.},label={lst:null-rate}]
 SELECT
@@ -136,12 +141,12 @@ SELECT 'fuel_used',
 \begin{figure}[h]
 \centering
 \includegraphics[width=0.85\textwidth]{figures/missing_heatmap.pdf}
-\caption{Null-rate heatmap on the principal source tables.}
+\caption{Null-rate heatmap on the principal staging tables.}
 \label{fig:missing-heatmap}
 \end{figure}
 
 \subsection{Referential integrity}
-The referential integrity between the source tables and the prospective dimensions is verified by Listing~\ref{lst:integrity}. The query identifies the devices appearing in the trip table that are not linked to any vehicle through the assignment chain, and quantifies their share in the total volume.
+The referential integrity between the staging tables of the archive and the master-data tables imported from the \texttt{user\_xxxxx} database is verified by Listing~\ref{lst:integrity}. The query identifies the devices appearing in the trip table that are not linked to any vehicle through the assignment chain, and quantifies their share in the total volume.
 
 \begin{lstlisting}[style=sql,caption={Referential integrity between \texttt{staging.path} and the device--vehicle chain.},label={lst:integrity}]
 SELECT COUNT(DISTINCT p.device_id) AS orphan_devices,
@@ -165,7 +170,7 @@ FROM staging.path;
 \section{Exploratory Data Analysis}
 
 \subsection{Univariate distributions}
-The distribution of every quantitative variable has been studied through descriptive statistics and through histograms generated by \texttt{fig\_distributions.py}. Figure~\ref{fig:dist-distance} shows, by way of example, the histogram of the per-trip distance, on a logarithmic scale, which exhibits a typical right-skew.
+The distribution of every quantitative variable has been studied through descriptive statistics and through histograms generated by \texttt{fig\_distributions.py}. Figure~\ref{fig:dist-distance} shows, by way of example, the histogram of the per-trip distance, on a logarithmic scale, which exhibits a typical right-skew compatible with operational fleets in which short urban trips dominate the count and long inter-city trips dominate the total mileage.
 
 \begin{figure}[h]
 \centering
@@ -181,26 +186,26 @@ A bivariate analysis between the trip distance and the maximum speed shows a smo
 The aggregation of the principal indicators per tenant confirms two distinct regimes: tenant \texttt{264} exhibits an \emph{overspeed-rich} behavioural signature, with high overspeed-per-100~km values, while tenant \texttt{1787} exhibits a \emph{harsh-event-rich} signature. Tenants \texttt{235} and \texttt{238} occupy intermediate positions. This contrast directly informs the per-tenant fitting strategy retained in Chapter~\ref{chap:model}.
 
 \subsection{Temporal coverage}
-A monthly time series of trip counts and distances has been computed and plotted. The series shows a stable activity from 2025-01 onward, the period during which the archive-derived signals (harsh events, telemetry) are also available. The combination of the activity series and the archive coverage motivates the restriction of the modeling window to 2025-01--2026-04.
+A monthly time series of trip counts and distances has been computed and plotted on the staging slice. The series shows a stable activity from 2025-01 onward, the period during which the archive-derived signals (harsh events, telemetry) are also available. The combination of the activity series and the archive coverage motivates the restriction of the modeling window to 2025-01--2026-04. Beyond that window, the six-month retention policy of the operational \texttt{arch\_xxxxx} tables would have constrained the depth of the historical archive.
 
 \section{Synthesis of identified issues}
 The data understanding phase has identified eleven principal data issues, listed in Table~\ref{tab:issues}. They are formalized as cleaning rules in Chapter~\ref{chap:prep}.
 
 \begin{table}[h]
 \centering
-\caption{Synthesis of the data quality issues detected on the source tables.}
+\caption{Synthesis of the data quality issues detected on the staging tables.}
 \label{tab:issues}
 \begin{tabular}{|l|p{8cm}|c|}
 \hline
 \textbf{ID} & \textbf{Issue} & \textbf{Source} \\
 \hline
-DQ-1 & Trip timestamps below 2019-10-01 (epoch artefacts). & \texttt{path} \\
+DQ-1 & Trip timestamps below 2019-10-01 (epoch artefacts of the legacy ingestion). & \texttt{path} \\
 DQ-2 & Trip durations $\le 0$. & \texttt{path} \\
 DQ-3 & Trip distances $\le 0$. & \texttt{path} \\
 DQ-4 & Fuel values outside $[0,500]$~L. & \texttt{path} \\
 DQ-5 & Maximum speed $>$ 200~km/h. & \texttt{path} \\
 DQ-6 & Stop durations $\le 0$ or $>$ 1 year. & \texttt{stop} \\
-DQ-7 & Devices not linked to any vehicle. & \texttt{path}, \texttt{vehicule} \\
+DQ-7 & Devices not linked to any vehicle in the master data. & \texttt{path}, \texttt{vehicule} \\
 DQ-8 & Archive rows with ignition $\neq$ 1 used for harsh events. & \texttt{archive} \\
 DQ-9 & Accelerometer values outside the int8 range. & \texttt{archive} \\
 DQ-10 & Archive speed outside $[0, 250]$. & \texttt{archive} \\
@@ -210,4 +215,4 @@ DQ-11 & Archive RPM outside $[0, 8000]$. & \texttt{archive} \\
 \end{table}
 
 \section{Conclusion}
-This chapter has executed the data understanding phase by mobilizing the PostgreSQL profiling toolchain, by inspecting the schema, by building a data dictionary, by quantifying the data quality through dedicated SQL queries and by conducting an exploratory data analysis on the principal indicators. The eleven data quality issues identified in this chapter become, in Chapter~\ref{chap:prep}, the input specification of the cleaning rule engine that opens the data preparation phase.
+This chapter has executed the data understanding phase by mobilizing the PostgreSQL profiling toolchain on the staging slice converted from the MySQL dumps of \hostorg. It has documented the role and the schema of the three operational databases of the company, characterized the dump-based extraction protocol, profiled the staging tables through dedicated SQL queries and conducted an exploratory data analysis on the principal indicators. The eleven data quality issues identified in this chapter become, in Chapter~\ref{chap:prep}, the input specification of the cleaning rule engine that opens the data preparation phase.

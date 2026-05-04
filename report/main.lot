@@ -2,23 +2,23 @@
 \babel@toc {french}{}\relax 
 \babel@toc {english}{}\relax 
 \addvspace {10\p@ }
-\contentsline {table}{\numberline {1.1}{\ignorespaces Comparison of the candidate project-management methodologies.}}{7}{table.caption.8}%
+\contentsline {table}{\numberline {1.1}{\ignorespaces Comparison of the candidate project-management methodologies.}}{10}{table.caption.8}%
 \addvspace {10\p@ }
-\contentsline {table}{\numberline {2.1}{\ignorespaces Functional requirements.}}{11}{table.caption.9}%
-\contentsline {table}{\numberline {2.2}{\ignorespaces Non-functional requirements.}}{12}{table.caption.10}%
+\contentsline {table}{\numberline {2.1}{\ignorespaces Functional requirements.}}{14}{table.caption.9}%
+\contentsline {table}{\numberline {2.2}{\ignorespaces Non-functional requirements.}}{15}{table.caption.10}%
 \addvspace {10\p@ }
-\contentsline {table}{\numberline {3.1}{\ignorespaces Data dictionary excerpt for \texttt {staging.path}.}}{18}{table.caption.13}%
-\contentsline {table}{\numberline {3.2}{\ignorespaces Synthesis of the data quality issues detected on the source tables.}}{22}{table.caption.16}%
+\contentsline {table}{\numberline {3.1}{\ignorespaces Data dictionary excerpt for \texttt {staging.path}.}}{25}{table.caption.13}%
+\contentsline {table}{\numberline {3.2}{\ignorespaces Synthesis of the data quality issues detected on the staging tables.}}{29}{table.caption.16}%
 \addvspace {10\p@ }
-\contentsline {table}{\numberline {4.1}{\ignorespaces Cleaning rule catalogue applied at the warehouse boundary.}}{24}{table.caption.17}%
-\contentsline {table}{\numberline {4.2}{\ignorespaces Fact tables produced by the warehouse layer.}}{26}{table.caption.18}%
-\contentsline {table}{\numberline {4.3}{\ignorespaces Sample of the 35-feature registry (selected groups).}}{28}{table.caption.19}%
+\contentsline {table}{\numberline {4.1}{\ignorespaces Cleaning rule catalogue applied at the warehouse boundary.}}{33}{table.caption.17}%
+\contentsline {table}{\numberline {4.2}{\ignorespaces Fact tables produced by the warehouse layer.}}{35}{table.caption.18}%
+\contentsline {table}{\numberline {4.3}{\ignorespaces Sample of the 35-feature registry (selected groups).}}{37}{table.caption.19}%
 \addvspace {10\p@ }
-\contentsline {table}{\numberline {5.1}{\ignorespaces Comparative performance of the candidate models.}}{34}{table.caption.20}%
-\contentsline {table}{\numberline {5.2}{\ignorespaces Per-tenant K-Means results on the modeling window.}}{34}{table.caption.21}%
+\contentsline {table}{\numberline {5.1}{\ignorespaces Comparative performance of the candidate models.}}{43}{table.caption.20}%
+\contentsline {table}{\numberline {5.2}{\ignorespaces Per-tenant K-Means results on the modeling window.}}{43}{table.caption.21}%
 \addvspace {10\p@ }
-\contentsline {table}{\numberline {6.1}{\ignorespaces API endpoints exposed by the platform.}}{40}{table.caption.25}%
+\contentsline {table}{\numberline {6.1}{\ignorespaces API endpoints exposed by the platform.}}{50}{table.caption.25}%
 \addvspace {10\p@ }
 \addvspace {10\p@ }
-\contentsline {table}{\numberline {B.1}{\ignorespaces Figure-generation scripts referenced in the thesis.}}{48}{table.caption.29}%
+\contentsline {table}{\numberline {B.1}{\ignorespaces Figure-generation scripts referenced in the thesis.}}{60}{table.caption.29}%
 \addvspace {10\p@ }

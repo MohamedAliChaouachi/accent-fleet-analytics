@@ -5,7 +5,7 @@
 \label{chap:deploy}
 
 \section{Introduction}
-The evaluation of Chapter~\ref{chap:model} has confirmed the readiness of the K-Means segmentation and of the Isolation Forest risk score for industrialization. The present chapter executes the deployment phase of CRISP-DM. The chapter describes the deployment strategy, the API and the dashboard exposing the model outputs, the integration with the PostgreSQL warehouse, the cron-driven automation, the monitoring and alerting layer, and finally the Microsoft Azure infrastructure on which the platform runs --- with a particular focus on the secure remote collaboration setup (SSH tunnelling, IP allowlist on the Network Security Group, service accounts).
+The evaluation of Chapter~\ref{chap:model} has confirmed the readiness of the K-Means segmentation and of the Isolation Forest risk score for industrialization. The present chapter executes the deployment phase of CRISP-DM. The chapter describes the deployment strategy, the API and the dashboard exposing the model outputs, the integration with the analytical PostgreSQL warehouse populated from the converted MySQL dumps of \hostorg, the cron-driven automation, the monitoring and alerting layer, and finally the Microsoft Azure infrastructure on which the platform runs --- with a particular focus on the secure remote collaboration setup that allows the binomial of student engineers to operate the platform from separate workstations through SSH tunnelling, IP allowlisting on the Azure Network Security Group, and dedicated service accounts.
 
 \section{Deployment strategy}
 
@@ -27,7 +27,7 @@ The pipeline supports three operating modes accessible through a single command-
 The platform is hosted on a Microsoft Azure Linux virtual machine. The VM hosts, on the same operating system, the analytical PostgreSQL instance, the Python virtual environment, the Prefect flow, the API process, the BI dashboard process, the cron entry and the system journal. The git repository of the project is cloned into \texttt{/opt/accent-fleet-analytics} and a dedicated Linux user (\texttt{azureuser}) owns the runtime artefacts.
 
 \subsection{Network Security Group and IP allowlist}
-The VM is associated with an Azure Network Security Group that closes every public port except SSH (port 22), and the SSH port is itself restricted to an explicit allowlist of source IP addresses corresponding to the development workstations of the team and to the office network of \hostorg. This combination ensures that no PostgreSQL port, no API port and no dashboard port is exposed to the public internet.
+The VM is associated with an Azure Network Security Group that closes every public port except SSH (port 22) and the HTTPS port of the reverse proxy (port 443). The SSH port is itself restricted to an explicit allowlist of source IP addresses corresponding to the personal workstations of the binomial of student engineers and to the office network of \hostorg. This combination ensures that no PostgreSQL port, no API port and no dashboard port is exposed to the public internet, while still allowing both members of the binomial to connect to the shared analytical environment from their respective home workstations.
 
 \subsection{Secure remote collaboration via SSH tunnelling}
 Day-to-day collaboration of the team relies on SSH tunnelling. Each team member opens a local tunnel that forwards the local PostgreSQL port to the remote port on the VM, as illustrated in Listing~\ref{lst:ssh-tunnel}. The notebooks and the local clients then connect to \texttt{localhost:5432} as if the database were running locally, while the actual traffic is encrypted by SSH.
@@ -41,12 +41,12 @@ ssh -i ~/.ssh/azure_id_ed25519 \
 \end{lstlisting}
 
 \subsection{Service accounts}
-Three categories of accounts coexist on the VM: \emph{personal accounts} for human users (e.g.~\texttt{alice}, \texttt{bob}), used only through SSH key authentication; an \emph{automation account} (\texttt{azureuser}) used by cron and by the systemd services; and a \emph{database service account} (\texttt{accent\_pipeline}) used by the pipeline to authenticate against PostgreSQL, with credentials externalized in an environment file.
+Three categories of accounts coexist on the VM: \emph{personal accounts}, one per member of the binomial, used only through SSH key authentication and intended exclusively for human interactive sessions; an \emph{automation account} (\texttt{azureuser}) used by cron and by the systemd services; and a \emph{database service account} (\texttt{accent\_pipeline}) used by the pipeline to authenticate against PostgreSQL, with credentials externalized in an environment file. Each binomial member uses their own SSH key pair, which means that an audit of the system journal can attribute every interactive command to its actual operator without ambiguity.
 
 \section{PostgreSQL integration}
 
-\subsection{Local PostgreSQL on the VM}
-The analytical PostgreSQL is provisioned in version~16 on the VM, with the three schemas \texttt{staging}, \texttt{warehouse} and \texttt{marts}, plus the operational tables \texttt{etl\_watermark}, \texttt{etl\_run\_log} and \texttt{quarantine\_rejected}. The instance listens only on \texttt{localhost}, which is why remote access is mediated by the SSH tunnel described above.
+\subsection{Analytical PostgreSQL on the VM}
+The analytical PostgreSQL is provisioned in version~16 on the VM, with the three schemas \texttt{staging}, \texttt{warehouse} and \texttt{marts}, plus the operational tables \texttt{etl\_watermark}, \texttt{etl\_run\_log} and \texttt{quarantine\_rejected}. It is populated by the conversion bridge of Chapter~\ref{chap:prep}, which loads the converted MySQL dumps of \hostorg{} into the staging schema, and then by the watermark-driven pipeline described in this chapter. The instance listens only on \texttt{localhost}, which is why remote access from the binomial workstations is mediated by the SSH tunnel described above.
 
 \subsection{Connection management}
 The pipeline manages the database connection through a \texttt{SQLAlchemy} engine with a connection pool, an automatic ping before each transaction (\texttt{pool\_pre\_ping}) and an explicit timeout. The credentials are read from a \texttt{.env} file owned by \texttt{azureuser}, with restrictive file permissions.
@@ -154,4 +154,4 @@ The deployment pipeline is summarized in Figure~\ref{fig:deploy-pipeline}.
 \end{figure}
 
 \section{Conclusion}
-This chapter has formalized the deployment of the data engineering and machine learning platform on the Microsoft Azure infrastructure, with explicit attention to the secure remote collaboration setup (SSH tunnelling, IP allowlist on the Network Security Group, service accounts), the API and the BI dashboard, the cron-driven automation, and the layered monitoring and alerting plan. The end-to-end CRISP-DM cycle is therefore brought to its operational completion. The general conclusion that follows synthesizes the deliverables, the lessons learned and the perspectives opened by the project.
+This chapter has formalized the deployment of the data engineering and machine learning platform on the Microsoft Azure infrastructure, with explicit attention to the analytical PostgreSQL warehouse fed from the converted MySQL dumps of \hostorg, to the secure remote collaboration setup that allows the binomial of student engineers to operate the platform from separate workstations (SSH tunnelling, IP allowlist on the Network Security Group, per-member service accounts), to the API and the BI dashboard, to the cron-driven automation, and to the layered monitoring and alerting plan. The end-to-end CRISP-DM cycle is therefore brought to its operational completion. The general conclusion that follows synthesizes the deliverables, the lessons learned and the perspectives opened by the project.

@@ -5,7 +5,7 @@
 \label{chap:model}
 
 \section{Introduction}
-The data preparation work of Chapter~\ref{chap:prep} has produced a curated device-month dataset of 1{,}723 observations enriched with 35 behavioural features. The present chapter executes the modeling and the evaluation phases of CRISP-DM. The chapter compares baseline approaches against more sophisticated machine-learning and deep-learning candidates, justifies the final adoption of an unsupervised pair (K-Means + Isolation Forest), reports the experimental metrics, presents the operational interpretation of the resulting clusters and risk scores, and previews the model-driven dashboards that are deployed in Chapter~\ref{chap:deploy}.
+The data preparation work of Chapter~\ref{chap:prep} has produced --- starting from MySQL dump files exported from the \texttt{arch\_xxxxx} archive and the \texttt{user\_xxxxx} master data of \hostorg, converted to PostgreSQL and consolidated through an explicit cleaning rule engine --- a curated device-month dataset of 1{,}723 observations enriched with 35 behavioural features. The present chapter executes the modeling and the evaluation phases of CRISP-DM on this dataset. The chapter compares baseline approaches against more sophisticated machine-learning and deep-learning candidates, justifies the final adoption of an unsupervised pair (K-Means + Isolation Forest), reports the experimental metrics, presents the operational interpretation of the resulting clusters and risk scores, and previews the model-driven dashboards that are deployed in Chapter~\ref{chap:deploy}. The unsupervised setting is itself a deliberate consequence of the corrected problem statement of Chapter~\ref{chap:context}: in the absence of a labelled incident feed, the analytical leverage on top of the existing descriptive surface of \hostorg{} comes from segmentation and anomaly detection, not from a supervised classifier.
 
 \section{Test design}
 
@@ -113,7 +113,7 @@ Table~\ref{tab:kmeans-final} reports the K-Means results obtained per tenant.
 \end{table}
 
 \subsection{Justification of the final choice}
-The final choice of the pair K-Means + Isolation Forest is justified by four considerations: (i)~the operational interpretability of the segmentation, which exposes labels recognized by the fleet managers; (ii)~the stability of the assignments and of the score across the holdout window; (iii)~the absence of a labelled incident feed, which forbids the deployment of a fully supervised model; and (iv)~the modesty of the operational cost of the inference, which fits inside the five-minute incremental cycle.
+The final choice of the pair K-Means + Isolation Forest is justified by five considerations: (i)~the operational interpretability of the segmentation, which exposes labels recognized by the fleet managers; (ii)~the stability of the assignments and of the score across the holdout window; (iii)~the absence of a labelled incident feed, which forbids the deployment of a fully supervised model; (iv)~the modesty of the operational cost of the inference, which fits inside the five-minute incremental cycle on the shared Azure VM; and (v)~the consistency of the chosen models with the analytical leverage point established in Chapter~\ref{chap:context} --- moving the analytical centre of gravity from the descriptive reports of the legacy MySQL stack towards forward-looking, decision-grade signals.
 
 \section{Results interpretation}
 

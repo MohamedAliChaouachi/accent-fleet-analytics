@@ -18,7 +18,7 @@
 \@writefile{toc}{\contentsline {chapter}{Abstract}{iii}{chapter*.2}\protected@file@percent }
 \babel@aux{french}{}
 \babel@aux{english}{}
-\@writefile{toc}{\contentsline {chapter}{List of Acronyms}{xiv}{chapter*.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{List of Acronyms}{xv}{chapter*.6}\protected@file@percent }
 \@writefile{toc}{\contentsline {chapter}{General Introduction}{1}{chapter*.7}\protected@file@percent }
 \@writefile{toc}{\contentsline {chapter}{\numberline {1}General Context of the Project}{3}{chapter.1}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
@@ -30,320 +30,338 @@
 \@writefile{toc}{\contentsline {subsection}{\numberline {1.3.1}Presentation of Accent Tunisie}{4}{subsection.1.3.1}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {1.3.2}Activities and business areas}{4}{subsection.1.3.2}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {1.3.3}Organizational structure of the internship}{4}{subsection.1.3.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {1.4}Analysis of the existing system}{4}{section.1.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {1.4.1}Description of the legacy pipeline}{4}{subsection.1.4.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {1.4.2}Identified limitations}{5}{subsection.1.4.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {1.4.3}Synthesis of the diagnostic}{5}{subsection.1.4.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {1.5}Problem statement}{5}{section.1.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {1.6}Proposed solution}{6}{section.1.6}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {1.6.1}Functional outline}{6}{subsection.1.6.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {1.6.2}Architectural outline}{6}{subsection.1.6.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {1.6.3}Expected benefits}{6}{subsection.1.6.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {1.7}Project management methodology}{7}{section.1.7}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {1.7.1}Comparison of candidate methodologies}{7}{subsection.1.7.1}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {1.1}{\ignorespaces Comparison of the candidate project-management methodologies.}}{7}{table.caption.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {1.4}Analysis of the existing system}{5}{section.1.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.4.1}Operational landscape of Accent Tunisie}{5}{subsection.1.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{Database 1 --- raw telemetry stream}{5}{subsection.1.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{Database 2 --- decoded archive}{5}{subsection.1.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{Database 3 --- users, clients and master data}{6}{subsection.1.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.4.2}Decoding pipeline and data flow}{6}{subsection.1.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.4.3}Analytical surface of the existing system}{6}{subsection.1.4.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.4.4}Identified limitations}{6}{subsection.1.4.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.4.5}Synthesis of the diagnostic}{7}{subsection.1.4.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {1.5}Problem statement}{7}{section.1.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {1.6}Proposed solution}{8}{section.1.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.6.1}Functional outline}{8}{subsection.1.6.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.6.2}Why an analytical PostgreSQL warehouse?}{8}{subsection.1.6.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.6.3}Why a Microsoft Azure virtual machine?}{9}{subsection.1.6.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.6.4}Architectural outline}{9}{subsection.1.6.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.6.5}Expected benefits}{10}{subsection.1.6.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {1.7}Project management methodology}{10}{section.1.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.7.1}Comparison of candidate methodologies}{10}{subsection.1.7.1}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {1.1}{\ignorespaces Comparison of the candidate project-management methodologies.}}{10}{table.caption.8}\protected@file@percent }
 \providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
-\newlabel{tab:method-compare}{{1.1}{7}{Comparison of the candidate project-management methodologies}{table.caption.8}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {1.7.2}Justification of the choice of CRISP-DM}{7}{subsection.1.7.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {1.7.3}Project plan along the six CRISP-DM phases}{7}{subsection.1.7.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {1.8}Conclusion}{8}{section.1.8}\protected@file@percent }
-\@writefile{toc}{\contentsline {chapter}{\numberline {2}Business Understanding, Requirements and Architecture}{9}{chapter.2}\protected@file@percent }
+\newlabel{tab:method-compare}{{1.1}{10}{Comparison of the candidate project-management methodologies}{table.caption.8}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.7.2}Justification of the choice of CRISP-DM}{10}{subsection.1.7.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.7.3}Project plan along the six CRISP-DM phases}{11}{subsection.1.7.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {1.8}Conclusion}{11}{section.1.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{\numberline {2}Business Understanding, Requirements and Architecture}{12}{chapter.2}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{chap:business}{{2}{9}{Business Understanding, Requirements and Architecture}{chapter.2}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {2.1}Introduction}{9}{section.2.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {2.2}Business objectives}{9}{section.2.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.2.1}Strategic objectives of the host organization}{9}{subsection.2.2.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.2.2}Operational objectives of the project}{9}{subsection.2.2.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {2.3}Research questions}{10}{section.2.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {2.4}Requirements analysis}{10}{section.2.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.4.1}Functional requirements}{10}{subsection.2.4.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.4.2}Non-functional requirements}{10}{subsection.2.4.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.4.3}User profiles}{10}{subsection.2.4.3}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {2.1}{\ignorespaces Functional requirements.}}{11}{table.caption.9}\protected@file@percent }
-\newlabel{tab:fr}{{2.1}{11}{Functional requirements}{table.caption.9}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {2.5}Target architecture}{11}{section.2.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.5.1}Logical view}{11}{subsection.2.5.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.5.2}Physical view on Microsoft Azure}{11}{subsection.2.5.2}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {2.2}{\ignorespaces Non-functional requirements.}}{12}{table.caption.10}\protected@file@percent }
-\newlabel{tab:nfr}{{2.2}{12}{Non-functional requirements}{table.caption.10}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.5.3}Data flow}{12}{subsection.2.5.3}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {2.1}{\ignorespaces Logical data flow of the platform.}}{12}{figure.caption.11}\protected@file@percent }
-\newlabel{fig:dataflow}{{2.1}{12}{Logical data flow of the platform}{figure.caption.11}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.5.4}Layered storage}{13}{subsection.2.5.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {2.6}Technology stack}{13}{section.2.6}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.6.1}Storage and database}{13}{subsection.2.6.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.6.2}Processing and orchestration}{13}{subsection.2.6.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.6.3}Modeling and machine learning}{13}{subsection.2.6.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.6.4}Serving, API and dashboard}{13}{subsection.2.6.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.6.5}Cloud and operations}{14}{subsection.2.6.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.6.6}Justification of the technology choices}{14}{subsection.2.6.6}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {2.7}Conclusion}{14}{section.2.7}\protected@file@percent }
-\@writefile{toc}{\contentsline {chapter}{\numberline {3}Data Understanding through PostgreSQL Profiling}{15}{chapter.3}\protected@file@percent }
+\newlabel{chap:business}{{2}{12}{Business Understanding, Requirements and Architecture}{chapter.2}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {2.1}Introduction}{12}{section.2.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.2}Business objectives}{12}{section.2.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2.1}Strategic objectives of the host organization}{12}{subsection.2.2.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2.2}From observation to anticipation}{13}{subsection.2.2.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2.3}Operational objectives of the project}{13}{subsection.2.2.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.3}Research questions}{13}{section.2.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.4}Requirements analysis}{14}{section.2.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4.1}Functional requirements}{14}{subsection.2.4.1}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {2.1}{\ignorespaces Functional requirements.}}{14}{table.caption.9}\protected@file@percent }
+\newlabel{tab:fr}{{2.1}{14}{Functional requirements}{table.caption.9}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4.2}Non-functional requirements}{15}{subsection.2.4.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {2.2}{\ignorespaces Non-functional requirements.}}{15}{table.caption.10}\protected@file@percent }
+\newlabel{tab:nfr}{{2.2}{15}{Non-functional requirements}{table.caption.10}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4.3}User profiles}{15}{subsection.2.4.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.5}Target architecture}{15}{section.2.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.5.1}Logical view}{15}{subsection.2.5.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.5.2}Physical view on Microsoft Azure}{16}{subsection.2.5.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.5.3}Data flow}{16}{subsection.2.5.3}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {2.1}{\ignorespaces Logical data flow of the platform, from MySQL sources to PostgreSQL marts.}}{16}{figure.caption.11}\protected@file@percent }
+\newlabel{fig:dataflow}{{2.1}{16}{Logical data flow of the platform, from MySQL sources to PostgreSQL marts}{figure.caption.11}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.5.4}Layered storage}{16}{subsection.2.5.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.6}Technology stack}{17}{section.2.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.6.1}Operational source: MySQL}{17}{subsection.2.6.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.6.2}Analytical warehouse: PostgreSQL~16}{17}{subsection.2.6.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.6.3}Why PostgreSQL rather than MySQL for the warehouse}{17}{subsection.2.6.3}\protected@file@percent }
+\newlabel{ssec:why-postgres}{{2.6.3}{17}{Why PostgreSQL rather than MySQL for the warehouse}{subsection.2.6.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.6.4}Conversion bridge: MySQL dumps to PostgreSQL}{18}{subsection.2.6.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.6.5}Processing and orchestration}{18}{subsection.2.6.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.6.6}Modeling and machine learning}{19}{subsection.2.6.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.6.7}Serving, API and dashboard}{19}{subsection.2.6.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.6.8}Cloud and shared collaboration environment}{19}{subsection.2.6.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.6.9}Justification of the technology choices}{19}{subsection.2.6.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.7}Conclusion}{20}{section.2.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{\numberline {3}Data Understanding through Source Profiling}{21}{chapter.3}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{chap:data}{{3}{15}{Data Understanding through PostgreSQL Profiling}{chapter.3}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {3.1}Introduction}{15}{section.3.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {3.2}Source database presentation}{15}{section.3.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.2.1}Operational PostgreSQL of Accent Tunisie}{15}{subsection.3.2.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.2.2}Tables of interest}{15}{subsection.3.2.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {3.3}Extraction strategy}{16}{section.3.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.3.1}Connection setup}{16}{subsection.3.3.1}\protected@file@percent }
-\newlabel{lst:psycopg-connect}{{3.1}{16}{Read-only connection from Python to PostgreSQL}{lstlisting.3.1}{}}
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {3.1}{\ignorespaces Read-only connection from Python to PostgreSQL.}}{16}{lstlisting.3.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.3.2}MCP-driven exploration}{16}{subsection.3.3.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.3.3}Automated extraction to CSV}{16}{subsection.3.3.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {3.4}Schema analysis}{17}{section.3.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.4.1}Schema inspection queries}{17}{subsection.3.4.1}\protected@file@percent }
-\newlabel{lst:schema-columns}{{3.2}{17}{Schema inspection query against \texttt {information\_schema}}{lstlisting.3.2}{}}
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {3.2}{\ignorespaces Schema inspection query against \texttt  {information\_schema}.}}{17}{lstlisting.3.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.4.2}Schema map}{17}{subsection.3.4.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {3.5}Data dictionary}{17}{section.3.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.5.1}Methodology}{17}{subsection.3.5.1}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {3.1}{\ignorespaces Logical schema map of the source tables of interest.}}{18}{figure.caption.12}\protected@file@percent }
-\newlabel{fig:schema-map}{{3.1}{18}{Logical schema map of the source tables of interest}{figure.caption.12}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.5.2}Excerpt of the data dictionary}{18}{subsection.3.5.2}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {3.1}{\ignorespaces Data dictionary excerpt for \texttt  {staging.path}.}}{18}{table.caption.13}\protected@file@percent }
-\newlabel{tab:dict-path}{{3.1}{18}{Data dictionary excerpt for \texttt {staging.path}}{table.caption.13}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {3.6}Data quality assessment}{18}{section.3.6}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.6.1}Row count profile}{18}{subsection.3.6.1}\protected@file@percent }
-\newlabel{lst:row-count}{{3.3}{18}{Row counts per table of interest}{lstlisting.3.3}{}}
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {3.3}{\ignorespaces Row counts per table of interest.}}{18}{lstlisting.3.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.6.2}Null-rate analysis}{19}{subsection.3.6.2}\protected@file@percent }
-\newlabel{lst:null-rate}{{3.4}{19}{Null-rate analysis for \texttt {staging.path}}{lstlisting.3.4}{}}
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {3.4}{\ignorespaces Null-rate analysis for \texttt  {staging.path}.}}{19}{lstlisting.3.4}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {3.2}{\ignorespaces Null-rate heatmap on the principal source tables.}}{20}{figure.caption.14}\protected@file@percent }
-\newlabel{fig:missing-heatmap}{{3.2}{20}{Null-rate heatmap on the principal source tables}{figure.caption.14}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.6.3}Referential integrity}{20}{subsection.3.6.3}\protected@file@percent }
-\newlabel{lst:integrity}{{3.5}{20}{Referential integrity between \texttt {staging.path} and the device--vehicle chain}{lstlisting.3.5}{}}
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {3.5}{\ignorespaces Referential integrity between \texttt  {staging.path} and the device--vehicle chain.}}{20}{lstlisting.3.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.6.4}Outlier detection}{20}{subsection.3.6.4}\protected@file@percent }
-\newlabel{lst:outliers}{{3.6}{20}{Detection of physically implausible values in \texttt {staging.path}}{lstlisting.3.6}{}}
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {3.6}{\ignorespaces Detection of physically implausible values in \texttt  {staging.path}.}}{20}{lstlisting.3.6}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {3.7}Exploratory Data Analysis}{21}{section.3.7}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.7.1}Univariate distributions}{21}{subsection.3.7.1}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {3.3}{\ignorespaces Histogram of the per-trip distance in \texttt  {staging.path} (log scale).}}{21}{figure.caption.15}\protected@file@percent }
-\newlabel{fig:dist-distance}{{3.3}{21}{Histogram of the per-trip distance in \texttt {staging.path} (log scale)}{figure.caption.15}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.7.2}Bivariate analysis}{21}{subsection.3.7.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.7.3}Per-tenant signatures}{21}{subsection.3.7.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.7.4}Temporal coverage}{22}{subsection.3.7.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {3.8}Synthesis of identified issues}{22}{section.3.8}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {3.2}{\ignorespaces Synthesis of the data quality issues detected on the source tables.}}{22}{table.caption.16}\protected@file@percent }
-\newlabel{tab:issues}{{3.2}{22}{Synthesis of the data quality issues detected on the source tables}{table.caption.16}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {3.9}Conclusion}{22}{section.3.9}\protected@file@percent }
-\@writefile{toc}{\contentsline {chapter}{\numberline {4}Data Preparation and ETL Pipeline}{23}{chapter.4}\protected@file@percent }
+\newlabel{chap:data}{{3}{21}{Data Understanding through Source Profiling}{chapter.3}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.1}Introduction}{21}{section.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3.2}Source databases of Accent Tunisie}{21}{section.3.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2.1}Three operational MySQL databases}{21}{subsection.3.2.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2.2}Tables of interest}{22}{subsection.3.2.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3.3}Acquisition strategy}{22}{section.3.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3.1}Dump-based extraction from MySQL}{22}{subsection.3.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3.2}Connection to the analytical PostgreSQL}{22}{subsection.3.3.2}\protected@file@percent }
+\newlabel{lst:psycopg-connect}{{3.1}{23}{Read-only connection from Python to the analytical PostgreSQL}{lstlisting.3.1}{}}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {3.1}{\ignorespaces Read-only connection from Python to the analytical PostgreSQL.}}{23}{lstlisting.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3.3}MCP-driven exploration}{23}{subsection.3.3.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3.4}Reproducible export to CSV}{23}{subsection.3.3.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3.4}Schema analysis of the staging layer}{23}{section.3.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.4.1}Schema inspection queries}{23}{subsection.3.4.1}\protected@file@percent }
+\newlabel{lst:schema-columns}{{3.2}{23}{Schema inspection query against \texttt {information\_schema}}{lstlisting.3.2}{}}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {3.2}{\ignorespaces Schema inspection query against \texttt  {information\_schema}.}}{23}{lstlisting.3.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.4.2}Schema map}{24}{subsection.3.4.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {3.1}{\ignorespaces Logical schema map of the staging tables, after conversion of the MySQL dumps.}}{24}{figure.caption.12}\protected@file@percent }
+\newlabel{fig:schema-map}{{3.1}{24}{Logical schema map of the staging tables, after conversion of the MySQL dumps}{figure.caption.12}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.5}Data dictionary}{24}{section.3.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.5.1}Methodology}{24}{subsection.3.5.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.5.2}Excerpt of the data dictionary}{25}{subsection.3.5.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3.1}{\ignorespaces Data dictionary excerpt for \texttt  {staging.path}.}}{25}{table.caption.13}\protected@file@percent }
+\newlabel{tab:dict-path}{{3.1}{25}{Data dictionary excerpt for \texttt {staging.path}}{table.caption.13}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.6}Data quality assessment}{25}{section.3.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.6.1}Row count profile}{25}{subsection.3.6.1}\protected@file@percent }
+\newlabel{lst:row-count}{{3.3}{25}{Row counts per staging table of interest}{lstlisting.3.3}{}}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {3.3}{\ignorespaces Row counts per staging table of interest.}}{25}{lstlisting.3.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.6.2}Null-rate analysis}{26}{subsection.3.6.2}\protected@file@percent }
+\newlabel{lst:null-rate}{{3.4}{26}{Null-rate analysis for \texttt {staging.path}}{lstlisting.3.4}{}}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {3.4}{\ignorespaces Null-rate analysis for \texttt  {staging.path}.}}{26}{lstlisting.3.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.6.3}Referential integrity}{26}{subsection.3.6.3}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {3.2}{\ignorespaces Null-rate heatmap on the principal staging tables.}}{27}{figure.caption.14}\protected@file@percent }
+\newlabel{fig:missing-heatmap}{{3.2}{27}{Null-rate heatmap on the principal staging tables}{figure.caption.14}{}}
+\newlabel{lst:integrity}{{3.5}{27}{Referential integrity between \texttt {staging.path} and the device--vehicle chain}{lstlisting.3.5}{}}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {3.5}{\ignorespaces Referential integrity between \texttt  {staging.path} and the device--vehicle chain.}}{27}{lstlisting.3.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.6.4}Outlier detection}{27}{subsection.3.6.4}\protected@file@percent }
+\newlabel{lst:outliers}{{3.6}{27}{Detection of physically implausible values in \texttt {staging.path}}{lstlisting.3.6}{}}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {3.6}{\ignorespaces Detection of physically implausible values in \texttt  {staging.path}.}}{27}{lstlisting.3.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3.7}Exploratory Data Analysis}{27}{section.3.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.7.1}Univariate distributions}{27}{subsection.3.7.1}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {3.3}{\ignorespaces Histogram of the per-trip distance in \texttt  {staging.path} (log scale).}}{28}{figure.caption.15}\protected@file@percent }
+\newlabel{fig:dist-distance}{{3.3}{28}{Histogram of the per-trip distance in \texttt {staging.path} (log scale)}{figure.caption.15}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.7.2}Bivariate analysis}{28}{subsection.3.7.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.7.3}Per-tenant signatures}{28}{subsection.3.7.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.7.4}Temporal coverage}{28}{subsection.3.7.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3.8}Synthesis of identified issues}{29}{section.3.8}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3.2}{\ignorespaces Synthesis of the data quality issues detected on the staging tables.}}{29}{table.caption.16}\protected@file@percent }
+\newlabel{tab:issues}{{3.2}{29}{Synthesis of the data quality issues detected on the staging tables}{table.caption.16}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.9}Conclusion}{29}{section.3.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{\numberline {4}Data Preparation: Conversion, ETL and Feature Engineering}{30}{chapter.4}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{chap:prep}{{4}{23}{Data Preparation and ETL Pipeline}{chapter.4}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {4.1}Introduction}{23}{section.4.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {4.2}Pipeline architecture}{23}{section.4.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.2.1}Pipeline stages}{23}{subsection.4.2.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.2.2}Watermark-driven incremental processing}{23}{subsection.4.2.2}\protected@file@percent }
-\newlabel{lst:watermark}{{4.1}{23}{Reading and updating a watermark}{lstlisting.4.1}{}}
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {4.1}{\ignorespaces Reading and updating a watermark.}}{23}{lstlisting.4.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.2.3}Idempotency and replay}{24}{subsection.4.2.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {4.3}Cleaning rule engine}{24}{section.4.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.3.1}Rule catalogue}{24}{subsection.4.3.1}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {4.1}{\ignorespaces Cleaning rule catalogue applied at the warehouse boundary.}}{24}{table.caption.17}\protected@file@percent }
-\newlabel{tab:rules-prep}{{4.1}{24}{Cleaning rule catalogue applied at the warehouse boundary}{table.caption.17}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.3.2}Implementation pattern}{24}{subsection.4.3.2}\protected@file@percent }
-\newlabel{lst:rule-c2}{{4.2}{25}{Implementation of cleaning rule \texttt {C2} (positive trip duration)}{lstlisting.4.2}{}}
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {4.2}{\ignorespaces Implementation of cleaning rule \texttt  {C2} (positive trip duration).}}{25}{lstlisting.4.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.3.3}Quarantine table}{25}{subsection.4.3.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {4.4}Dimensional modeling of the warehouse}{25}{section.4.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.4.1}Dimensions}{25}{subsection.4.4.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.4.2}Facts}{26}{subsection.4.4.2}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {4.2}{\ignorespaces Fact tables produced by the warehouse layer.}}{26}{table.caption.18}\protected@file@percent }
-\newlabel{tab:facts-prep}{{4.2}{26}{Fact tables produced by the warehouse layer}{table.caption.18}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.4.3}UPSERT pattern}{26}{subsection.4.4.3}\protected@file@percent }
-\newlabel{lst:upsert}{{4.3}{26}{Idempotent upsert into \texttt {fact\_trip}}{lstlisting.4.3}{}}
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {4.3}{\ignorespaces Idempotent upsert into \texttt  {fact\_trip}.}}{26}{lstlisting.4.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {4.5}Analytical marts}{27}{section.4.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.5.1}Behaviour mart}{27}{subsection.4.5.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.5.2}Telemetry mart}{27}{subsection.4.5.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.5.3}BI marts}{27}{subsection.4.5.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.5.4}Unified ML view}{27}{subsection.4.5.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {4.6}Feature engineering}{27}{section.4.6}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.6.1}Feature registry}{27}{subsection.4.6.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.6.2}Aggregation strategy}{27}{subsection.4.6.2}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {4.3}{\ignorespaces Sample of the 35-feature registry (selected groups).}}{28}{table.caption.19}\protected@file@percent }
-\newlabel{tab:features-sample}{{4.3}{28}{Sample of the 35-feature registry (selected groups)}{table.caption.19}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.6.3}Transformations}{28}{subsection.4.6.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {4.7}Validation of the prepared dataset}{28}{section.4.7}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.7.1}Validation suite design}{28}{subsection.4.7.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.7.2}Final dataset summary}{28}{subsection.4.7.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {4.8}Conclusion}{29}{section.4.8}\protected@file@percent }
-\@writefile{toc}{\contentsline {chapter}{\numberline {5}Modeling, Evaluation and Final Justification}{30}{chapter.5}\protected@file@percent }
+\newlabel{chap:prep}{{4}{30}{Data Preparation: Conversion, ETL and Feature Engineering}{chapter.4}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {4.1}Introduction}{30}{section.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4.2}From MySQL dumps to a PostgreSQL staging layer}{30}{section.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2.1}Rationale and scope}{30}{subsection.4.2.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2.2}Dialect-level translation}{30}{subsection.4.2.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2.3}Conversion pipeline}{31}{subsection.4.2.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2.4}Hexadecimal payloads of the raw telemetry database}{31}{subsection.4.2.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4.3}Pipeline architecture}{32}{section.4.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3.1}Pipeline stages}{32}{subsection.4.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3.2}Watermark-driven incremental processing}{32}{subsection.4.3.2}\protected@file@percent }
+\newlabel{lst:watermark}{{4.1}{32}{Reading and updating a watermark}{lstlisting.4.1}{}}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {4.1}{\ignorespaces Reading and updating a watermark.}}{32}{lstlisting.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3.3}Idempotency and replay}{32}{subsection.4.3.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4.4}Cleaning rule engine}{33}{section.4.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4.1}Rule catalogue}{33}{subsection.4.4.1}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {4.1}{\ignorespaces Cleaning rule catalogue applied at the warehouse boundary.}}{33}{table.caption.17}\protected@file@percent }
+\newlabel{tab:rules-prep}{{4.1}{33}{Cleaning rule catalogue applied at the warehouse boundary}{table.caption.17}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4.2}Implementation pattern}{33}{subsection.4.4.2}\protected@file@percent }
+\newlabel{lst:rule-c2}{{4.2}{33}{Implementation of cleaning rule \texttt {C2} (positive trip duration)}{lstlisting.4.2}{}}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {4.2}{\ignorespaces Implementation of cleaning rule \texttt  {C2} (positive trip duration).}}{33}{lstlisting.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4.3}Quarantine table}{34}{subsection.4.4.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4.5}Dimensional modeling of the warehouse}{34}{section.4.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.5.1}Dimensions}{34}{subsection.4.5.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.5.2}Facts}{34}{subsection.4.5.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.5.3}UPSERT pattern}{34}{subsection.4.5.3}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {4.2}{\ignorespaces Fact tables produced by the warehouse layer.}}{35}{table.caption.18}\protected@file@percent }
+\newlabel{tab:facts-prep}{{4.2}{35}{Fact tables produced by the warehouse layer}{table.caption.18}{}}
+\newlabel{lst:upsert}{{4.3}{35}{Idempotent upsert into \texttt {fact\_trip}}{lstlisting.4.3}{}}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {4.3}{\ignorespaces Idempotent upsert into \texttt  {fact\_trip}.}}{35}{lstlisting.4.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4.6}Analytical marts}{35}{section.4.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.6.1}Behaviour mart}{35}{subsection.4.6.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.6.2}Telemetry mart}{36}{subsection.4.6.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.6.3}BI marts}{36}{subsection.4.6.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.6.4}Unified ML view}{36}{subsection.4.6.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4.7}Feature engineering}{36}{section.4.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.7.1}Feature registry}{36}{subsection.4.7.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.7.2}Aggregation strategy}{36}{subsection.4.7.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.7.3}Transformations}{36}{subsection.4.7.3}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {4.3}{\ignorespaces Sample of the 35-feature registry (selected groups).}}{37}{table.caption.19}\protected@file@percent }
+\newlabel{tab:features-sample}{{4.3}{37}{Sample of the 35-feature registry (selected groups)}{table.caption.19}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {4.8}Validation of the prepared dataset}{37}{section.4.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.8.1}Validation suite design}{37}{subsection.4.8.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.8.2}Final dataset summary}{37}{subsection.4.8.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4.9}Conclusion}{37}{section.4.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{\numberline {5}Modeling, Evaluation and Final Justification}{39}{chapter.5}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{chap:model}{{5}{30}{Modeling, Evaluation and Final Justification}{chapter.5}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {5.1}Introduction}{30}{section.5.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {5.2}Test design}{30}{section.5.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.2.1}Temporal split}{30}{subsection.5.2.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.2.2}Per-tenant fitting protocol}{30}{subsection.5.2.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.2.3}Reproducibility}{31}{subsection.5.2.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {5.3}Baseline models}{31}{section.5.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.3.1}Statistical baseline}{31}{subsection.5.3.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.3.2}Linear baseline}{31}{subsection.5.3.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {5.4}Machine learning candidates}{31}{section.5.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.4.1}K-Means clustering}{31}{subsection.5.4.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.4.2}Hierarchical clustering}{31}{subsection.5.4.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.4.3}DBSCAN}{32}{subsection.5.4.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.4.4}Isolation Forest for anomaly detection}{32}{subsection.5.4.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.4.5}One-Class SVM and Local Outlier Factor}{32}{subsection.5.4.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {5.5}Deep learning baseline}{32}{section.5.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.5.1}Autoencoder}{32}{subsection.5.5.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.5.2}Multi-Layer Perceptron}{32}{subsection.5.5.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.5.3}Comparison with classical ML}{32}{subsection.5.5.3}\protected@file@percent }
+\newlabel{chap:model}{{5}{39}{Modeling, Evaluation and Final Justification}{chapter.5}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {5.1}Introduction}{39}{section.5.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5.2}Test design}{39}{section.5.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2.1}Temporal split}{39}{subsection.5.2.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2.2}Per-tenant fitting protocol}{40}{subsection.5.2.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2.3}Reproducibility}{40}{subsection.5.2.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5.3}Baseline models}{40}{section.5.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3.1}Statistical baseline}{40}{subsection.5.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3.2}Linear baseline}{40}{subsection.5.3.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5.4}Machine learning candidates}{40}{section.5.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.4.1}K-Means clustering}{40}{subsection.5.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.4.2}Hierarchical clustering}{41}{subsection.5.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.4.3}DBSCAN}{41}{subsection.5.4.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.4.4}Isolation Forest for anomaly detection}{41}{subsection.5.4.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.4.5}One-Class SVM and Local Outlier Factor}{41}{subsection.5.4.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5.5}Deep learning baseline}{41}{section.5.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.5.1}Autoencoder}{41}{subsection.5.5.1}\protected@file@percent }
 \abx@aux@cite{0}{rousseeuw1987silhouettes}
 \abx@aux@segm{0}{0}{rousseeuw1987silhouettes}
 \abx@aux@cite{0}{davies1979cluster}
 \abx@aux@segm{0}{0}{davies1979cluster}
 \abx@aux@cite{0}{calinski1974dendrite}
 \abx@aux@segm{0}{0}{calinski1974dendrite}
-\@writefile{toc}{\contentsline {section}{\numberline {5.6}Evaluation metrics}{33}{section.5.6}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.6.1}Internal clustering metrics}{33}{subsection.5.6.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.6.2}Anomaly metrics}{33}{subsection.5.6.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.6.3}Business proxies}{33}{subsection.5.6.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {5.7}Model comparison and final justification}{33}{section.5.7}\protected@file@percent }
-\newlabel{sec:model-compare}{{5.7}{33}{Model comparison and final justification}{section.5.7}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.7.1}Comparative table}{33}{subsection.5.7.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.7.2}Per-tenant K-Means results}{33}{subsection.5.7.2}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {5.1}{\ignorespaces Comparative performance of the candidate models.}}{34}{table.caption.20}\protected@file@percent }
-\newlabel{tab:model-compare}{{5.1}{34}{Comparative performance of the candidate models}{table.caption.20}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {5.2}{\ignorespaces Per-tenant K-Means results on the modeling window.}}{34}{table.caption.21}\protected@file@percent }
-\newlabel{tab:kmeans-final}{{5.2}{34}{Per-tenant K-Means results on the modeling window}{table.caption.21}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.7.3}Justification of the final choice}{34}{subsection.5.7.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {5.8}Results interpretation}{34}{section.5.8}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.8.1}Behavioural profiles}{34}{subsection.5.8.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.8.2}Risk score distribution}{34}{subsection.5.8.2}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {5.1}{\ignorespaces Distribution of the rescaled risk score per tenant.}}{35}{figure.caption.22}\protected@file@percent }
-\newlabel{fig:risk-dist}{{5.1}{35}{Distribution of the rescaled risk score per tenant}{figure.caption.22}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.8.3}Confusion matrix against the rule baseline}{35}{subsection.5.8.3}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {5.2}{\ignorespaces Confusion matrix between the rule baseline and the Isolation Forest.}}{35}{figure.caption.23}\protected@file@percent }
-\newlabel{fig:confusion}{{5.2}{35}{Confusion matrix between the rule baseline and the Isolation Forest}{figure.caption.23}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.8.4}Feature importance}{35}{subsection.5.8.4}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {5.3}{\ignorespaces Surrogate feature importance for the unsupervised models.}}{36}{figure.caption.24}\protected@file@percent }
-\newlabel{fig:feature-imp}{{5.3}{36}{Surrogate feature importance for the unsupervised models}{figure.caption.24}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {5.9}Dashboards and analytical artefacts}{36}{section.5.9}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {5.10}Conclusion}{36}{section.5.10}\protected@file@percent }
-\@writefile{toc}{\contentsline {chapter}{\numberline {6}Deployment, API, Dashboard and Azure Operations}{37}{chapter.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.5.2}Multi-Layer Perceptron}{42}{subsection.5.5.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.5.3}Comparison with classical ML}{42}{subsection.5.5.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5.6}Evaluation metrics}{42}{section.5.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.6.1}Internal clustering metrics}{42}{subsection.5.6.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.6.2}Anomaly metrics}{42}{subsection.5.6.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.6.3}Business proxies}{42}{subsection.5.6.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5.7}Model comparison and final justification}{43}{section.5.7}\protected@file@percent }
+\newlabel{sec:model-compare}{{5.7}{43}{Model comparison and final justification}{section.5.7}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.7.1}Comparative table}{43}{subsection.5.7.1}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {5.1}{\ignorespaces Comparative performance of the candidate models.}}{43}{table.caption.20}\protected@file@percent }
+\newlabel{tab:model-compare}{{5.1}{43}{Comparative performance of the candidate models}{table.caption.20}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.7.2}Per-tenant K-Means results}{43}{subsection.5.7.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {5.2}{\ignorespaces Per-tenant K-Means results on the modeling window.}}{43}{table.caption.21}\protected@file@percent }
+\newlabel{tab:kmeans-final}{{5.2}{43}{Per-tenant K-Means results on the modeling window}{table.caption.21}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.7.3}Justification of the final choice}{43}{subsection.5.7.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5.8}Results interpretation}{44}{section.5.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.8.1}Behavioural profiles}{44}{subsection.5.8.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.8.2}Risk score distribution}{44}{subsection.5.8.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {5.1}{\ignorespaces Distribution of the rescaled risk score per tenant.}}{44}{figure.caption.22}\protected@file@percent }
+\newlabel{fig:risk-dist}{{5.1}{44}{Distribution of the rescaled risk score per tenant}{figure.caption.22}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.8.3}Confusion matrix against the rule baseline}{44}{subsection.5.8.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.8.4}Feature importance}{44}{subsection.5.8.4}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {5.2}{\ignorespaces Confusion matrix between the rule baseline and the Isolation Forest.}}{45}{figure.caption.23}\protected@file@percent }
+\newlabel{fig:confusion}{{5.2}{45}{Confusion matrix between the rule baseline and the Isolation Forest}{figure.caption.23}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {5.3}{\ignorespaces Surrogate feature importance for the unsupervised models.}}{45}{figure.caption.24}\protected@file@percent }
+\newlabel{fig:feature-imp}{{5.3}{45}{Surrogate feature importance for the unsupervised models}{figure.caption.24}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {5.9}Dashboards and analytical artefacts}{45}{section.5.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5.10}Conclusion}{46}{section.5.10}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{\numberline {6}Deployment, API, Dashboard and Azure Operations}{47}{chapter.6}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{chap:deploy}{{6}{37}{Deployment, API, Dashboard and Azure Operations}{chapter.6}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {6.1}Introduction}{37}{section.6.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {6.2}Deployment strategy}{37}{section.6.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.2.1}Industrialization principles}{37}{subsection.6.2.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.2.2}Operating modes}{37}{subsection.6.2.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {6.3}Microsoft Azure infrastructure}{38}{section.6.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.3.1}Azure Virtual Machine}{38}{subsection.6.3.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.3.2}Network Security Group and IP allowlist}{38}{subsection.6.3.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.3.3}Secure remote collaboration via SSH tunnelling}{38}{subsection.6.3.3}\protected@file@percent }
-\newlabel{lst:ssh-tunnel}{{6.1}{38}{Opening an SSH tunnel from a developer workstation to the Azure VM}{lstlisting.6.1}{}}
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {6.1}{\ignorespaces Opening an SSH tunnel from a developer workstation to the Azure VM.}}{38}{lstlisting.6.1}\protected@file@percent }
+\newlabel{chap:deploy}{{6}{47}{Deployment, API, Dashboard and Azure Operations}{chapter.6}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {6.1}Introduction}{47}{section.6.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {6.2}Deployment strategy}{47}{section.6.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.2.1}Industrialization principles}{47}{subsection.6.2.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.2.2}Operating modes}{47}{subsection.6.2.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {6.3}Microsoft Azure infrastructure}{48}{section.6.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.3.1}Azure Virtual Machine}{48}{subsection.6.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.3.2}Network Security Group and IP allowlist}{48}{subsection.6.3.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.3.3}Secure remote collaboration via SSH tunnelling}{48}{subsection.6.3.3}\protected@file@percent }
+\newlabel{lst:ssh-tunnel}{{6.1}{48}{Opening an SSH tunnel from a developer workstation to the Azure VM}{lstlisting.6.1}{}}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {6.1}{\ignorespaces Opening an SSH tunnel from a developer workstation to the Azure VM.}}{48}{lstlisting.6.1}\protected@file@percent }
 \abx@aux@cite{0}{fastapi2024}
 \abx@aux@segm{0}{0}{fastapi2024}
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.3.4}Service accounts}{39}{subsection.6.3.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {6.4}PostgreSQL integration}{39}{section.6.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.4.1}Local PostgreSQL on the VM}{39}{subsection.6.4.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.4.2}Connection management}{39}{subsection.6.4.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.4.3}Backups and snapshots}{39}{subsection.6.4.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {6.5}API and backend}{39}{section.6.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.5.1}API design}{39}{subsection.6.5.1}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {6.1}{\ignorespaces API endpoints exposed by the platform.}}{40}{table.caption.25}\protected@file@percent }
-\newlabel{tab:api-endpoints}{{6.1}{40}{API endpoints exposed by the platform}{table.caption.25}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.5.2}Backend architecture}{40}{subsection.6.5.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.5.3}Reverse proxy and TLS}{40}{subsection.6.5.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {6.6}Dashboard and frontend}{40}{section.6.6}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.6.1}Dashboard implementation}{40}{subsection.6.6.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.6.2}Pages and visualizations}{40}{subsection.6.6.2}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {6.1}{\ignorespaces Architecture of the BI dashboard.}}{41}{figure.caption.26}\protected@file@percent }
-\newlabel{fig:dashboard}{{6.1}{41}{Architecture of the BI dashboard}{figure.caption.26}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {6.7}Automation}{41}{section.6.7}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.7.1}Cron entry}{41}{subsection.6.7.1}\protected@file@percent }
-\newlabel{lst:cron}{{6.2}{41}{Cron entry triggering the incremental pipeline every five minutes}{lstlisting.6.2}{}}
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {6.2}{\ignorespaces Cron entry triggering the incremental pipeline every five minutes.}}{41}{lstlisting.6.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.7.2}Prefect flow}{41}{subsection.6.7.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.7.3}Backfill orchestration}{41}{subsection.6.7.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {6.8}Monitoring and alerting}{42}{section.6.8}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.8.1}Run log and lineage}{42}{subsection.6.8.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.8.2}Data quality monitoring}{42}{subsection.6.8.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.8.3}Model drift monitoring}{42}{subsection.6.8.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.8.4}Alerting}{42}{subsection.6.8.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.8.5}Operations runbook}{42}{subsection.6.8.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {6.9}Production deployment workflow}{42}{section.6.9}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.9.1}Code deployment}{42}{subsection.6.9.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.9.2}Database migrations}{43}{subsection.6.9.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.9.3}Model deployment}{43}{subsection.6.9.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.9.4}Diagram of the deployment pipeline}{43}{subsection.6.9.4}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {6.2}{\ignorespaces End-to-end deployment pipeline of the platform.}}{43}{figure.caption.27}\protected@file@percent }
-\newlabel{fig:deploy-pipeline}{{6.2}{43}{End-to-end deployment pipeline of the platform}{figure.caption.27}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {6.10}Conclusion}{43}{section.6.10}\protected@file@percent }
-\@writefile{toc}{\contentsline {chapter}{General Conclusion}{44}{chapter*.28}\protected@file@percent }
-\@writefile{toc}{\contentsline {chapter}{Bibliography}{46}{chapter*.28}\protected@file@percent }
-\@writefile{toc}{\contentsline {chapter}{\numberline {A}SQL Exploration Scripts}{46}{appendix.A}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.3.4}Service accounts}{49}{subsection.6.3.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {6.4}PostgreSQL integration}{49}{section.6.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.4.1}Analytical PostgreSQL on the VM}{49}{subsection.6.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.4.2}Connection management}{49}{subsection.6.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.4.3}Backups and snapshots}{49}{subsection.6.4.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {6.5}API and backend}{50}{section.6.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.5.1}API design}{50}{subsection.6.5.1}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {6.1}{\ignorespaces API endpoints exposed by the platform.}}{50}{table.caption.25}\protected@file@percent }
+\newlabel{tab:api-endpoints}{{6.1}{50}{API endpoints exposed by the platform}{table.caption.25}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.5.2}Backend architecture}{50}{subsection.6.5.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.5.3}Reverse proxy and TLS}{50}{subsection.6.5.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {6.6}Dashboard and frontend}{50}{section.6.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.6.1}Dashboard implementation}{50}{subsection.6.6.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.6.2}Pages and visualizations}{51}{subsection.6.6.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {6.1}{\ignorespaces Architecture of the BI dashboard.}}{51}{figure.caption.26}\protected@file@percent }
+\newlabel{fig:dashboard}{{6.1}{51}{Architecture of the BI dashboard}{figure.caption.26}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {6.7}Automation}{51}{section.6.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.7.1}Cron entry}{51}{subsection.6.7.1}\protected@file@percent }
+\newlabel{lst:cron}{{6.2}{51}{Cron entry triggering the incremental pipeline every five minutes}{lstlisting.6.2}{}}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {6.2}{\ignorespaces Cron entry triggering the incremental pipeline every five minutes.}}{51}{lstlisting.6.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.7.2}Prefect flow}{51}{subsection.6.7.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.7.3}Backfill orchestration}{52}{subsection.6.7.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {6.8}Monitoring and alerting}{52}{section.6.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.8.1}Run log and lineage}{52}{subsection.6.8.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.8.2}Data quality monitoring}{52}{subsection.6.8.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.8.3}Model drift monitoring}{52}{subsection.6.8.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.8.4}Alerting}{52}{subsection.6.8.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.8.5}Operations runbook}{52}{subsection.6.8.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {6.9}Production deployment workflow}{53}{section.6.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.9.1}Code deployment}{53}{subsection.6.9.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.9.2}Database migrations}{53}{subsection.6.9.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.9.3}Model deployment}{53}{subsection.6.9.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.9.4}Diagram of the deployment pipeline}{53}{subsection.6.9.4}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {6.2}{\ignorespaces End-to-end deployment pipeline of the platform.}}{53}{figure.caption.27}\protected@file@percent }
+\newlabel{fig:deploy-pipeline}{{6.2}{53}{End-to-end deployment pipeline of the platform}{figure.caption.27}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {6.10}Conclusion}{53}{section.6.10}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{General Conclusion}{55}{chapter*.28}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{Bibliography}{58}{chapter*.28}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{\numberline {A}SQL Exploration Scripts}{58}{appendix.A}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{app:sql}{{A}{46}{SQL Exploration Scripts}{appendix.A}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {A.1}Schema inspection}{46}{section.A.1}\protected@file@percent }
-\newlabel{sec:app-sql-schema}{{A.1}{46}{Schema inspection}{section.A.1}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {A.2}Data profiling}{46}{section.A.2}\protected@file@percent }
-\newlabel{sec:app-sql-profile}{{A.2}{46}{Data profiling}{section.A.2}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {A.3}Null analysis}{46}{section.A.3}\protected@file@percent }
-\newlabel{sec:app-sql-null}{{A.3}{46}{Null analysis}{section.A.3}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {A.4}Distributions}{46}{section.A.4}\protected@file@percent }
-\newlabel{sec:app-sql-distrib}{{A.4}{46}{Distributions}{section.A.4}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {A.5}KPI extraction}{47}{section.A.5}\protected@file@percent }
-\newlabel{sec:app-sql-kpi}{{A.5}{47}{KPI extraction}{section.A.5}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {A.6}Metadata analysis}{47}{section.A.6}\protected@file@percent }
-\newlabel{sec:app-sql-meta}{{A.6}{47}{Metadata analysis}{section.A.6}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {A.7}Validation suite}{47}{section.A.7}\protected@file@percent }
-\@writefile{toc}{\contentsline {chapter}{\numberline {B}Python Scripts and Figure Generation}{48}{appendix.B}\protected@file@percent }
+\newlabel{app:sql}{{A}{58}{SQL Exploration Scripts}{appendix.A}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {A.1}Schema inspection}{58}{section.A.1}\protected@file@percent }
+\newlabel{sec:app-sql-schema}{{A.1}{58}{Schema inspection}{section.A.1}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {A.2}Data profiling}{58}{section.A.2}\protected@file@percent }
+\newlabel{sec:app-sql-profile}{{A.2}{58}{Data profiling}{section.A.2}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {A.3}Null analysis}{58}{section.A.3}\protected@file@percent }
+\newlabel{sec:app-sql-null}{{A.3}{58}{Null analysis}{section.A.3}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {A.4}Distributions}{58}{section.A.4}\protected@file@percent }
+\newlabel{sec:app-sql-distrib}{{A.4}{58}{Distributions}{section.A.4}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {A.5}KPI extraction}{59}{section.A.5}\protected@file@percent }
+\newlabel{sec:app-sql-kpi}{{A.5}{59}{KPI extraction}{section.A.5}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {A.6}Metadata analysis}{59}{section.A.6}\protected@file@percent }
+\newlabel{sec:app-sql-meta}{{A.6}{59}{Metadata analysis}{section.A.6}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {A.7}Validation suite}{59}{section.A.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{\numberline {B}Python Scripts and Figure Generation}{60}{appendix.B}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{app:python}{{B}{48}{Python Scripts and Figure Generation}{appendix.B}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {B.1}Automated extraction to CSV}{48}{section.B.1}\protected@file@percent }
-\newlabel{sec:app-py-extract}{{B.1}{48}{Automated extraction to CSV}{section.B.1}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {B.2}Figure generation}{48}{section.B.2}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {B.1}{\ignorespaces Figure-generation scripts referenced in the thesis.}}{48}{table.caption.29}\protected@file@percent }
-\newlabel{tab:figures}{{B.1}{48}{Figure-generation scripts referenced in the thesis}{table.caption.29}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {B.3}Modeling scripts}{49}{section.B.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {chapter}{\numberline {C}Azure Operations Runbook}{50}{appendix.C}\protected@file@percent }
+\newlabel{app:python}{{B}{60}{Python Scripts and Figure Generation}{appendix.B}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {B.1}Automated extraction to CSV}{60}{section.B.1}\protected@file@percent }
+\newlabel{sec:app-py-extract}{{B.1}{60}{Automated extraction to CSV}{section.B.1}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {B.2}Figure generation}{60}{section.B.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {B.1}{\ignorespaces Figure-generation scripts referenced in the thesis.}}{60}{table.caption.29}\protected@file@percent }
+\newlabel{tab:figures}{{B.1}{60}{Figure-generation scripts referenced in the thesis}{table.caption.29}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {B.3}Modeling scripts}{61}{section.B.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{\numberline {C}Azure Operations Runbook}{62}{appendix.C}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{app:azure}{{C}{50}{Azure Operations Runbook}{appendix.C}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {C.1}VM provisioning}{50}{section.C.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {C.1.1}VM specification}{50}{subsection.C.1.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {C.1.2}Network Security Group}{50}{subsection.C.1.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {C.1.3}IP allowlist management}{50}{subsection.C.1.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {C.2}SSH access}{51}{section.C.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {C.2.1}Account types}{51}{subsection.C.2.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {C.2.2}SSH tunnel}{51}{subsection.C.2.2}\protected@file@percent }
-\newlabel{lst:ssh-tunnel-app}{{C.1}{51}{SSH tunnel for PostgreSQL access}{lstlisting.C.1}{}}
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {C.1}{\ignorespaces SSH tunnel for PostgreSQL access.}}{51}{lstlisting.C.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {C.2.3}Key rotation}{51}{subsection.C.2.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {C.3}Pipeline operations}{51}{section.C.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {C.3.1}Cron entry}{51}{subsection.C.3.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {C.3.2}Inspecting the run log}{51}{subsection.C.3.2}\protected@file@percent }
-\newlabel{lst:run-log}{{C.2}{51}{Inspecting the run log}{lstlisting.C.2}{}}
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {C.2}{\ignorespaces Inspecting the run log.}}{51}{lstlisting.C.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {C.3.3}Triggering a backfill}{52}{subsection.C.3.3}\protected@file@percent }
-\newlabel{lst:backfill}{{C.3}{52}{Triggering a chunked backfill}{lstlisting.C.3}{}}
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {C.3}{\ignorespaces Triggering a chunked backfill.}}{52}{lstlisting.C.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {C.4}Database operations}{52}{section.C.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {C.4.1}Backup}{52}{subsection.C.4.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {C.4.2}Credential rotation}{52}{subsection.C.4.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {C.5}API and dashboard operations}{52}{section.C.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {C.5.1}Service management}{52}{subsection.C.5.1}\protected@file@percent }
-\newlabel{lst:systemd}{{C.4}{52}{Managing the API and dashboard systemd units}{lstlisting.C.4}{}}
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {C.4}{\ignorespaces Managing the API and dashboard systemd units.}}{52}{lstlisting.C.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {C.5.2}TLS certificate renewal}{53}{subsection.C.5.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {C.6}Monitoring and alerting}{53}{section.C.6}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {C.6.1}Pipeline alerts}{53}{subsection.C.6.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {C.6.2}Data quality alerts}{53}{subsection.C.6.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {C.6.3}Drift alerts}{53}{subsection.C.6.3}\protected@file@percent }
+\newlabel{app:azure}{{C}{62}{Azure Operations Runbook}{appendix.C}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {C.1}VM provisioning}{62}{section.C.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {C.1.1}VM specification}{62}{subsection.C.1.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {C.1.2}Network Security Group}{62}{subsection.C.1.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {C.1.3}IP allowlist management}{62}{subsection.C.1.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {C.2}SSH access}{63}{section.C.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {C.2.1}Account types}{63}{subsection.C.2.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {C.2.2}SSH tunnel}{63}{subsection.C.2.2}\protected@file@percent }
+\newlabel{lst:ssh-tunnel-app}{{C.1}{63}{SSH tunnel for PostgreSQL access}{lstlisting.C.1}{}}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {C.1}{\ignorespaces SSH tunnel for PostgreSQL access.}}{63}{lstlisting.C.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {C.2.3}Key rotation}{63}{subsection.C.2.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {C.3}Pipeline operations}{63}{section.C.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {C.3.1}Cron entry}{63}{subsection.C.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {C.3.2}Inspecting the run log}{63}{subsection.C.3.2}\protected@file@percent }
+\newlabel{lst:run-log}{{C.2}{63}{Inspecting the run log}{lstlisting.C.2}{}}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {C.2}{\ignorespaces Inspecting the run log.}}{63}{lstlisting.C.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {C.3.3}Triggering a backfill}{64}{subsection.C.3.3}\protected@file@percent }
+\newlabel{lst:backfill}{{C.3}{64}{Triggering a chunked backfill}{lstlisting.C.3}{}}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {C.3}{\ignorespaces Triggering a chunked backfill.}}{64}{lstlisting.C.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {C.4}Database operations}{64}{section.C.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {C.4.1}Backup}{64}{subsection.C.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {C.4.2}Credential rotation}{64}{subsection.C.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {C.5}API and dashboard operations}{64}{section.C.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {C.5.1}Service management}{64}{subsection.C.5.1}\protected@file@percent }
+\newlabel{lst:systemd}{{C.4}{64}{Managing the API and dashboard systemd units}{lstlisting.C.4}{}}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {C.4}{\ignorespaces Managing the API and dashboard systemd units.}}{64}{lstlisting.C.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {C.5.2}TLS certificate renewal}{65}{subsection.C.5.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {C.6}Monitoring and alerting}{65}{section.C.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {C.6.1}Pipeline alerts}{65}{subsection.C.6.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {C.6.2}Data quality alerts}{65}{subsection.C.6.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {C.6.3}Drift alerts}{65}{subsection.C.6.3}\protected@file@percent }
 \abx@aux@lbx@loadrequest{french}
 \abx@aux@lbx@loadrequest{french}
 \abx@aux@read@bbl@mdfivesum{nobblfile}
 \abx@aux@read@bblrerun
-\gdef \@abspage@last{70}
+\gdef \@abspage@last{83}
