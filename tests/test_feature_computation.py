@@ -10,7 +10,7 @@ from accent_fleet.features import load_feature_registry, load_risk_scorer
 
 
 # ---------------------------------------------------------------------------
-def test_registry_has_all_six_groups():
+def test_registry_has_expected_groups():
     reg = load_feature_registry()
     assert set(reg.groups()) == {
         "trip_volume_patterns",
@@ -19,6 +19,8 @@ def test_registry_has_all_six_groups():
         "alerts",
         "stops_idling",
         "temporal_patterns",
+        "harsh_events",
+        "telemetry_engine_idling",
     }
 
 
