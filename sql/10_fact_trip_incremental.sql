@@ -41,6 +41,15 @@ CREATE TABLE IF NOT EXISTS warehouse.fact_trip (
   is_rush_hour_trip    BOOLEAN,
   is_short_trip        BOOLEAN,                     -- distance < 1 km
   is_long_trip         BOOLEAN,                     -- distance > 100 km
+  -- Source provenance. Normal rows come from staging.path; bounded
+  -- telemetry reconstructions can be inserted by sql/27 for tenants whose
+  -- path feed is missing.
+  trip_source          TEXT NOT NULL DEFAULT 'path',
+  reconstruction_method TEXT,
+  source_ping_count    BIGINT,
+  moving_ping_count    BIGINT,
+  valid_gps_ping_count BIGINT,
+  source_month         CHAR(7),
   -- Lineage
   _etl_run_id          BIGINT,
   _loaded_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -126,5 +135,11 @@ ON CONFLICT (tenant_id, device_id, begin_path_time) DO UPDATE
       fuel_used         = EXCLUDED.fuel_used,
       start_odo         = EXCLUDED.start_odo,
       end_odo           = EXCLUDED.end_odo,
+      trip_source       = 'path',
+      reconstruction_method = NULL,
+      source_ping_count = NULL,
+      moving_ping_count = NULL,
+      valid_gps_ping_count = NULL,
+      source_month      = NULL,
       _etl_run_id       = EXCLUDED._etl_run_id,
       _loaded_at        = NOW();
