@@ -1,0 +1,142 @@
+% $ biblatex auxiliary file $
+% $ biblatex bbl format version 3.3 $
+% Do not modify the above lines!
+%
+% This is an auxiliary file used by the 'biblatex' package.
+% This file may safely be deleted. It will be recreated by
+% biber as required.
+%
+\begingroup
+\makeatletter
+\@ifundefined{ver@biblatex.sty}
+  {\@latex@error
+     {Missing 'biblatex' package}
+     {The bibliography requires the 'biblatex' package.}
+      \aftergroup\endinput}
+  {}
+\endgroup
+
+
+\refsection{0}
+  \datalist[entry]{none/global//global/global/global}
+    \entry{rousseeuw1987silhouettes}{article}{}{}
+      \name{author}{1}{}{%
+        {{hash=72d8129c9f4e6afddacb834fb2d8226f}{%
+           family={Rousseeuw},
+           familyi={R\bibinitperiod},
+           given={Peter\bibnamedelima J.},
+           giveni={P\bibinitperiod\bibinitdelim J\bibinitperiod}}}%
+      }
+      \strng{namehash}{72d8129c9f4e6afddacb834fb2d8226f}
+      \strng{fullhash}{72d8129c9f4e6afddacb834fb2d8226f}
+      \strng{fullhashraw}{72d8129c9f4e6afddacb834fb2d8226f}
+      \strng{bibnamehash}{72d8129c9f4e6afddacb834fb2d8226f}
+      \strng{authorbibnamehash}{72d8129c9f4e6afddacb834fb2d8226f}
+      \strng{authornamehash}{72d8129c9f4e6afddacb834fb2d8226f}
+      \strng{authorfullhash}{72d8129c9f4e6afddacb834fb2d8226f}
+      \strng{authorfullhashraw}{72d8129c9f4e6afddacb834fb2d8226f}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{journaltitle}{Journal of Computational and Applied Mathematics}
+      \field{title}{Silhouettes: A graphical aid to the interpretation and validation of cluster analysis}
+      \field{volume}{20}
+      \field{year}{1987}
+      \field{pages}{53\bibrangedash 65}
+      \range{pages}{13}
+    \endentry
+    \entry{davies1979cluster}{article}{}{}
+      \name{author}{2}{}{%
+        {{hash=3e635d77b8d72bf4b91799a7c67b1c17}{%
+           family={Davies},
+           familyi={D\bibinitperiod},
+           given={David\bibnamedelima L.},
+           giveni={D\bibinitperiod\bibinitdelim L\bibinitperiod}}}%
+        {{hash=95a088363005642e50919b1753b85c9e}{%
+           family={Bouldin},
+           familyi={B\bibinitperiod},
+           given={Donald\bibnamedelima W.},
+           giveni={D\bibinitperiod\bibinitdelim W\bibinitperiod}}}%
+      }
+      \strng{namehash}{4ce4c2976c5cf0d48fca53858a43efda}
+      \strng{fullhash}{4ce4c2976c5cf0d48fca53858a43efda}
+      \strng{fullhashraw}{4ce4c2976c5cf0d48fca53858a43efda}
+      \strng{bibnamehash}{4ce4c2976c5cf0d48fca53858a43efda}
+      \strng{authorbibnamehash}{4ce4c2976c5cf0d48fca53858a43efda}
+      \strng{authornamehash}{4ce4c2976c5cf0d48fca53858a43efda}
+      \strng{authorfullhash}{4ce4c2976c5cf0d48fca53858a43efda}
+      \strng{authorfullhashraw}{4ce4c2976c5cf0d48fca53858a43efda}
+      \field{sortinit}{2}
+      \field{sortinithash}{8b555b3791beccb63322c22f3320aa9a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{journaltitle}{IEEE Transactions on Pattern Analysis and Machine Intelligence}
+      \field{number}{2}
+      \field{title}{A cluster separation measure}
+      \field{volume}{PAMI-1}
+      \field{year}{1979}
+      \field{pages}{224\bibrangedash 227}
+      \range{pages}{4}
+    \endentry
+    \entry{calinski1974dendrite}{article}{}{}
+      \name{author}{2}{}{%
+        {{hash=74b28f30912e45b424de18f111b69b81}{%
+           family={Caliński},
+           familyi={C\bibinitperiod},
+           given={Tadeusz},
+           giveni={T\bibinitperiod}}}%
+        {{hash=705a0f0d8bea0216da600ed8696dcdb7}{%
+           family={Harabasz},
+           familyi={H\bibinitperiod},
+           given={Jerzy},
+           giveni={J\bibinitperiod}}}%
+      }
+      \strng{namehash}{0353a140f42cb3b4e1be02a67a54cdb0}
+      \strng{fullhash}{0353a140f42cb3b4e1be02a67a54cdb0}
+      \strng{fullhashraw}{0353a140f42cb3b4e1be02a67a54cdb0}
+      \strng{bibnamehash}{0353a140f42cb3b4e1be02a67a54cdb0}
+      \strng{authorbibnamehash}{0353a140f42cb3b4e1be02a67a54cdb0}
+      \strng{authornamehash}{0353a140f42cb3b4e1be02a67a54cdb0}
+      \strng{authorfullhash}{0353a140f42cb3b4e1be02a67a54cdb0}
+      \strng{authorfullhashraw}{0353a140f42cb3b4e1be02a67a54cdb0}
+      \field{sortinit}{3}
+      \field{sortinithash}{ad6fe7482ffbd7b9f99c9e8b5dccd3d7}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{journaltitle}{Communications in Statistics}
+      \field{number}{1}
+      \field{title}{A dendrite method for cluster analysis}
+      \field{volume}{3}
+      \field{year}{1974}
+      \field{pages}{1\bibrangedash 27}
+      \range{pages}{27}
+    \endentry
+    \entry{fastapi2024}{misc}{}{}
+      \name{author}{1}{}{%
+        {{hash=efe3b88203dcb08f01f0192be9ca61ff}{%
+           family={Ramirez},
+           familyi={R\bibinitperiod},
+           given={Sebastián},
+           giveni={S\bibinitperiod}}}%
+      }
+      \strng{namehash}{efe3b88203dcb08f01f0192be9ca61ff}
+      \strng{fullhash}{efe3b88203dcb08f01f0192be9ca61ff}
+      \strng{fullhashraw}{efe3b88203dcb08f01f0192be9ca61ff}
+      \strng{bibnamehash}{efe3b88203dcb08f01f0192be9ca61ff}
+      \strng{authorbibnamehash}{efe3b88203dcb08f01f0192be9ca61ff}
+      \strng{authornamehash}{efe3b88203dcb08f01f0192be9ca61ff}
+      \strng{authorfullhash}{efe3b88203dcb08f01f0192be9ca61ff}
+      \strng{authorfullhashraw}{efe3b88203dcb08f01f0192be9ca61ff}
+      \field{sortinit}{4}
+      \field{sortinithash}{9381316451d1b9788675a07e972a12a7}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{howpublished}{\url{https://fastapi.tiangolo.com/}}
+      \field{title}{FastAPI Framework}
+      \field{year}{2024}
+    \endentry
+  \enddatalist
+\endrefsection
+\endinput
+
