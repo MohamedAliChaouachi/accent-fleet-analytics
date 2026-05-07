@@ -14,7 +14,9 @@
 \usepackage{parskip}
 
 % --- Graphics & colour ---
-\usepackage{graphicx}
+% Load graphics in draft mode to avoid build failure if some image files are missing.
+% Change to non-draft when all images are present.
+\usepackage[draft]{graphicx}
 \graphicspath{{figures/}}
 \usepackage{xcolor}
 \definecolor{accentblue}{HTML}{1F4E79}

@@ -7,18 +7,24 @@
 \contentsline {table}{\numberline {2.1}{\ignorespaces Functional requirements.}}{14}{table.caption.9}%
 \contentsline {table}{\numberline {2.2}{\ignorespaces Non-functional requirements.}}{15}{table.caption.10}%
 \addvspace {10\p@ }
-\contentsline {table}{\numberline {3.1}{\ignorespaces Data dictionary excerpt for \texttt {staging.path}.}}{25}{table.caption.13}%
-\contentsline {table}{\numberline {3.2}{\ignorespaces Synthesis of the data quality issues detected on the staging tables.}}{29}{table.caption.16}%
+\contentsline {table}{\numberline {3.1}{\ignorespaces Row counts on the principal staging tables (snapshot 2026-05-06).}}{24}{table.caption.12}%
+\contentsline {table}{\numberline {3.2}{\ignorespaces Data dictionary excerpt for \texttt {staging.path}.}}{26}{table.caption.14}%
+\contentsline {table}{\numberline {3.3}{\ignorespaces Validity checks on \texttt {staging.path} (population: 7{,}482{,}166 trips).}}{27}{table.caption.15}%
+\contentsline {table}{\numberline {3.4}{\ignorespaces Per-tenant device coverage and historical depth on \texttt {staging.path}.}}{28}{table.caption.17}%
+\contentsline {table}{\numberline {3.5}{\ignorespaces Descriptive statistics on the cleaned modeling window of \texttt {staging.path} ($N=2{,}987{,}892$).}}{29}{table.caption.18}%
+\contentsline {table}{\numberline {3.6}{\ignorespaces Per-tenant ping coverage of \texttt {staging.archive}, sample-extrapolated to the full population (54.72~M rows).}}{30}{table.caption.19}%
+\contentsline {table}{\numberline {3.7}{\ignorespaces Class balance (\% of trips with the flag = 1), derived from \texttt {staging.path} on the cleaned modeling window.}}{35}{table.caption.26}%
+\contentsline {table}{\numberline {3.8}{\ignorespaces Synthesis of the data quality issues detected on the staging tables.}}{38}{table.caption.28}%
 \addvspace {10\p@ }
-\contentsline {table}{\numberline {4.1}{\ignorespaces Cleaning rule catalogue applied at the warehouse boundary.}}{33}{table.caption.17}%
-\contentsline {table}{\numberline {4.2}{\ignorespaces Fact tables produced by the warehouse layer.}}{35}{table.caption.18}%
-\contentsline {table}{\numberline {4.3}{\ignorespaces Sample of the 35-feature registry (selected groups).}}{37}{table.caption.19}%
+\contentsline {table}{\numberline {4.1}{\ignorespaces Cleaning rule catalogue applied at the warehouse boundary.}}{43}{table.caption.29}%
+\contentsline {table}{\numberline {4.2}{\ignorespaces Fact tables produced by the warehouse layer.}}{45}{table.caption.30}%
+\contentsline {table}{\numberline {4.3}{\ignorespaces Sample of the 35-feature registry (selected groups).}}{47}{table.caption.31}%
 \addvspace {10\p@ }
-\contentsline {table}{\numberline {5.1}{\ignorespaces Comparative performance of the candidate models.}}{43}{table.caption.20}%
-\contentsline {table}{\numberline {5.2}{\ignorespaces Per-tenant K-Means results on the modeling window.}}{43}{table.caption.21}%
+\contentsline {table}{\numberline {5.1}{\ignorespaces Comparative performance of the candidate models.}}{53}{table.caption.32}%
+\contentsline {table}{\numberline {5.2}{\ignorespaces Per-tenant K-Means results on the modeling window.}}{53}{table.caption.33}%
 \addvspace {10\p@ }
-\contentsline {table}{\numberline {6.1}{\ignorespaces API endpoints exposed by the platform.}}{50}{table.caption.25}%
+\contentsline {table}{\numberline {6.1}{\ignorespaces API endpoints exposed by the platform.}}{60}{table.caption.37}%
 \addvspace {10\p@ }
 \addvspace {10\p@ }
-\contentsline {table}{\numberline {B.1}{\ignorespaces Figure-generation scripts referenced in the thesis.}}{60}{table.caption.29}%
+\contentsline {table}{\numberline {B.1}{\ignorespaces Figure-generation scripts referenced in the thesis.}}{71}{table.caption.42}%
 \addvspace {10\p@ }

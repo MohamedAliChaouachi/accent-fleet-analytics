@@ -5,17 +5,23 @@
 \addvspace {10\p@ }
 \contentsline {figure}{\numberline {2.1}{\ignorespaces Logical data flow of the platform, from MySQL sources to PostgreSQL marts.}}{16}{figure.caption.11}%
 \addvspace {10\p@ }
-\contentsline {figure}{\numberline {3.1}{\ignorespaces Logical schema map of the staging tables, after conversion of the MySQL dumps.}}{24}{figure.caption.12}%
-\contentsline {figure}{\numberline {3.2}{\ignorespaces Null-rate heatmap on the principal staging tables.}}{27}{figure.caption.14}%
-\contentsline {figure}{\numberline {3.3}{\ignorespaces Histogram of the per-trip distance in \texttt {staging.path} (log scale).}}{28}{figure.caption.15}%
+\contentsline {figure}{\numberline {3.1}{\ignorespaces Logical schema map of the staging tables, after conversion of the MySQL dumps.}}{25}{figure.caption.13}%
+\contentsline {figure}{\numberline {3.2}{\ignorespaces Data quality profile of \texttt {staging.path}: percentage of rows failing each completeness and validity check.}}{27}{figure.caption.16}%
+\contentsline {figure}{\numberline {3.3}{\ignorespaces \texttt {staging.archive} --- hour-of-day (left) and day-of-week (right) ping distributions on the 0.1~\% sample.}}{31}{figure.caption.20}%
+\contentsline {figure}{\numberline {3.4}{\ignorespaces \texttt {staging.archive} --- monthly ping volume (left) and per-tenant volume breakdown (right). Device counts in the sample annotated above each tenant bar.}}{32}{figure.caption.21}%
+\contentsline {figure}{\numberline {3.5}{\ignorespaces Monthly trip volume and active-device count on \texttt {staging.path}, between 2024-01 and 2026-04.}}{33}{figure.caption.22}%
+\contentsline {figure}{\numberline {3.6}{\ignorespaces Hour-of-day (left) and day-of-week (right) trip distributions on \texttt {staging.path}, Sep--Nov 2025 segment.}}{34}{figure.caption.23}%
+\contentsline {figure}{\numberline {3.7}{\ignorespaces Trip-duration distribution from \texttt {staging.path}: raw scale (left) and Normal fit on $\log (\text {duration})$ (right).}}{34}{figure.caption.24}%
+\contentsline {figure}{\numberline {3.8}{\ignorespaces Class balance of the five binary trip-status flags derived from \texttt {staging.path}.}}{35}{figure.caption.25}%
+\contentsline {figure}{\numberline {3.9}{\ignorespaces Per-tenant behavioural signatures derived from staging tables (since 2025-01-01).}}{36}{figure.caption.27}%
 \addvspace {10\p@ }
 \addvspace {10\p@ }
-\contentsline {figure}{\numberline {5.1}{\ignorespaces Distribution of the rescaled risk score per tenant.}}{44}{figure.caption.22}%
-\contentsline {figure}{\numberline {5.2}{\ignorespaces Confusion matrix between the rule baseline and the Isolation Forest.}}{45}{figure.caption.23}%
-\contentsline {figure}{\numberline {5.3}{\ignorespaces Surrogate feature importance for the unsupervised models.}}{45}{figure.caption.24}%
+\contentsline {figure}{\numberline {5.1}{\ignorespaces Distribution of the rescaled risk score per tenant.}}{54}{figure.caption.34}%
+\contentsline {figure}{\numberline {5.2}{\ignorespaces Confusion matrix between the rule baseline and the Isolation Forest.}}{55}{figure.caption.35}%
+\contentsline {figure}{\numberline {5.3}{\ignorespaces Surrogate feature importance for the unsupervised models.}}{55}{figure.caption.36}%
 \addvspace {10\p@ }
-\contentsline {figure}{\numberline {6.1}{\ignorespaces Architecture of the BI dashboard.}}{51}{figure.caption.26}%
-\contentsline {figure}{\numberline {6.2}{\ignorespaces End-to-end deployment pipeline of the platform.}}{53}{figure.caption.27}%
+\contentsline {figure}{\numberline {6.1}{\ignorespaces Architecture of the BI dashboard.}}{61}{figure.caption.38}%
+\contentsline {figure}{\numberline {6.2}{\ignorespaces End-to-end deployment pipeline of the platform.}}{63}{figure.caption.39}%
 \addvspace {10\p@ }
 \addvspace {10\p@ }
 \addvspace {10\p@ }
