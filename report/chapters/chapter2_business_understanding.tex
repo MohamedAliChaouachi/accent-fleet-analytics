@@ -5,7 +5,7 @@
 \label{chap:business}
 
 \section{Introduction}
-Building on the strategic outline of Chapter~\ref{chap:context}, the present chapter formalizes the first phase of the CRISP-DM methodology: the \emph{business understanding}. The chapter restates the business objectives of the project in operational terms, formulates the research questions that drive the analytical work, derives the functional and non-functional requirements of the platform, presents the target software architecture --- with explicit attention to the MySQL-to-PostgreSQL bridge and to the secure remote-collaboration setup mandated by the binomial organization --- and concludes by justifying the technology stack adopted for the implementation.
+Building on the strategic outline of Chapter~\ref{chap:context}, the present chapter formalizes the first phase of the CRISP-DM methodology: the \emph{business understanding}. The chapter restates the business objectives of the project in operational terms, formulates the research questions that drive the analytical work, derives the functional and non-functional requirements of the platform, presents the target software architecture --- with explicit attention to the MySQL-to-PostgreSQL bridge and to the secure remote-collaboration setup mandated by the distributed working mode of the student team --- and concludes by justifying the technology stack adopted for the implementation.
 
 \section{Business objectives}
 
@@ -23,16 +23,20 @@ The strategic priorities decompose into five concrete operational objectives:
     \item replace any ad-hoc, full-refresh analytical recomputation by an incremental, watermark-driven architecture with sub-ten-minute freshness;
     \item materialize a clean dimensional warehouse and a family of marts dedicated respectively to machine learning and to business intelligence;
     \item train an unsupervised behavioural segmentation and a continuous risk score per device-month, exposed through an API and a BI dashboard;
-    \item industrialize the pipeline on the Azure VM through Prefect orchestration, cron scheduling and an explicit monitoring layer, while granting the binomial of students secure remote access.
+    \item industrialize the pipeline on the Azure VM through Prefect orchestration, cron scheduling and an explicit monitoring layer, while granting the two authors secure remote access.
 \end{enumerate}
 
 \section{Research questions}
-Three research questions structure the analytical investigation:
+\label{sec:research-questions}
+Three research questions structure the analytical investigation. Each question is stated in a short, focal form, then followed by a one-sentence elaboration that pins down its scope.
 
 \begin{enumerate}
-    \item[\textbf{RQ1}] \emph{Can the heterogeneous behavioural signals of a multi-tenant telematics fleet --- recorded as raw hexadecimal telemetry, decoded \texttt{arch\_xxxxx} archive rows and \texttt{user\_xxxxx} master data --- be condensed into a small set of interpretable indicators at the device-month grain, without losing operational meaning?}
-    \item[\textbf{RQ2}] \emph{Can these indicators be exploited by an unsupervised model in order to produce an actionable behavioural segmentation and a continuous risk score, in the absence of a labelled incident feed?}
-    \item[\textbf{RQ3}] \emph{Can the resulting analytical outputs be served to fleet managers through a low-latency API and an interactive dashboard, hosted on a shared Azure infrastructure, without compromising the idempotency, the observability and the cost profile of the production pipeline?}
+    \item[\textbf{RQ1}] \emph{Can the heterogeneous behavioural signals of a multi-tenant telematics fleet be condensed into a small set of interpretable indicators at the device-month grain?}\\
+    Specifically: starting from the raw hexadecimal telemetry, the decoded \texttt{arch\_xxxxx} archive and the \texttt{user\_xxxxx} master data, the question is whether such a condensation is achievable without losing operational meaning.
+    \item[\textbf{RQ2}] \emph{Can these indicators be exploited by an unsupervised model to produce an actionable behavioural segmentation and a continuous risk score?}\\
+    The question is posed in the absence of a labelled incident feed, which rules out supervised approaches and forces the modeling to rely on internal validity criteria.
+    \item[\textbf{RQ3}] \emph{Can the resulting analytical outputs be served to fleet managers through a low-latency API and an interactive dashboard?}\\
+    The serving must be hosted on a shared Azure infrastructure and must preserve the idempotency, the observability and the cost profile of the production pipeline.
 \end{enumerate}
 
 \section{Requirements analysis}
@@ -54,12 +58,12 @@ FR-3 & Apply the eleven cleaning rules and quarantine rejected rows. & High \\
 FR-4 & Materialize five dimensions and eleven facts with idempotent upserts. & High \\
 FR-5 & Build the device-month behavioural mart and the telemetry mart. & High \\
 FR-6 & Train the per-tenant K-Means and Isolation Forest models. & High \\
-FR-7 & Expose the cluster assignments and risk scores through a REST API. & High \\
+FR-7 & Expose the cluster assignments and risk scores through a REST (Representational State Transfer) API. & High \\
 FR-8 & Provide an interactive BI dashboard for fleet managers. & High \\
 FR-9 & Run the pipeline incrementally every five minutes via cron. & High \\
 FR-10 & Persist a run log and a data-quality measurement at every cycle. & Medium \\
 FR-11 & Support full backfill and bootstrap modes for historical loads. & Medium \\
-FR-12 & Support secure remote operations via SSH tunnelling and IP allowlist for the binomial. & High \\
+FR-12 & Support secure remote operations via SSH tunnelling and IP allowlist for the student team. & High \\
 FR-13 & Document the feature registry and the validation suite. & Medium \\
 \hline
 \end{tabular}
@@ -104,7 +108,8 @@ Three user profiles consume the outputs of the platform:
 At the logical level, the platform is organized as a four-tier architecture that explicitly mirrors the lifecycle of a telemetry signal: a \emph{source tier} represented by the three operational MySQL databases of \hostorg{} (raw hex telemetry, decoded \texttt{arch\_xxxxx} archive, \texttt{user\_xxxxx} master data); a \emph{conversion and ingestion tier} that exports MySQL dumps, converts them to PostgreSQL-compatible files and loads them into staging; a \emph{processing and storage tier} composed of the staging, warehouse and marts schemas of the analytical PostgreSQL, transformed by Python and SQL tasks orchestrated by Prefect; and a \emph{serving tier} composed of the API, the BI dashboard and the model artefact store.
 
 \subsection{Physical view on Microsoft Azure}
-At the physical level, the platform is hosted on a Microsoft Azure virtual machine running a recent Linux distribution. The analytical PostgreSQL instance, the Python virtual environment, the Prefect flow, the cron entry, the API and the dashboard are co-located on this VM. Two binomial members access the VM through SSH key authentication; an explicit IP allowlist enforced by an Azure Network Security Group attached to the VM restricts inbound SSH connections to the two students' workstations and to the office network of \hostorg. Database access from local notebooks of the binomial passes through an SSH tunnel terminating on \texttt{localhost:5432} of the VM, so that the PostgreSQL port is never exposed to the public internet.
+\label{ssec:physical-view}
+At the physical level, the platform is hosted on a Microsoft Azure virtual machine running a recent Linux distribution. The analytical PostgreSQL instance, the Python virtual environment, the Prefect flow, the cron entry, the API and the dashboard are co-located on this VM. The two members of the student team access the VM through SSH key authentication; an explicit IP allowlist enforced by an Azure Network Security Group attached to the VM restricts inbound SSH connections to the two students' workstations and to the office network of \hostorg. Database access from local notebooks passes through an SSH tunnel terminating on \texttt{localhost:5432} of the VM, so that the PostgreSQL port is never exposed to the public internet.
 
 \subsection{Data flow}
 The data flow is represented in Figure~\ref{fig:dataflow}. MySQL dump files are exported from the operational system of \hostorg, converted to PostgreSQL by dedicated scripts, loaded into the staging schema, processed by the cleaning engine into the warehouse layer, condensed into the marts and finally consumed either by the API and the dashboard or by the offline modeling notebooks.
@@ -133,8 +138,8 @@ The decision to host the analytical layer on PostgreSQL rather than on the same 
 
 \begin{enumerate}
     \item \textbf{Analytical SQL surface.} PostgreSQL exposes a rich set of analytical idioms --- window functions over arbitrary partitions, common table expressions (recursive included), \texttt{LATERAL} joins, set-returning functions, \texttt{FILTER} clauses on aggregates --- that condense behavioural feature definitions into compact, readable SQL. The same logic in operational MySQL would require lengthier and more error-prone query rewrites.
-    \item \textbf{ACID compliance and crash safety.} The full ACID semantics of PostgreSQL on \texttt{INSERT~\dots~ON~CONFLICT~DO~UPDATE} and on transactional DDL are required by an unattended pipeline that runs every five minutes and must survive partial failures without manual intervention.
-    \item \textbf{Advanced indexing.} The native availability of B-tree, BRIN, GIN, partial and expression indexes covers the access patterns of the analytical layer (range scans on time, aggregate filters, JSON inspection) much more naturally than the indexing options of the operational MySQL setup.
+    \item \textbf{ACID compliance and crash safety.} The full ACID (Atomicity, Consistency, Isolation, Durability) semantics of PostgreSQL on \texttt{INSERT~\dots~ON~CONFLICT~DO~UPDATE} and on transactional DDL are required by an unattended pipeline that runs every five minutes and must survive partial failures without manual intervention.
+    \item \textbf{Advanced indexing.} The native availability of B-tree, BRIN (Block Range Index), GIN (Generalized Inverted Index), partial and expression indexes covers the access patterns of the analytical layer (range scans on time, aggregate filters, JSON inspection) much more naturally than the indexing options of the operational MySQL setup.
     \item \textbf{Scalability to large datasets.} PostgreSQL handles the volumes considered by the project --- of the order of \(10^7\) telemetry rows --- without the architectural retrofitting that the same volume would require on a MySQL warehouse retrofitted from an operational instance.
     \item \textbf{Extensibility.} The PostgreSQL extension ecosystem (\texttt{pg\_stat\_statements} for workload telemetry, \texttt{postgis} for geospatial enrichment, \texttt{pg\_partman} for partitioned tables) opens forward trajectories that fit the analytical roadmap of \hostorg{}.
     \item \textbf{Compatibility with data warehousing and BI tools.} The PostgreSQL JDBC and \texttt{psycopg2} drivers, the wide adoption by orchestration frameworks (Prefect, Airflow), by Python (pandas, SQLAlchemy) and by BI clients (Streamlit, Plotly Dash, Metabase, Power BI through ODBC) make PostgreSQL the path of least friction for the consumers of the warehouse.
@@ -155,10 +160,11 @@ The unsupervised modeling layer relies on \texttt{scikit-learn} (StandardScaler,
 The API is implemented with FastAPI, exposed through Uvicorn behind an Nginx reverse proxy. The dashboard is implemented with Streamlit (or, equivalently, Plotly Dash), embedded on the same VM and connected to the marts schema. Both components are deployed as systemd services.
 
 \subsection{Cloud and shared collaboration environment}
-The cloud platform is Microsoft Azure. The VM is provisioned with a Linux image, a managed disk, an attached Network Security Group with an IP allowlist for SSH, and a static public IP. The git repository of the project is cloned into \texttt{/opt/accent-fleet-analytics}, the Python virtual environment is provisioned locally, and the cron entry under \texttt{/etc/cron.d/} triggers the incremental runs. The system journal collects the structured logs. The Azure VM constitutes the shared workspace of the binomial: both students connect to the same database and operate the same pipeline through their personal SSH keys, while the IP allowlist on the Network Security Group prevents any non-authorized host from reaching the VM.
+\label{ssec:cloud-collab}
+The cloud platform is Microsoft Azure. The VM is provisioned with a Linux image, a managed disk, an attached Network Security Group with an IP allowlist for SSH, and a static public IP. The git repository of the project is cloned into \texttt{/opt/accent-fleet-analytics}, the Python virtual environment is provisioned locally, and the cron entry under \texttt{/etc/cron.d/} triggers the incremental runs. The system journal collects the structured logs. The Azure VM constitutes the shared workspace of the student team: both authors connect to the same database and operate the same pipeline through their personal SSH keys, while the IP allowlist on the Network Security Group prevents any non-authorized host from reaching the VM.
 
 \subsection{Justification of the technology choices}
-The technology choices are justified by four criteria. \emph{Alignment} with the operational stack of \hostorg{} is preserved on the source side (MySQL is consumed without modification). \emph{Separation of concerns} is respected on the analytical side (PostgreSQL is dedicated to analytics). \emph{Maturity} of the Python data ecosystem (\texttt{scikit-learn}, \texttt{pandas}, Prefect) supports a binomial of student engineers without imposing rare or fragile components. \emph{Minimality} of the operational footprint --- every component runs on a single VM, with no managed Kubernetes cluster nor managed Spark cluster --- controls the cloud cost and keeps the surface of the system small enough to be operated by a binomial.
+The technology choices are justified by four criteria. \emph{Alignment} with the operational stack of \hostorg{} is preserved on the source side (MySQL is consumed without modification). \emph{Separation of concerns} is respected on the analytical side (PostgreSQL is dedicated to analytics). \emph{Maturity} of the Python data ecosystem (\texttt{scikit-learn}, \texttt{pandas}, Prefect) supports a small student team without imposing rare or fragile components. \emph{Minimality} of the operational footprint --- every component runs on a single VM, with no managed Kubernetes cluster nor managed Spark cluster --- controls the cloud cost and keeps the surface of the system small enough to be operated by two authors.
 
 \section{Conclusion}
-This chapter has formalized the business understanding of the project, derived the functional and non-functional requirements --- including the explicit MySQL-to-PostgreSQL conversion bridge and the requirements imposed by the binomial collaboration mode --- and presented the logical and physical architecture of the platform with a particular focus on the analytical PostgreSQL warehouse hosted on the Azure VM. The next chapter executes the data understanding phase by inspecting the three operational databases of \hostorg{} and by characterizing the slices that feed the analytical pipeline.
+This chapter has formalized the business understanding of the project, derived the functional and non-functional requirements --- including the explicit MySQL-to-PostgreSQL conversion bridge and the requirements imposed by the distributed collaboration mode of the student team --- and presented the logical and physical architecture of the platform with a particular focus on the analytical PostgreSQL warehouse hosted on the Azure VM. The next chapter executes the data understanding phase by inspecting the three operational databases of \hostorg{} and by characterizing the slices that feed the analytical pipeline.
