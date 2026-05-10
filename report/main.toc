@@ -19,12 +19,12 @@
 \contentsline {subsubsection}{Database 3 --- users, clients and master data}{6}{subsection.1.4.1}%
 \contentsline {subsection}{\numberline {1.4.2}Decoding pipeline and data flow}{6}{subsection.1.4.2}%
 \contentsline {subsection}{\numberline {1.4.3}Analytical surface of the existing system}{6}{subsection.1.4.3}%
-\contentsline {subsection}{\numberline {1.4.4}Identified limitations}{6}{subsection.1.4.4}%
+\contentsline {subsection}{\numberline {1.4.4}Identified limitations}{7}{subsection.1.4.4}%
 \contentsline {subsection}{\numberline {1.4.5}Synthesis of the diagnostic}{7}{subsection.1.4.5}%
-\contentsline {section}{\numberline {1.5}Problem statement}{7}{section.1.5}%
+\contentsline {section}{\numberline {1.5}Problem statement}{8}{section.1.5}%
 \contentsline {section}{\numberline {1.6}Proposed solution}{8}{section.1.6}%
 \contentsline {subsection}{\numberline {1.6.1}Functional outline}{8}{subsection.1.6.1}%
-\contentsline {subsection}{\numberline {1.6.2}Why an analytical PostgreSQL warehouse?}{8}{subsection.1.6.2}%
+\contentsline {subsection}{\numberline {1.6.2}Why an analytical PostgreSQL warehouse?}{9}{subsection.1.6.2}%
 \contentsline {subsection}{\numberline {1.6.3}Why a Microsoft Azure virtual machine?}{9}{subsection.1.6.3}%
 \contentsline {subsection}{\numberline {1.6.4}Architectural outline}{9}{subsection.1.6.4}%
 \contentsline {subsection}{\numberline {1.6.5}Expected benefits}{10}{subsection.1.6.5}%
@@ -42,19 +42,19 @@
 \contentsline {section}{\numberline {2.3}Research questions}{13}{section.2.3}%
 \contentsline {section}{\numberline {2.4}Requirements analysis}{14}{section.2.4}%
 \contentsline {subsection}{\numberline {2.4.1}Functional requirements}{14}{subsection.2.4.1}%
-\contentsline {subsection}{\numberline {2.4.2}Non-functional requirements}{15}{subsection.2.4.2}%
-\contentsline {subsection}{\numberline {2.4.3}User profiles}{15}{subsection.2.4.3}%
-\contentsline {section}{\numberline {2.5}Target architecture}{15}{section.2.5}%
-\contentsline {subsection}{\numberline {2.5.1}Logical view}{15}{subsection.2.5.1}%
-\contentsline {subsection}{\numberline {2.5.2}Physical view on Microsoft Azure}{16}{subsection.2.5.2}%
+\contentsline {subsection}{\numberline {2.4.2}Non-functional requirements}{14}{subsection.2.4.2}%
+\contentsline {subsection}{\numberline {2.4.3}User profiles}{14}{subsection.2.4.3}%
+\contentsline {section}{\numberline {2.5}Target architecture}{14}{section.2.5}%
+\contentsline {subsection}{\numberline {2.5.1}Logical view}{14}{subsection.2.5.1}%
+\contentsline {subsection}{\numberline {2.5.2}Physical view on Microsoft Azure}{15}{subsection.2.5.2}%
 \contentsline {subsection}{\numberline {2.5.3}Data flow}{16}{subsection.2.5.3}%
-\contentsline {subsection}{\numberline {2.5.4}Layered storage}{16}{subsection.2.5.4}%
+\contentsline {subsection}{\numberline {2.5.4}Layered storage}{17}{subsection.2.5.4}%
 \contentsline {section}{\numberline {2.6}Technology stack}{17}{section.2.6}%
 \contentsline {subsection}{\numberline {2.6.1}Operational source: MySQL}{17}{subsection.2.6.1}%
 \contentsline {subsection}{\numberline {2.6.2}Analytical warehouse: PostgreSQL~16}{17}{subsection.2.6.2}%
 \contentsline {subsection}{\numberline {2.6.3}Why PostgreSQL rather than MySQL for the warehouse}{17}{subsection.2.6.3}%
 \contentsline {subsection}{\numberline {2.6.4}Conversion bridge: MySQL dumps to PostgreSQL}{18}{subsection.2.6.4}%
-\contentsline {subsection}{\numberline {2.6.5}Processing and orchestration}{18}{subsection.2.6.5}%
+\contentsline {subsection}{\numberline {2.6.5}Processing and orchestration}{19}{subsection.2.6.5}%
 \contentsline {subsection}{\numberline {2.6.6}Modeling and machine learning}{19}{subsection.2.6.6}%
 \contentsline {subsection}{\numberline {2.6.7}Serving, API and dashboard}{19}{subsection.2.6.7}%
 \contentsline {subsection}{\numberline {2.6.8}Cloud and shared collaboration environment}{19}{subsection.2.6.8}%
@@ -79,7 +79,7 @@
 \contentsline {section}{\numberline {3.6}Data quality assessment of the staging layer}{26}{section.3.6}%
 \contentsline {subsection}{\numberline {3.6.1}Completeness analysis}{26}{subsection.3.6.1}%
 \contentsline {subsection}{\numberline {3.6.2}Validity and physical-plausibility checks}{27}{subsection.3.6.2}%
-\contentsline {subsection}{\numberline {3.6.3}Referential integrity}{28}{subsection.3.6.3}%
+\contentsline {subsection}{\numberline {3.6.3}Referential integrity}{27}{subsection.3.6.3}%
 \contentsline {section}{\numberline {3.7}Descriptive statistics on the staging layer}{28}{section.3.7}%
 \contentsline {subsection}{\numberline {3.7.1}Per-tenant scope}{28}{subsection.3.7.1}%
 \contentsline {subsection}{\numberline {3.7.2}Numerical summary}{28}{subsection.3.7.2}%
@@ -87,20 +87,20 @@
 \contentsline {section}{\numberline {3.8}Exploratory Data Analysis on the staging layer}{29}{section.3.8}%
 \contentsline {subsection}{\numberline {3.8.1}Profile of the high-frequency telemetry archive}{29}{subsection.3.8.1}%
 \contentsline {paragraph}{Volumetry and scope.}{29}{subsection.3.8.1}%
-\contentsline {paragraph}{Sensor schema.}{30}{subsection.3.8.1}%
+\contentsline {paragraph}{Sensor schema.}{29}{subsection.3.8.1}%
 \contentsline {paragraph}{Per-tenant ping coverage.}{30}{subsection.3.8.1}%
 \contentsline {paragraph}{Data quality.}{30}{table.caption.19}%
-\contentsline {paragraph}{Numerical summary of the principal sensors.}{31}{table.caption.19}%
+\contentsline {paragraph}{Numerical summary of the principal sensors.}{30}{table.caption.19}%
 \contentsline {paragraph}{Temporal regularity.}{31}{table.caption.19}%
 \contentsline {paragraph}{Volume by tenant and over time.}{31}{figure.caption.20}%
-\contentsline {paragraph}{Hand-off to feature engineering.}{32}{figure.caption.21}%
+\contentsline {paragraph}{Hand-off to feature engineering.}{31}{figure.caption.21}%
 \contentsline {subsection}{\numberline {3.8.2}Temporal patterns}{32}{subsection.3.8.2}%
 \contentsline {subsection}{\numberline {3.8.3}Distribution of the duration target}{33}{subsection.3.8.3}%
-\contentsline {subsection}{\numberline {3.8.4}Class imbalance of the trip-status flags}{34}{subsection.3.8.4}%
+\contentsline {subsection}{\numberline {3.8.4}Class imbalance of the trip-status flags}{33}{subsection.3.8.4}%
 \contentsline {subsection}{\numberline {3.8.5}Per-tenant behavioural signatures}{35}{subsection.3.8.5}%
 \contentsline {section}{\numberline {3.9}Analytical synthesis}{36}{section.3.9}%
 \contentsline {subsection}{\numberline {3.9.1}Q1 --- Data quality and integrity for reliable modeling}{36}{subsection.3.9.1}%
-\contentsline {subsection}{\numberline {3.9.2}Q2 --- Stable temporal patterns as features}{37}{subsection.3.9.2}%
+\contentsline {subsection}{\numberline {3.9.2}Q2 --- Stable temporal patterns as features}{36}{subsection.3.9.2}%
 \contentsline {subsection}{\numberline {3.9.3}Q3 --- Suitability of the duration target for direct regression}{37}{subsection.3.9.3}%
 \contentsline {subsection}{\numberline {3.9.4}Q4 --- Manageability of the status class imbalance}{37}{subsection.3.9.4}%
 \contentsline {section}{\numberline {3.10}Synthesis of identified data quality issues}{37}{section.3.10}%

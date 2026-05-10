@@ -4,8 +4,8 @@
 \addvspace {10\p@ }
 \contentsline {table}{\numberline {1.1}{\ignorespaces Comparison of the candidate project-management methodologies.}}{10}{table.caption.8}%
 \addvspace {10\p@ }
-\contentsline {table}{\numberline {2.1}{\ignorespaces Functional requirements.}}{14}{table.caption.9}%
-\contentsline {table}{\numberline {2.2}{\ignorespaces Non-functional requirements.}}{15}{table.caption.10}%
+\contentsline {table}{\numberline {2.1}{\ignorespaces Functional requirements.}}{15}{table.caption.9}%
+\contentsline {table}{\numberline {2.2}{\ignorespaces Non-functional requirements.}}{16}{table.caption.10}%
 \addvspace {10\p@ }
 \contentsline {table}{\numberline {3.1}{\ignorespaces Row counts on the principal staging tables (snapshot 2026-05-06).}}{24}{table.caption.12}%
 \contentsline {table}{\numberline {3.2}{\ignorespaces Data dictionary excerpt for \texttt {staging.path}.}}{26}{table.caption.14}%
