@@ -161,6 +161,39 @@ def task_recompute_tenant_summary(touched_months: list[str], run_id: int) -> int
 
 
 @task(retries=1)
+def task_score_latest_partition(touched_months: list[str], run_id: int) -> int:
+    """
+    Run the clustering model over the touched months and write
+    fact_device_cluster_assignment rows. Never fails the flow: a missing
+    model is logged and skipped so the rest of the pipeline keeps running.
+
+    Imported lazily because batch_scoring pulls in sklearn/mlflow — keep
+    those out of the bootstrap path for environments that haven't installed
+    the ML extras yet.
+    """
+    if not touched_months:
+        log.info("cluster_scoring.skip_no_touched_months")
+        return 0
+    from accent_fleet.ml.batch_scoring import score_partitions
+
+    result = score_partitions(touched_months, run_id)
+    if result.skipped_reason:
+        log.warning(
+            "cluster_scoring.skipped",
+            reason=result.skipped_reason,
+            months=touched_months,
+        )
+    else:
+        log.info(
+            "cluster_scoring.done",
+            rows=result.rows_scored,
+            months=touched_months,
+            model_version=result.model_version,
+        )
+    return result.rows_scored
+
+
+@task(retries=1)
 def task_ensure_views() -> None:
     """(Re)create the marts views. Idempotent."""
     with transaction() as conn:
@@ -190,6 +223,8 @@ def task_ensure_mart_structure() -> None:
         for sql_file in (
             "20_mart_device_monthly_behavior.sql",
             "25_mart_device_monthly_telemetry.sql",
+            # ML output table (DDL only — populated by batch_scoring.py)
+            "27_fact_device_cluster_assignment.sql",
             # BI marts (DDL only — recompute happens later)
             "30_mart_fleet_daily.sql",
             "31_mart_vehicle_monthly.sql",
@@ -278,10 +313,16 @@ def incremental_flow(window_end: datetime | None = None) -> None:
         # tenant_summary rolls up the two BI marts above — must run last.
         task_recompute_tenant_summary(touched, run_id)
 
-        # 4. Views are views — they don't need refreshing, but we keep
+        # 4. Score touched partitions against the clustering model and
+        #    persist cluster assignments. Runs AFTER all marts because the
+        #    scorer reads from marts.v_ml_features_full. If no model is
+        #    registered yet this is a no-op (logs and continues).
+        task_score_latest_partition(touched, run_id)
+
+        # 5. Views are views — they don't need refreshing, but we keep
         #    the task in case we switch to materialised views later.
 
-        # 5. Validation
+        # 6. Validation
         task_run_validation(run_id)
 
         total_loaded = sum(r.rows_loaded for r in fact_results)

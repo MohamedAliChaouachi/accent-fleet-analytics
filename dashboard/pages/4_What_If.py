@@ -1,8 +1,10 @@
 """
-Ad-hoc what-if scoring — calls POST /score/risk on the FastAPI service.
+Ad-hoc what-if scoring — calls POST /score/risk and POST /score/cluster
+on the FastAPI service.
 
-Lets an analyst tweak feature values for a device and see how the
-composite risk score moves, without re-running the SQL view.
+Lets an analyst tweak feature values for a device and see how the composite
+risk score moves and which cluster the device would land in, without
+re-running the SQL view or batch scorer.
 """
 
 from __future__ import annotations
@@ -10,18 +12,22 @@ from __future__ import annotations
 import os
 
 import httpx
+import pandas as pd
 import plotly.express as px
 import streamlit as st
 
 from dashboard.lib.theme import RISK_COLORS, apply_layout, render_sidebar_filters
 
 apply_layout(page_title="What-if scoring")
-render_sidebar_filters()
+render_sidebar_filters()  # filters not strictly used, but keep sidebar consistent
 
 API_BASE = os.environ.get("API_BASE_URL", "http://api:8000")
 
 st.title("What-if scoring")
-st.caption(f"Hits `POST {API_BASE}/score/risk`. Tweak the sliders and re-score.")
+st.caption(
+    f"Hits `POST {API_BASE}/score/risk` and `/score/cluster`. "
+    "Tweak the sliders and re-score."
+)
 
 with st.form("what_if"):
     col_a, col_b = st.columns(2)
@@ -53,16 +59,17 @@ payload = {
     "avg_max_speed_kmh": avg_max_speed_kmh,
 }
 
+# ---- Risk score ----
 try:
     r = httpx.post(f"{API_BASE}/score/risk", json=payload, timeout=5.0)
     r.raise_for_status()
-    data = r.json()
+    risk_data = r.json()
 except Exception as exc:  # noqa: BLE001
-    st.error(f"API call failed: {exc}")
+    st.error(f"Risk API call failed: {exc}")
     st.stop()
 
-score = data["risk_score"]
-category = data["category"]
+score = risk_data["risk_score"]
+category = risk_data["category"]
 color = RISK_COLORS.get(category, "#777")
 
 st.markdown(
@@ -76,13 +83,33 @@ st.markdown(
 )
 
 st.subheader("Per-factor contribution")
-components = data.get("components", {})
+components = risk_data.get("components", {})
 if components:
-    df = (
+    bar_df = pd.DataFrame(
         {"factor": list(components.keys()), "contribution": list(components.values())}
     )
-    fig = px.bar(df, x="factor", y="contribution")
+    fig = px.bar(bar_df, x="factor", y="contribution")
     st.plotly_chart(fig, use_container_width=True)
 
-with st.expander("Raw response"):
-    st.json(data)
+# ---- Cluster prediction (best-effort; 503 if no model is registered) ----
+st.subheader("Cluster prediction")
+try:
+    r = httpx.post(f"{API_BASE}/score/cluster", json=payload, timeout=5.0)
+    if r.status_code == 503:
+        st.info(
+            "Cluster model not yet available — the API returned 503. "
+            "Run `python scripts/train_clustering.py` to train and register one."
+        )
+    else:
+        r.raise_for_status()
+        cluster_data = r.json()
+        cid = cluster_data.get("cluster_id")
+        dist = cluster_data.get("distance")
+        ver = cluster_data.get("version", "?")
+        st.metric("Cluster", f"#{cid}", help=f"Distance to centroid: {dist:.3f}")
+        st.caption(f"Model version: `{ver}`")
+except Exception as exc:  # noqa: BLE001
+    st.warning(f"Cluster API call failed: {exc}")
+
+with st.expander("Raw responses"):
+    st.json({"risk": risk_data})
