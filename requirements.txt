@@ -37,3 +37,17 @@ great-expectations>=0.18.0    # optional, used in monitoring module
 python-dotenv>=1.0.0
 rich>=13.7.0                  # pretty CLI logs
 structlog>=24.1.0             # structured logging
+
+# --- v0.5 operationalization (API + dashboard + MLflow) ---
+# API service
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+httpx>=0.27.0                 # API client used by tests and dashboard What-If
+
+# ML lifecycle
+mlflow>=2.16.0
+joblib>=1.4.0
+
+# Dashboard
+streamlit>=1.38.0
+streamlit-aggrid>=1.0.5
