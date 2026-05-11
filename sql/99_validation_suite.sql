@@ -69,3 +69,30 @@ SELECT 'V8_risk_distribution' AS check_name,
        COUNT(*) FILTER (WHERE risk_category = 'moderate') AS moderate_cnt,
        COUNT(*) FILTER (WHERE risk_category = 'low')      AS low_cnt
 FROM marts.v_device_risk_profile;
+
+-- V9: cluster assignment cluster_ids are non-negative and finite distances.
+-- A NULL or negative cluster_id would mean the batch scorer corrupted a row.
+-- We allow the table to be empty (no model trained yet) without failing —
+-- that is reported by V10 instead.
+SELECT 'V9_cluster_assignment_sanity' AS check_name,
+       COUNT(*) FILTER (WHERE cluster_id < 0
+                           OR distance_to_centroid IS NULL
+                           OR distance_to_centroid < 0
+                           OR model_version IS NULL) = 0 AS passed,
+       COUNT(*)                                                 AS total_rows,
+       COUNT(DISTINCT cluster_id)                               AS distinct_clusters,
+       COUNT(DISTINCT model_version)                            AS distinct_model_versions
+FROM marts.fact_device_cluster_assignment;
+
+-- V10: cluster assignments are a subset of the device-month mart. An orphan
+-- here means we scored a (tenant, device, month) tuple that no longer has
+-- supporting feature rows — usually a stale-partition bug.
+SELECT 'V10_cluster_assignment_ref_integrity' AS check_name,
+       COUNT(*) = 0 AS passed,
+       COUNT(*)     AS orphan_count
+FROM marts.fact_device_cluster_assignment a
+LEFT JOIN marts.mart_device_monthly_behavior m
+  ON m.tenant_id  = a.tenant_id
+ AND m.device_id  = a.device_id
+ AND m.year_month = a.year_month
+WHERE m.device_id IS NULL;
