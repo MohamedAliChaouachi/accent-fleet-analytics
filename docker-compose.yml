@@ -1,8 +1,41 @@
+# Accent Fleet Analytics — local/Azure-VM compose stack.
+#
+# Default services (always start):  base, mlflow, api, dashboard, etl
+# Optional profiles:
+#   --profile localdb   -> spins up a Postgres 16 container for purely local dev.
+#                          Skip this on Azure where the DB is hosted externally
+#                          (Azure Database for PostgreSQL or another VM).
+#   --profile streaming -> spins up Redpanda once Kafka work begins.
+#
+# Typical Azure-VM usage:
+#   docker compose build base
+#   docker compose up -d mlflow api dashboard etl
+#   (.env has PG_HOST=<your-server>.postgres.database.azure.com and PG_SSLMODE=require)
+
 services:
+
+  # ---------------------------------------------------------------------------
+  # Base image build target. Other services FROM accent-fleet-base:latest.
+  # Build once with: docker compose build base
+  # ---------------------------------------------------------------------------
+  base:
+    image: accent-fleet-base:latest
+    build:
+      context: .
+      dockerfile: docker/base.Dockerfile
+    # This service exists only to build the shared image. Never started.
+    command: ["python", "--version"]
+    profiles: ["build-only"]
+
+  # ---------------------------------------------------------------------------
+  # OPTIONAL local Postgres. Disabled by default — we use Azure Postgres.
+  # Enable with:  docker compose --profile localdb up -d postgres
+  # ---------------------------------------------------------------------------
   postgres:
     image: postgres:16-alpine
     container_name: accent_postgres
     restart: unless-stopped
+    profiles: ["localdb"]
     environment:
       POSTGRES_DB: ${PG_DATABASE:-accent_fleet}
       POSTGRES_USER: ${PG_USER:-accent}
@@ -17,23 +50,122 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    networks: [fleet-net]
 
-  # Redpanda: Kafka-compatible broker. Uncomment when streaming goes live.
-  # redpanda:
-  #   image: redpandadata/redpanda:v24.1.2
-  #   container_name: accent_redpanda
-  #   command:
-  #     - redpanda
-  #     - start
-  #     - --smp=1
-  #     - --memory=1G
-  #     - --overprovisioned
-  #     - --node-id=0
-  #     - --kafka-addr=PLAINTEXT://0.0.0.0:9092
-  #     - --advertise-kafka-addr=PLAINTEXT://localhost:9092
-  #   ports:
-  #     - "9092:9092"
-  #     - "9644:9644"
+  # ---------------------------------------------------------------------------
+  # MLflow tracking + model registry.
+  # File backend, single-writer (only train_clustering.py writes; API reads).
+  # ---------------------------------------------------------------------------
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.16.2
+    container_name: accent_mlflow
+    restart: unless-stopped
+    command: >
+      mlflow server
+        --host 0.0.0.0
+        --port 5000
+        --backend-store-uri sqlite:////mlflow/mlflow.db
+        --default-artifact-root /mlartifacts
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow_data:/mlflow
+      - mlflow_artifacts:/mlartifacts
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:5000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks: [fleet-net]
+
+  # ---------------------------------------------------------------------------
+  # FastAPI scoring service.
+  # ---------------------------------------------------------------------------
+  api:
+    image: accent-fleet-api:latest
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    container_name: accent_api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Make sure the API talks to the in-network MLflow regardless of .env.
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      # Read-only access to model artifacts written by the trainer.
+      - ./models:/app/models:ro
+    depends_on:
+      mlflow:
+        condition: service_healthy
+    networks: [fleet-net]
+
+  # ---------------------------------------------------------------------------
+  # Streamlit dashboard.
+  # ---------------------------------------------------------------------------
+  dashboard:
+    image: accent-fleet-dashboard:latest
+    build:
+      context: .
+      dockerfile: docker/dashboard.Dockerfile
+    container_name: accent_dashboard
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      API_BASE_URL: http://api:8000
+    ports:
+      - "${DASHBOARD_PORT:-8501}:8501"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks: [fleet-net]
+
+  # ---------------------------------------------------------------------------
+  # ETL container. Runs the incremental Prefect flow on a loop.
+  # Override CMD for bootstrap/backfill:
+  #   docker compose run --rm etl python scripts/run_batch.py bootstrap
+  # ---------------------------------------------------------------------------
+  etl:
+    image: accent-fleet-etl:latest
+    build:
+      context: .
+      dockerfile: docker/etl.Dockerfile
+    container_name: accent_etl
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./models:/app/models
+    networks: [fleet-net]
+
+  # ---------------------------------------------------------------------------
+  # Redpanda: Kafka-compatible broker. Enabled when streaming goes live.
+  # Start with: docker compose --profile streaming up -d redpanda
+  # ---------------------------------------------------------------------------
+  redpanda:
+    image: redpandadata/redpanda:v24.1.2
+    container_name: accent_redpanda
+    profiles: ["streaming"]
+    command:
+      - redpanda
+      - start
+      - --smp=1
+      - --memory=1G
+      - --overprovisioned
+      - --node-id=0
+      - --kafka-addr=PLAINTEXT://0.0.0.0:9092
+      - --advertise-kafka-addr=PLAINTEXT://redpanda:9092
+    ports:
+      - "9092:9092"
+      - "9644:9644"
+    networks: [fleet-net]
+
+networks:
+  fleet-net:
+    driver: bridge
 
 volumes:
   postgres_data:
+  mlflow_data:
+  mlflow_artifacts:
