@@ -15,9 +15,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 import structlog
+from accent_fleet.pipeline.flow_stream import run_stream
 
 from accent_fleet.config import settings
-from accent_fleet.pipeline.flow_stream import run_stream
 
 
 def main() -> int:

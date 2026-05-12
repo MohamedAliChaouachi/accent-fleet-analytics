@@ -26,5 +26,30 @@ markers = [
 line-length = 100
 target-version = "py311"
 
+# One-off matplotlib figure generators and notebook builders use intentional
+# one-liner style (semicolons, long lines with embedded plotting params).
+# Linting them produces noise without value — these aren't on the production
+# hot path. Re-introduce when the figure code moves into a maintained module.
+extend-exclude = [
+  "scripts/python/figures",
+  "scripts/build_eval_notebooks.py",
+]
+
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+# Streamlit's multi-page convention REQUIRES filenames like `Home.py` and
+# `0_Executive_Overview.py` — the numeric prefix controls page ordering and
+# the capitalised stem becomes the visible page label. Renaming would break
+# the dashboard, so N999 (invalid-module-name) is ignored for these.
+# E501 (line-too-long) is also ignored because Streamlit pages embed long
+# literal Markdown / column-metric expressions where wrapping hurts more
+# than it helps.
+"dashboard/Home.py" = ["N999", "E501"]
+"dashboard/pages/*.py" = ["N999", "E501"]
+
+# sklearn's training API uses uppercase `X` (feature matrix) and lowercase
+# `y` (target vector) by convention. Renaming would obscure what the code
+# does for anyone coming from a ML background.
+"src/accent_fleet/ml/*.py" = ["N806"]

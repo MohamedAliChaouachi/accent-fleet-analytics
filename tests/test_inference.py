@@ -14,7 +14,6 @@ from accent_fleet.ml.inference import (
     score_with_components,
 )
 
-
 SAMPLE = {
     "overspeed_per_100km": 4.0,
     "overspeed_count": 80,

@@ -18,7 +18,6 @@ from __future__ import annotations
 import json
 import logging
 import threading
-from pathlib import Path
 from typing import Any
 
 from accent_fleet.config import PROJECT_ROOT, config_hash, settings

@@ -19,7 +19,6 @@ from fastapi import APIRouter, Header, HTTPException, status
 
 from accent_fleet.config import settings
 from accent_fleet.ml.inference import ClusterPredictor
-
 from app.deps import ClusterPredictorDep
 
 logger = logging.getLogger("accent_fleet.api.admin")

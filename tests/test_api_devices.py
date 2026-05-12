@@ -19,7 +19,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 
 from accent_fleet.db.engine import get_engine
-
 from app.main import app
 
 

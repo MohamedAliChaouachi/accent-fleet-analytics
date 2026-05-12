@@ -15,9 +15,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from accent_fleet.features.risk_score import load_risk_scorer
-
 from app.main import app
-
 
 SAMPLE_FEATURES = {
     "overspeed_per_100km": 5.0,

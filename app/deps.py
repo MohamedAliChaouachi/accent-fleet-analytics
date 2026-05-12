@@ -7,7 +7,7 @@ can take them as typed parameters instead of reaching into globals.
 
 from __future__ import annotations
 
-from typing import Iterator
+from collections.abc import Iterator
 
 from fastapi import Depends, Request
 from sqlalchemy.engine import Connection

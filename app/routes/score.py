@@ -15,7 +15,6 @@ from fastapi import APIRouter, HTTPException, status
 from accent_fleet.config import config_hash
 from accent_fleet.features.risk_score import RiskScorer
 from accent_fleet.ml.inference import ClusterPredictor, score_with_components
-
 from app.deps import ClusterPredictorDep, RiskScorerDep
 from app.schemas.score import (
     ClusterScoreResponse,

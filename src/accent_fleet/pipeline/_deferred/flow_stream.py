@@ -18,11 +18,10 @@ import time
 
 import polars as pl
 import structlog
-from sqlalchemy import text
 
 from accent_fleet.cleaning import load_rule_engine
 from accent_fleet.config import settings
-from accent_fleet.db import get_engine, transaction
+from accent_fleet.db import get_engine
 from accent_fleet.ingestion import StreamKafkaSource
 from accent_fleet.pipeline.run_log import begin_run, end_run
 

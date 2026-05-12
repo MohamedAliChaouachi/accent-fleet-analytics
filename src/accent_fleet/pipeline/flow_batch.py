@@ -29,7 +29,7 @@ from sqlalchemy import text
 
 from accent_fleet.config import load_pipeline_config
 from accent_fleet.db import get_engine, run_sql_file, transaction
-from accent_fleet.db.sql_loader import split_sql_statements, load_sql
+from accent_fleet.db.sql_loader import load_sql, split_sql_statements
 from accent_fleet.monitoring import run_validation_suite
 from accent_fleet.pipeline.run_log import begin_run, end_run
 from accent_fleet.transforms import refresh_all_dimensions

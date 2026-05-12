@@ -16,8 +16,7 @@ import json
 import logging
 import os
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from pathlib import Path
+from datetime import UTC, datetime
 from typing import Any
 
 import joblib
@@ -121,7 +120,8 @@ def fit_clustering(
         raise RuntimeError("KMeans selection produced no model")
 
     labels, counts = np.unique(best_km.labels_, return_counts=True)
-    sizes = {int(lab): int(c) for lab, c in zip(labels, counts)}
+    # strict=True: labels and counts come from np.unique → guaranteed same length.
+    sizes = {int(lab): int(c) for lab, c in zip(labels, counts, strict=True)}
 
     result = TrainResult(
         k=best_k,
@@ -141,7 +141,7 @@ def save_local(kmeans: KMeans, scaler: StandardScaler, result: TrainResult) -> N
     joblib.dump(scaler, ARTIFACT_DIR / "scaler_v1.joblib")
     metadata: dict[str, Any] = {
         "version": "v1",
-        "trained_at": datetime.now(timezone.utc).isoformat(),
+        "trained_at": datetime.now(UTC).isoformat(),
         "k": result.k,
         "silhouette": result.silhouette,
         "n_rows": result.n_rows,

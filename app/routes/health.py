@@ -15,7 +15,6 @@ from sqlalchemy import text
 
 from accent_fleet.config import settings
 from accent_fleet.db.engine import get_engine
-
 from app import __version__
 
 router = APIRouter(tags=["meta"])

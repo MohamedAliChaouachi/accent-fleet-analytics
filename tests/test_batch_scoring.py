@@ -16,6 +16,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -118,12 +119,10 @@ class _ThresholdKMeans:
         self.threshold = threshold
 
     def predict(self, X):  # noqa: N803
-        import numpy as np
 
         return np.array([1 if row[0] > self.threshold else 0 for row in X], dtype=int)
 
     def transform(self, X):  # noqa: N803
-        import numpy as np
 
         # Two centroids; distance 0 to the assigned one, 9.9 to the other.
         rows = []
@@ -135,7 +134,6 @@ class _ThresholdKMeans:
         return np.array(rows, dtype=float)
 
 
-import numpy as np  # noqa: E402  — kept after class so _ThresholdKMeans imports cleanly
 
 
 @pytest.fixture

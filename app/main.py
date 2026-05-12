@@ -20,7 +20,6 @@ from fastapi import FastAPI
 
 from accent_fleet.config import settings
 from accent_fleet.ml.inference import ClusterPredictor, get_risk_scorer
-
 from app import __version__
 from app.routes import admin, devices, health, score
 

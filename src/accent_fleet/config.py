@@ -23,7 +23,6 @@ import yaml
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
 # Project root = two levels up from this file (src/accent_fleet/config.py)
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CONFIG_DIR = PROJECT_ROOT / "config"
@@ -52,7 +51,8 @@ class Settings(BaseSettings):
     pg_schema_warehouse: str = Field("warehouse", alias="PG_SCHEMA_WAREHOUSE")
     pg_schema_marts: str = Field("marts", alias="PG_SCHEMA_MARTS")
     # SSL mode for psycopg. "prefer" works locally; Azure Database for PostgreSQL
-    # requires "require" (or stricter). Valid values: disable|allow|prefer|require|verify-ca|verify-full
+    # requires "require" (or stricter). Valid values:
+    #   disable | allow | prefer | require | verify-ca | verify-full
     pg_sslmode: str = Field("prefer", alias="PG_SSLMODE")
 
     # --- Pipeline ---

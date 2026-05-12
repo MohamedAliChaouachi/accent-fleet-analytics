@@ -7,7 +7,6 @@ from datetime import date, timedelta
 
 import streamlit as st
 
-
 # Color palette aligned with the executive dashboard SQL view tier labels.
 RISK_COLORS = {
     "low": "#2ecc71",

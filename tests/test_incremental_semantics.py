@@ -20,7 +20,6 @@ from sqlalchemy import text
 from accent_fleet.db import get_engine
 from accent_fleet.pipeline import incremental_flow
 
-
 pytestmark = pytest.mark.integration
 
 
