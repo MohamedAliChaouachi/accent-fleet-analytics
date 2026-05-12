@@ -103,9 +103,9 @@ If anything is red, stop and fix before continuing — every later step assumes 
 
 ```powershell
 @'
-from accent_fleet.db.engine import engine
+from accent_fleet.db.engine import get_engine
 from sqlalchemy import text
-c = engine().connect()
+c = get_engine().connect()
 for q in [
     "SELECT current_user, current_database(), version()",
     "SELECT COUNT(*) FROM marts.mart_device_monthly_behavior",
@@ -138,7 +138,7 @@ SELECT to_regclass('marts.fact_device_cluster_assignment') -> None
 ## 3. Sprint 2 — Apply new DDL
 
 ```powershell
-python scripts\run_batch.py bootstrap
+python scripts\run_batch.py --mode bootstrap
 ```
 
 **Expected:** the script enumerates `sql/*.sql` files in order, prints each one applied, and ends without errors. Specifically look for these lines:
@@ -151,9 +151,9 @@ applied sql/99_validation_suite.sql
 
 ```powershell
 @'
-from accent_fleet.db.engine import engine
+from accent_fleet.db.engine import get_engine
 from sqlalchemy import text
-c = engine().connect()
+c = get_engine().connect()
 print("table:", c.execute(text("SELECT to_regclass('marts.fact_device_cluster_assignment')")).scalar())
 for idx in [
     "idx_fact_cluster_assignment_cluster",
@@ -207,7 +207,7 @@ type models\clustering\metadata.json
 
 **Common failures:**
 - `permission denied for view v_ml_features_full` → grants missing.
-- `No data returned from v_ml_features_full` → backfill the DB first (`python scripts\run_batch.py backfill --from 2024-01`).
+- `No data returned from v_ml_features_full` → backfill the DB first (`python scripts\run_batch.py --mode backfill --from 2024-01`).
 
 **Status:** ☐ PASS ☐ FAIL
 
@@ -271,7 +271,7 @@ Open in browser: <http://127.0.0.1:8000/docs>
 Back in the first terminal:
 
 ```powershell
-python scripts\run_batch.py incremental
+python scripts\run_batch.py --mode incremental
 ```
 
 **Expected:** the flow runs every task and logs `task_score_latest_partition` near the end with a non-zero row count.
@@ -280,9 +280,9 @@ python scripts\run_batch.py incremental
 
 ```powershell
 @'
-from accent_fleet.db.engine import engine
+from accent_fleet.db.engine import get_engine
 from sqlalchemy import text
-c = engine().connect()
+c = get_engine().connect()
 print("rows:", c.execute(text("SELECT COUNT(*) FROM marts.fact_device_cluster_assignment")).scalar())
 print("distinct months:", c.execute(text("SELECT COUNT(DISTINCT year_month) FROM marts.fact_device_cluster_assignment")).scalar())
 print("distinct clusters:", c.execute(text("SELECT COUNT(DISTINCT cluster_id) FROM marts.fact_device_cluster_assignment")).scalar())
@@ -302,13 +302,13 @@ c.close()
 Re-run the same incremental flow:
 
 ```powershell
-python scripts\run_batch.py incremental
+python scripts\run_batch.py --mode incremental
 ```
 
 Then check the row count hasn't doubled:
 
 ```powershell
-python -c "from accent_fleet.db.engine import engine; from sqlalchemy import text; print(engine().connect().execute(text('SELECT COUNT(*) FROM marts.fact_device_cluster_assignment')).scalar())"
+python -c "from accent_fleet.db.engine import get_engine; from sqlalchemy import text; print(get_engine().connect().execute(text('SELECT COUNT(*) FROM marts.fact_device_cluster_assignment')).scalar())"
 ```
 
 **Expected:** identical (or near-identical, depending on data) row count to step 6.1. The DELETE-then-INSERT inside `_upsert_rows()` should replace, not append.
@@ -321,9 +321,9 @@ python -c "from accent_fleet.db.engine import engine; from sqlalchemy import tex
 
 ```powershell
 @'
-from accent_fleet.db.engine import engine
+from accent_fleet.db.engine import get_engine
 from sqlalchemy import text
-c = engine().connect()
+c = get_engine().connect()
 rows = c.execute(text("""
     SELECT check_name, status, details
       FROM warehouse.etl_run_log
@@ -349,8 +349,12 @@ In a **third terminal** (keep API running):
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
+$env:PYTHONPATH = "."
+$env:API_BASE_URL = "http://127.0.0.1:8000"
 streamlit run dashboard\Home.py
 ```
+
+> The `$env:PYTHONPATH = "."` line is critical — Streamlit launches `Home.py` with only `dashboard/` on `sys.path`, so `from dashboard.lib...` fails without it. Same applies on Unix: `PYTHONPATH=. streamlit run dashboard/Home.py`.
 
 **Expected:** browser opens at <http://localhost:8501> with the welcome page.
 
@@ -455,6 +459,8 @@ git push origin v0.5.0
 | Dashboard 3_Risk: "No cluster assignments yet" | Step 6 didn't write rows | Re-run Step 6 |
 | V9 / V10 missing from `etl_run_log` | `99_validation_suite.sql` not applied | Re-run Step 3, confirm file lists `V9` and `V10` |
 | Streamlit port 8501 already in use | Old streamlit process | `streamlit run dashboard\Home.py --server.port 8502` |
+| Streamlit `ModuleNotFoundError: No module named 'dashboard'` | `PYTHONPATH` not set | `$env:PYTHONPATH = "."` before `streamlit run` |
+| Bootstrap fails with `must be owner of <function/table>` | DB user lacks ownership of pre-existing objects | As admin, transfer ownership of schemas, tables, views, matviews, and functions in `staging`/`warehouse`/`marts` to the dev role. See `DB_ACCESS_REQUEST.md`. |
 
 ---
 
