@@ -5,7 +5,11 @@ FROM python:3.11-slim AS base
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    # Make the workdir importable so `streamlit run dashboard/Home.py` finds the
+    # `dashboard.lib.*` package. Without this, Streamlit only adds the script's
+    # own folder to sys.path and `from dashboard.lib...` raises ModuleNotFoundError.
+    PYTHONPATH=/app
 
 # System packages:
 #   - build-essential, libpq-dev: needed by psycopg + scikit-learn wheels on slim

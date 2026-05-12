@@ -45,7 +45,10 @@ uvicorn[standard]>=0.30.0
 httpx>=0.27.0                 # API client used by tests and dashboard What-If
 
 # ML lifecycle
-mlflow>=2.16.0
+# Pin to the 2.x line: server image ghcr.io/mlflow/mlflow:v2.16.2 doesn't
+# expose the /api/2.0/mlflow/logged-models endpoint that mlflow 3.x clients call,
+# so a 3.x client against this server fails with 404 during log_model().
+mlflow>=2.16.0,<3.0.0
 joblib>=1.4.0
 
 # Dashboard
