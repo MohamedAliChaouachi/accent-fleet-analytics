@@ -70,7 +70,10 @@ jobs:
           pip install pytest pytest-cov httpx
 
       - name: Run pytest
-        # Integration tests skip themselves when Postgres is unreachable; CI
-        # therefore exercises only the pure-unit tier here. Live coverage
-        # comes from the docker-compose smoke run in the release workflow.
-        run: pytest -ra --maxfail=5
+        # Exclude the `integration` mark — those tests boot a Prefect flow
+        # that requires Postgres. Other DB-touching tests (test_api_devices,
+        # SQL parity in test_feature_computation) self-skip via a
+        # `db_available` fixture, so they're safe to leave in the default
+        # selection. Live integration coverage comes from the docker-compose
+        # smoke run in the release workflow.
+        run: pytest -ra --maxfail=5 -m "not integration"
