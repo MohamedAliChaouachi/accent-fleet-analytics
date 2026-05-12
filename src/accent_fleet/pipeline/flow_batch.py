@@ -248,6 +248,61 @@ def task_run_validation(run_id: int) -> None:   # noqa: ARG001
         log.warning("validation.failures", failed=report.failed_checks)
 
 
+def _months_ago_yyyy_mm(now: datetime, months: int) -> str:
+    """
+    Return the YYYY-MM cutoff that's `months` calendar months before `now`.
+
+    Computed via integer month arithmetic to avoid pulling python-dateutil
+    for a single subtraction. Always produces a string sortable against
+    CHAR(7) year_month columns.
+    """
+    idx = now.year * 12 + (now.month - 1) - months
+    year, month0 = divmod(idx, 12)
+    return f"{year:04d}-{month0 + 1:02d}"
+
+
+@task(retries=1)
+def task_apply_retention(run_id: int) -> None:   # noqa: ARG001
+    """
+    Prune unbounded operational tables per config/pipeline.yaml > retention.
+
+    Disabled by default-friendly fallback: if the section is missing or
+    `enabled: false`, this task is a no-op so existing deployments behave
+    exactly as before this commit landed.
+
+    Why a separate task (vs. a cron job): keeping it inline means the
+    retention window is enforced on every successful flow, which is the
+    same cadence that fills these tables. No drift, no missed days.
+    """
+    cfg = load_pipeline_config()
+    ret = cfg.get("retention") or {}
+    if not ret.get("enabled", False):
+        log.info("retention.skip_disabled")
+        return
+
+    etl_days = int(ret.get("etl_run_log_days", 90))
+    quarantine_days = int(ret.get("quarantine_days", 30))
+    cluster_months = int(ret.get("cluster_assignment_months", 12))
+    cutoff_month = _months_ago_yyyy_mm(datetime.utcnow(), cluster_months)
+
+    with transaction() as conn:
+        run_sql_file(
+            conn,
+            "40_retention.sql",
+            params={
+                "etl_run_log_retention_days": etl_days,
+                "quarantine_retention_days": quarantine_days,
+                "cluster_assignment_cutoff_month": cutoff_month,
+            },
+        )
+    log.info(
+        "retention.applied",
+        etl_run_log_days=etl_days,
+        quarantine_days=quarantine_days,
+        cluster_assignment_cutoff_month=cutoff_month,
+    )
+
+
 # =============================================================================
 # Flow: bootstrap
 # =============================================================================
@@ -324,6 +379,12 @@ def incremental_flow(window_end: datetime | None = None) -> None:
 
         # 6. Validation
         task_run_validation(run_id)
+
+        # 7. Bounded retention — prune old etl_run_log / quarantine /
+        #    cluster_assignment rows per config/pipeline.yaml. Runs LAST
+        #    so even if it fails, the run that produced this batch's data
+        #    is already logged as success in step 5.
+        task_apply_retention(run_id)
 
         total_loaded = sum(r.rows_loaded for r in fact_results)
         end_run(run_id, status="success", rows_loaded=total_loaded)

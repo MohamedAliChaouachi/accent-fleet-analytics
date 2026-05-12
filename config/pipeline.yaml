@@ -207,3 +207,19 @@ quarantine:
   # Rows that fail a "reject" cleaning rule are written here for audit.
   enabled: true
   retention_days: 90
+
+# ---------------------------------------------------------------------------
+# Retention — bounded pruning for high-cardinality operational tables.
+# Implemented by sql/40_retention.sql, run on every incremental flow after
+# marts are recomputed. Failed runs are NEVER pruned regardless of these
+# values — they're the audit trail.
+# ---------------------------------------------------------------------------
+retention:
+  enabled: true
+  # warehouse.etl_run_log — successful runs older than this are pruned.
+  etl_run_log_days: 90
+  # warehouse.quarantine_rejected — rejected rows older than this are pruned.
+  # Capped at quarantine.retention_days above when both are set.
+  quarantine_days: 30
+  # marts.fact_device_cluster_assignment — keep this many months of history.
+  cluster_assignment_months: 12

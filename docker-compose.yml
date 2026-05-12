@@ -151,6 +151,28 @@ services:
     networks: [fleet-net]
 
   # ---------------------------------------------------------------------------
+  # nginx reverse proxy with HTTP Basic Auth in front of dashboard / mlflow / api.
+  # Opt-in via `--profile auth`. Required when the host is reachable outside
+  # localhost. See docker/nginx/nginx.conf + README §Auth-protected stack for
+  # how to create the htpasswd file before starting this service.
+  # ---------------------------------------------------------------------------
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: accent_nginx
+    restart: unless-stopped
+    profiles: ["auth"]
+    ports:
+      - "${NGINX_PORT:-8080}:80"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/htpasswd:/etc/nginx/htpasswd:ro
+    depends_on:
+      - dashboard
+      - mlflow
+      - api
+    networks: [fleet-net]
+
+  # ---------------------------------------------------------------------------
   # Redpanda: Kafka-compatible broker. Enabled when streaming goes live.
   # Start with: docker compose --profile streaming up -d redpanda
   # ---------------------------------------------------------------------------
