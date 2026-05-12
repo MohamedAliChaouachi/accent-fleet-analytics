@@ -22,7 +22,7 @@ from accent_fleet.config import settings
 from accent_fleet.ml.inference import ClusterPredictor, get_risk_scorer
 
 from app import __version__
-from app.routes import devices, health, score
+from app.routes import admin, devices, health, score
 
 logger = logging.getLogger("accent_fleet.api")
 
@@ -59,6 +59,7 @@ app = FastAPI(
 app.include_router(health.router)
 app.include_router(score.router)
 app.include_router(devices.router)
+app.include_router(admin.router)
 
 
 @app.get("/", tags=["meta"])

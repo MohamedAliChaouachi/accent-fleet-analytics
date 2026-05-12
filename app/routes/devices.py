@@ -84,15 +84,30 @@ def top_risk(
 ) -> TopRiskResponse:
     """Highest-risk devices from the rolling 3-month view."""
 
-    sql = """
-        SELECT tenant_id, device_id, latest_month::text AS latest_month,
-               risk_score, risk_category
-          FROM marts.v_device_risk_profile
-         WHERE (:tenant_id IS NULL OR tenant_id = :tenant_id)
-         ORDER BY risk_score DESC NULLS LAST
-         LIMIT :n
-    """
-    rows = conn.execute(text(sql), {"n": n, "tenant_id": tenant_id}).mappings().all()
+    # Branch the SQL on tenant_id presence instead of using a `(:x IS NULL OR ...)`
+    # guard: psycopg sends a typeless NULL for None, and Postgres can't infer the
+    # parameter type, raising AmbiguousParameter. Two simple statements are
+    # cheaper than the cast workaround and easier to read.
+    if tenant_id is None:
+        sql = """
+            SELECT tenant_id, device_id, latest_month::text AS latest_month,
+                   risk_score, risk_category
+              FROM marts.v_device_risk_profile
+             ORDER BY risk_score DESC NULLS LAST
+             LIMIT :n
+        """
+        params: dict = {"n": n}
+    else:
+        sql = """
+            SELECT tenant_id, device_id, latest_month::text AS latest_month,
+                   risk_score, risk_category
+              FROM marts.v_device_risk_profile
+             WHERE tenant_id = :tenant_id
+             ORDER BY risk_score DESC NULLS LAST
+             LIMIT :n
+        """
+        params = {"n": n, "tenant_id": tenant_id}
+    rows = conn.execute(text(sql), params).mappings().all()
     return TopRiskResponse(
         n=n,
         devices=[TopRiskDevice(**dict(r)) for r in rows],

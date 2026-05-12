@@ -127,6 +127,18 @@ def render_sidebar_filters() -> Filters:
         else:
             st.caption(f"Scope: all tenants, {start} → {end}")
 
+        # Freshness footer — rendered in the sidebar so it survives any
+        # st.stop() the page body might call when filters return no rows.
+        # Imported lazily to avoid a theme<->cache import cycle.
+        from dashboard.lib.cache import last_etl_run_at
+
+        st.divider()
+        ts = last_etl_run_at()
+        if ts:
+            st.caption(f"Last ETL refresh: **{ts}**")
+        else:
+            st.caption("Last ETL refresh: _no successful runs recorded_")
+
     filters = Filters(start=start, end=end, tenant_ids=tenant_ids)
     st.session_state["filters"] = filters
     return filters

@@ -8,6 +8,7 @@ import pytest
 
 from accent_fleet.features.risk_score import load_risk_scorer
 from accent_fleet.ml.inference import (
+    DEFAULT_MODEL_DIR,
     ClusterPredictor,
     get_risk_scorer,
     score_with_components,
@@ -48,8 +49,22 @@ def test_score_with_components_zero_features_zero_score():
     assert all(v == 0.0 for v in components.values())
 
 
-def test_cluster_predictor_raises_when_no_model():
-    """Without an MLflow Production model AND no local joblib, predict() raises."""
+def test_cluster_predictor_raises_when_no_model(monkeypatch):
+    """
+    Without an MLflow Production model AND no local joblib, predict() raises.
+
+    We point the local-load path at a guaranteed-empty temp directory so a
+    pre-existing models/clustering/ tree (created by an earlier train run)
+    doesn't make the predictor succeed and flip this test red. We also pin
+    MLFLOW_TRACKING_URI to an unreachable host so the registry path can't
+    succeed either.
+    """
+    monkeypatch.setattr(
+        "accent_fleet.ml.inference.DEFAULT_MODEL_DIR",
+        DEFAULT_MODEL_DIR.parent / "__no_such_dir_for_test__",
+    )
+    monkeypatch.setenv("MLFLOW_TRACKING_URI", "http://127.0.0.1:0")
+
     p = ClusterPredictor()
     # The predictor is intentionally lazy: instantiation never throws.
     assert p.is_loaded is False

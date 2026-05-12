@@ -120,6 +120,21 @@ class ClusterPredictor:
             )
 
     # ------------------------------------------------------------------
+    def reload(self) -> dict[str, str]:
+        """
+        Force a fresh load from MLflow (or local disk). Use after promoting a
+        new model version so the running API picks it up without a restart.
+        """
+        with self._lock:
+            self._kmeans = None
+            self._scaler = None
+            self._feature_order = None
+            self._model_version = "unloaded"
+            self._source = "none"
+        self.ensure_loaded()
+        return {"model_version": self._model_version, "source": self._source}
+
+    # ------------------------------------------------------------------
     def _try_load_mlflow(self) -> bool:
         """Load latest Production-stage clustering pipeline from MLflow."""
         s = settings()

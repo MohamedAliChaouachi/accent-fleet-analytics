@@ -82,6 +82,9 @@ class Settings(BaseSettings):
     api_host: str = Field("0.0.0.0", alias="API_HOST")
     api_port: int = Field(8000, alias="API_PORT")
     api_base_url: str = Field("http://localhost:8000", alias="API_BASE_URL")
+    # Admin endpoints (model reload) are gated by this key passed as X-API-Key.
+    # When unset, the admin router refuses every request — fail closed.
+    api_admin_key: str = Field("", alias="API_ADMIN_KEY")
 
     dashboard_port: int = Field(8501, alias="DASHBOARD_PORT")
     dashboard_base_url: str = Field("http://localhost:8501", alias="DASHBOARD_BASE_URL")
