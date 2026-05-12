@@ -19,6 +19,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 
 from accent_fleet.db.engine import get_engine
+from app.deps import get_db
 from app.main import app
 
 
@@ -37,6 +38,32 @@ def db_available() -> bool:
 def client() -> TestClient:
     with TestClient(app) as c:
         yield c
+
+
+@pytest.fixture
+def client_no_db() -> TestClient:
+    """
+    TestClient with `get_db` overridden to a no-op generator.
+
+    FastAPI resolves all route dependencies (including DbDep) as part of the
+    same `solve_dependencies` pass that validates Query parameters. That
+    means a request with an out-of-range query param still opens a DB
+    connection BEFORE returning 422 — fine when Postgres is reachable, but
+    crashes in CI where there is no DB. For tests that only exercise
+    parameter validation, override the dependency so no connection is
+    attempted.
+    """
+    def _no_db():
+        # FastAPI just needs an iterator; the value is never used because
+        # validation short-circuits before the route body runs.
+        yield None
+
+    app.dependency_overrides[get_db] = _no_db
+    try:
+        with TestClient(app) as c:
+            yield c
+    finally:
+        app.dependency_overrides.pop(get_db, None)
 
 
 # ---------------------------------------------------------------------------
@@ -65,13 +92,11 @@ def test_top_risk_with_tenant_filter_works(client, db_available):
         assert d["tenant_id"] == 1
 
 
-def test_top_risk_validates_n_bounds(client):
+def test_top_risk_validates_n_bounds(client_no_db):
     """Query-param validation happens before DB hit — works without a DB."""
-    with TestClient(app) as c:
-        r = c.get("/devices/top-risk?n=0")
+    r = client_no_db.get("/devices/top-risk?n=0")
     assert r.status_code == 422
-    with TestClient(app) as c:
-        r = c.get("/devices/top-risk?n=500")
+    r = client_no_db.get("/devices/top-risk?n=500")
     assert r.status_code == 422
 
 
@@ -96,13 +121,11 @@ def test_device_profile_unknown_id_returns_404(client, db_available):
     assert r.status_code == 404
 
 
-def test_device_profile_validates_months(client):
+def test_device_profile_validates_months(client_no_db):
     """Query-param validation — no DB needed."""
-    with TestClient(app) as c:
-        r = c.get("/devices/1/profile?months=0")
+    r = client_no_db.get("/devices/1/profile?months=0")
     assert r.status_code == 422
-    with TestClient(app) as c:
-        r = c.get("/devices/1/profile?months=120")
+    r = client_no_db.get("/devices/1/profile?months=120")
     assert r.status_code == 422
 
 
