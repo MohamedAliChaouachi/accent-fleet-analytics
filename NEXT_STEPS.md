@@ -23,66 +23,66 @@ Do Part 1 first. Part 2 only makes sense once Part 1 is solid.
 
 ---
 
-## Part 1 — Hardening sprint (~1 week)
+## Part 1 — Hardening sprint  ✅ **closed at v0.6.0** (kept as a changelog)
 
-Goal: take the stack from "works on our two machines" to "safe to give to a
-third person without supervision". No new features — close the real gaps in
-what we already have.
+The original DOD said *"Tag `v0.6.0` when all of 1.1–1.5 are done"* — v0.6.0
+was tagged. The tables below are preserved as a changelog so the line-item
+trail is visible. The two unchecked items are deferred deliberately, not
+forgotten: see notes per row. A separate **§1.6 Residual paper-cuts** below
+collects what's still genuinely open from Part 1.
 
 ### 1.1 Real bugs
 
-| Item | Where | Effort |
-|---|---|---|
-| `/devices/top-risk` 500s without `tenant_id` (untyped NULL parameter) | `app/routes/devices.py:~95` | 30 min |
-| `streamlit-aggrid` declared in `requirements.txt` but never imported | `requirements.txt`, dashboard pages | 15 min — either remove the dep or wire it into the risk page table |
-| MLflow client/server pinned — bump server to match? | `docker-compose.yml`, `requirements.txt` | 1 hr — optional; current pin is stable |
+| Item | Status |
+|---|---|
+| `/devices/top-risk` 500s without `tenant_id` (untyped NULL parameter) | ✅ v0.6.0 — `app/routes/devices.py` branches the SQL on `tenant_id is None` instead of using `(:x IS NULL OR ...)`. Regression-pinned in `tests/test_api_devices.py::test_top_risk_without_tenant_does_not_500`. |
+| `streamlit-aggrid` declared in `requirements.txt` but never imported | ✅ v0.6.0 — removed from requirements; dashboard pages use native `st.dataframe`. |
+| MLflow client/server pinned — bump server to match? | ⏭ Deferred — current pin (server v2.16.2 / client v2.16.x) is stable; bump it the next time it actively blocks something rather than chasing version drift. |
 
 ### 1.2 Test coverage gaps from the original plan
 
-| Item | Where | Effort |
-|---|---|---|
-| `tests/test_api_devices.py` — covers `/devices/top-risk` (with and without tenant_id) and `/devices/{id}/profile` | new file | 2 hr |
-| `tests/test_dashboard_smoke.py` — headless Streamlit + `curl /_stcore/health` + GET each page URL, assert non-500 | new file | 3 hr |
-| SQL parity assertion — extend `tests/test_feature_computation.py` so `cluster_id` from API equals `cluster_id` in `marts.fact_device_cluster_assignment` | existing test file | 2 hr |
-| Performance check — measure p95 for `/score/risk` (target <100ms) and `/devices/{id}/profile` (target <300ms). Document numbers in README. | one-off `locust` or `ab` run | 2 hr |
+| Item | Status |
+|---|---|
+| `tests/test_api_devices.py` — covers `/devices/top-risk` (with and without tenant_id) and `/devices/{id}/profile` | ✅ v0.6.0 — 8 tests; DB-bound tests auto-skip when Postgres isn't reachable so CI passes without a database. |
+| `tests/test_dashboard_smoke.py` — headless Streamlit + page-load asserts | ⏭ Deferred — Streamlit is on the deprecate-list (see §2.3). Building a smoke test for code we plan to replace is poor ROI. |
+| SQL parity assertion — `cluster_id` from API equals `cluster_id` in `marts.fact_device_cluster_assignment` | 📌 **Open — graduation-relevant.** Concrete evidence that online and offline compute paths agree. Tracked in §1.6. |
+| Performance check — p95 for `/score/risk` (<100ms) and `/devices/{id}/profile` (<300ms), numbers in README | 📌 **Open — graduation-relevant.** Concrete latency numbers belong in the report. Tracked in §1.6. |
 
 ### 1.3 CI
 
-| Item | Where | Effort |
-|---|---|---|
-| GitHub Actions workflow that runs `pytest -m "not slow"` on every push to a branch and on PR to main | `.github/workflows/ci.yml` (new) | 2 hr |
-| Same workflow runs `docker compose build base` to catch Dockerfile breakage | same | 30 min |
-| Branch protection on `main` requiring CI green before merge | GitHub settings | 5 min |
+| Item | Status |
+|---|---|
+| GitHub Actions workflow that runs `pytest -m "not slow"` on every push and PR | ✅ v0.6.0 — `.github/workflows/ci.yml`, jobs `lint (ruff)` + `test (pytest)` + `docker (build base image)`. |
+| Same workflow runs `docker compose build base` to catch Dockerfile breakage | ✅ v0.6.0 — `docker (build base image)` job in the same workflow. |
+| Branch protection on `main` requiring CI green before merge | ⏭ Deliberately skipped — single-maintainer repo, see commit `09afaacf` ("docs: record decision to skip branch protection on main"). Revisit when a second contributor lands. |
 
 ### 1.4 API operability
 
-| Item | Where | Effort |
-|---|---|---|
-| `POST /admin/reload-model` endpoint — calls `app.state.cluster_predictor.reload()` so a freshly-promoted Production model is picked up without restarting the container | `app/routes/admin.py` (new), `app/main.py` lifespan | 3 hr |
-| Dashboard footer: "Last ETL refresh: {timestamp}" pulled from `warehouse.etl_run_log` — already a documented risk mitigation in the original plan | `dashboard/Home.py`, `dashboard/lib/queries.py` | 1 hr |
+| Item | Status |
+|---|---|
+| `POST /admin/reload-model` endpoint — picks up a freshly-promoted Production model without container restart | ✅ v0.6.0 — `app/routes/admin.py`, fail-closed `X-API-Key` auth, calls `ClusterPredictor.reload()`. Critical now that the v0.8.0 retrain scheduler can promote candidates while the API is up. |
+| Dashboard footer: "Last ETL refresh: {timestamp}" pulled from `warehouse.etl_run_log` | 📌 Open — minor UX, ~1hr. Tracked in §1.6. |
 
 ### 1.5 Minimum operational hygiene
 
-| Item | Where | Effort |
-|---|---|---|
-| Document `.env` hand-off process (1Password? Encrypted file? In-person only?) — pick one and write it down | `README.md` "Deployment" section | 30 min |
-| Retention policy on `warehouse.etl_run_log` and `marts.fact_device_cluster_assignment` — purge rows older than N months in a daily Prefect task | `sql/`, `src/accent_fleet/pipeline/` | 4 hr |
-| Backup the MLflow SQLite + artifacts volume — even a nightly `docker run --rm -v mlflow_data:/data alpine tar czf` is enough | `docker/scripts/backup_mlflow.sh` (new), cron on host | 2 hr |
-| Auth — stick API + dashboard behind a single nginx with HTTP basic auth, or add an API key middleware. Pick one. Even bad auth is better than no auth. | `docker/nginx/`, `docker-compose.yml` | 1 day |
+| Item | Status |
+|---|---|
+| Document `.env` hand-off process | 📌 Open — boring but worth doing before the project changes hands. Tracked in §1.6. |
+| Retention policy on `warehouse.etl_run_log` and `marts.fact_device_cluster_assignment` | ✅ v0.6.0 — daily Prefect task purges rows older than the configured retention horizon. |
+| Backup the MLflow SQLite + artifacts volume | ✅ v0.6.0 — `docker/scripts/backup_mlflow.sh` plus the matching `backup_postgres.sh` added in v0.7.0. |
+| Auth — stick API + dashboard behind a single nginx with HTTP basic auth, or an API key middleware | ✅ v0.6.0 — `--profile auth` adds an nginx reverse-proxy with htpasswd-protected access to dashboard / mlflow / api. Stopgap only; the durable answer is §2.2. |
 
-### Definition of Done — Part 1
+### 1.6 Residual paper-cuts (still genuinely open)
 
-- `pytest` runs in CI on every PR, green before merge.
-- A new developer can clone the repo, run `make up` + `make seed`, and have a
-  working dashboard in under 10 minutes (verifying the original plan's
-  Definition of Done that we never actually verified).
-- Anyone on the LAN hitting `:8501` or `:8000` gets prompted for credentials.
-- p95 latency numbers for `/score/risk` and `/devices/{id}/profile` are
-  documented in the README.
-- Tag `v0.6.0` when all of 1.1–1.5 are done.
+Not blocking the platform; collected here so they aren't forgotten:
 
-### Estimated effort
-~5 working days, one developer.
+- **SQL parity assertion** (§1.2 row 3) — extend `tests/test_feature_computation.py` to cross-check `cluster_id` between the API and `marts.fact_device_cluster_assignment` for a sample of devices. ~2hr. Graduation-defensive.
+- **Performance check** (§1.2 row 4) — one-off `locust`/`ab` run against a warm stack; record p95 latency in the README. ~2hr. Graduation-defensive (concrete numbers for the report).
+- **Dashboard ETL-refresh footer** (§1.4 row 2) — ~1hr UX polish.
+- **`.env` hand-off docs** (§1.5 row 1) — ~30 min, README "Deployment" section.
+
+Total residual: ~6 hours. Pick these up opportunistically between bigger
+chunks, or in a single afternoon before the final report draft.
 
 ---
 
@@ -108,9 +108,21 @@ consumes. To turn this on:
 
 Estimated: 3–4 weeks. Mostly architectural decisions, not code volume.
 
-### 2.2 Real auth + multi-tenancy
+### 2.2 Real auth + multi-tenancy  📍 **NEXT — active workstream**
 
-Part 1.5 lands "any auth at all". This phase is "auth that scales":
+Part 1.5 landed "any auth at all" (nginx + htpasswd, single shared
+credential). This phase is "auth that scales" and is the chosen
+next workstream — selected over §2.5 model A/B routing because:
+
+  - A/B routing without 30+ days of accumulated silhouette signal from
+    the v0.8.0 scheduler has no story to tell yet. Let the gate run
+    while auth lands.
+  - Auth + multi-tenancy is the architectural artifact that defends
+    well in the graduation report: per-tenant isolation, RLS, JWT
+    handling, OWASP-grade thinking. A/B routing is a feature; auth is
+    a platform property.
+
+Scope:
 
 - SSO via OIDC (Azure AD is the natural choice given the Azure Postgres host).
 - Row-level security: a user logged in for tenant X should not see tenant Y
@@ -120,6 +132,7 @@ Part 1.5 lands "any auth at all". This phase is "auth that scales":
 - Admin panel for managing tenants + users.
 
 Estimated: 4–6 weeks. The hard part is RLS migration on existing data.
+A dedicated design doc lands before implementation.
 
 ### 2.3 Production frontend (deprecate Streamlit)
 
@@ -183,15 +196,23 @@ Estimated: 1–2 weeks once the upstream data is there.
 
 ## Sequencing notes
 
-- **Part 1 is gating.** Don't start Part 2 phases until 1.1–1.5 are done — you
-  will end up debugging missing tests and missing auth in the middle of a
-  Kubernetes migration, and that is a bad time.
-- Inside Part 2, the order is loose, but `2.2 (auth) → 2.3 (frontend) → 2.4
-  (cloud)` is the cleanest sequence. Streaming (2.1) can run in parallel with
-  any of them. ML maturity (2.5) and geo (2.6) are independent.
-- A real-world calendar: Part 1 = 1 week, then ~4 months to reach a usable
-  v1.0 (auth + new frontend + cloud deploy), then ongoing iteration on
-  streaming + ML.
+- **Part 1 is closed at v0.6.0.** The §1.6 residuals are nice-to-haves, not
+  gates — they get folded into normal iteration.
+- Inside Part 2, the active order is `2.2 (auth/multi-tenancy) → 2.5 model A/B
+  routing → 2.3 frontend → 2.4 cloud`. §2.2 was chosen over §2.5 model A/B as
+  the immediate next chunk because A/B has no story to tell until the v0.8.0
+  scheduler has accumulated 30+ days of gate decisions. Auth, by contrast, is
+  a platform-property investment with clear graduation-report value.
+- Streaming (§2.1) can run in parallel with any of the above but is currently
+  deferred pending Kafka data access from the source system.
+- ML maturity (§2.5) — drift detection + retraining cadence already shipped
+  at v0.7.0 / v0.8.0. The remaining two items (A/B routing, supervised risk
+  score) are both *partly blocked* — A/B on signal accumulation, supervised
+  on label availability.
+- §2.6 Geo is independent and unscheduled.
+- Calendar: ~4–6 weeks for §2.2, then re-evaluate. By the time §2.2 lands
+  there should be enough scheduler history to decide whether §2.5 A/B is
+  worth doing or whether the gate is sufficient on its own.
 
 ## Out of scope for this document
 
