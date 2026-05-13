@@ -413,8 +413,6 @@ def task_retrain_with_gate(month_from: str = "2025-01") -> dict:
     are reported in the return dict and as warning logs.
     """
     try:
-        import time
-
         from accent_fleet.ml.promotion import (
             DEFAULT_SILHOUETTE_TOLERANCE,
             retrain_with_gate,
