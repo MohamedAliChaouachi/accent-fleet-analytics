@@ -13,17 +13,23 @@ Run locally:
 
 from __future__ import annotations
 
-import logging
 from contextlib import asynccontextmanager
 
+import structlog
 from fastapi import FastAPI
 
 from accent_fleet.config import settings
 from accent_fleet.ml.inference import ClusterPredictor, get_risk_scorer
+from accent_fleet.observability import setup_logging
 from app import __version__
-from app.routes import admin, devices, health, score
+from app.middleware import MetricsMiddleware
+from app.routes import admin, devices, health, metrics, score
+from app.versioning import LEGACY_SUNSET_HUMAN, include_versioned_router
 
-logger = logging.getLogger("accent_fleet.api")
+# Configure structured logging once at import time so anything that runs
+# before lifespan (e.g. eager singletons in routes) still gets JSON output.
+setup_logging()
+logger = structlog.get_logger("accent_fleet.api")
 
 
 @asynccontextmanager
@@ -31,8 +37,10 @@ async def lifespan(app: FastAPI):
     """Warm up shared singletons before the first request."""
     s = settings()
     logger.info(
-        "starting api version=%s pg_host=%s mlflow=%s",
-        __version__, s.pg_host, s.mlflow_tracking_uri,
+        "api.starting",
+        version=__version__,
+        pg_host=s.pg_host,
+        mlflow=s.mlflow_tracking_uri,
     )
 
     # RiskScorer is pure-Python — load eagerly so misconfiguration fails fast.
@@ -42,7 +50,7 @@ async def lifespan(app: FastAPI):
     # model existing. Both may not be true on a fresh stack — lazy-load.
     app.state.cluster_predictor = ClusterPredictor()
     yield
-    logger.info("api shutting down")
+    logger.info("api.shutting_down")
 
 
 app = FastAPI(
@@ -55,10 +63,23 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Order matters: middleware wraps requests outside-in, so MetricsMiddleware
+# being added last means it's the outermost wrapper and sees the FINAL
+# response status (after FastAPI's exception handlers convert errors).
+app.add_middleware(MetricsMiddleware)
+
+# Operational endpoints — never versioned. k8s probes, Prometheus scrapers,
+# and uptime checks read these paths from configuration; renaming them
+# imposes coordinated changes on infrastructure for zero behavioural gain.
 app.include_router(health.router)
-app.include_router(score.router)
-app.include_router(devices.router)
-app.include_router(admin.router)
+app.include_router(metrics.router)
+
+# Business routers — mounted under /v1 (canonical, in OpenAPI schema) and
+# again at the legacy bare path (hidden from schema, Deprecation header
+# stamped on every response). See app/versioning.py for the policy.
+include_versioned_router(app, score.router)
+include_versioned_router(app, devices.router)
+include_versioned_router(app, admin.router)
 
 
 @app.get("/", tags=["meta"])
@@ -66,6 +87,8 @@ def root() -> dict[str, str]:
     return {
         "service": "accent-fleet-api",
         "version": __version__,
+        "api_version": "v1",
         "docs": "/docs",
         "health": "/health",
+        "legacy_sunset": LEGACY_SUNSET_HUMAN,
     }

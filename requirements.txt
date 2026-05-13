@@ -37,6 +37,7 @@ great-expectations>=0.18.0    # optional, used in monitoring module
 python-dotenv>=1.0.0
 rich>=13.7.0                  # pretty CLI logs
 structlog>=24.1.0             # structured logging
+prometheus-client>=0.20.0     # /metrics endpoint + ETL counters
 
 # --- v0.5 operationalization (API + dashboard + MLflow) ---
 # API service
