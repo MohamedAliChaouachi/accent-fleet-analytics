@@ -28,8 +28,8 @@ import math
 import os
 from pathlib import Path
 
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 FIGDIR = PROJECT_ROOT / "report" / "figures"

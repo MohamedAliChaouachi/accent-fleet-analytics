@@ -155,6 +155,48 @@ All 7 cleaning rules (C1–C7) have dedicated unit tests. The incremental-semant
 
 ---
 
+## Performance — API latency
+
+`scripts/bench_api.py` spawns a fresh `uvicorn app.main:app` subprocess, waits
+for `/health`, then drives N requests through C concurrent httpx clients
+per endpoint. Defaults: 500 requests, concurrency 16.
+
+```bash
+python scripts/bench_api.py --requests 1000 --concurrency 16
+python scripts/bench_api.py --no-db          # skip /devices/{id}/profile
+```
+
+### Measured numbers (2026-05-12, local dev box, Postgres on `localhost:5432`)
+
+| Endpoint | Concurrency | n | p50 | p95 | p99 | max | Target | Status |
+|---|---:|---:|---:|---:|---:|---:|---|---|
+| `POST /score/risk` | 1  | 200  | 2.9 ms   | 3.8 ms   | 4.1 ms   | 4.8 ms   | p95 ≤ 100 ms | OK |
+| `POST /score/risk` | 16 | 1000 | 22.3 ms  | 54.6 ms  | 77.1 ms  | 129.7 ms | p95 ≤ 100 ms | OK |
+| `GET /devices/{id}/profile` | 1  | 200  | 340.4 ms  | 499.7 ms  | 748.0 ms  | 813.0 ms  | p95 ≤ 300 ms | **OVER** |
+| `GET /devices/{id}/profile` | 16 | 1000 | 1031.2 ms | 1692.7 ms | 3489.8 ms | 4659.1 ms | p95 ≤ 300 ms | **OVER** |
+
+**`/score/risk`** is pure-Python (no DB hit) and lands well under target —
+the 16× concurrency penalty is a real cost (single uvicorn worker + sync
+route runs in the anyio threadpool) but absolute numbers are still fine.
+
+**`/devices/{id}/profile`** is over target even at single-request load. Two
+SQL hits per request: `marts.v_device_risk_profile` (a view doing a window
+rank over `mart_device_monthly_behavior` then a `WHERE device_id = ?`
+filter) and `marts.mart_device_monthly_behavior` (indexed). The view is
+the bottleneck — the window can't be pushed below the WHERE clause, so
+each request rescans the source table.
+
+**Follow-up to close the gap** — pick one:
+- Materialize `v_device_risk_profile` as a table refreshed by the
+  incremental flow (cheap; we already touch the source on every batch).
+- Or add a partial index `(device_id) WHERE ...` on
+  `mart_device_monthly_behavior` and rewrite the view to push the filter.
+
+Tracked as a Tier-1 follow-up; the bench script makes the regression
+test for it trivial.
+
+---
+
 ## Pipeline modes
 
 | Mode | Trigger | Window | Use case |
@@ -201,3 +243,94 @@ Run them in order — each notebook asserts its exit criterion in the last cell.
 2. [`notebooks/_template.ipynb`](./notebooks/_template.ipynb) — the 4-section notebook template.
 3. [`notebooks/00_setup/00_environment_check.ipynb`](./notebooks/00_setup/00_environment_check.ipynb) — start here.
 4. [`notebooks/06_deployment/02_scheduled_runs.md`](./notebooks/06_deployment/02_scheduled_runs.md) — cron recipe for the Azure VM.
+5. [`NEXT_STEPS.md`](./NEXT_STEPS.md) — Part 1 hardening sprint + Part 2 v1.0 plan.
+
+---
+
+## Hand-off — running the stack on a fresh machine
+
+A teammate cloning this repo should be able to bring everything up in three
+commands. The only state that doesn't live in git is `.env`. Everything else
+(SQL, configs, Docker images) is reproducible from a clean checkout.
+
+### 1. Provision the `.env` file
+
+```bash
+cp .env.example .env
+```
+
+Then fill in the **required** values. Anything left at its placeholder will
+either fail loudly on startup or silently disable a feature — both are
+listed below so the failure mode is predictable.
+
+| Variable | Required? | Failure if unset |
+|---|---|---|
+| `PG_HOST` / `PG_USER` / `PG_PASSWORD` / `PG_DATABASE` | **Yes** | API + dashboard + ETL all crash on startup with `connection refused` |
+| `PG_SSLMODE` | Yes (`require` on Azure, `prefer` locally) | TLS handshake fails on Azure Flexible Server |
+| `MLFLOW_TRACKING_URI` | Auto (compose sets `http://mlflow:5000`) | Cluster scoring falls back to local joblib |
+| `API_ADMIN_KEY` | Recommended | `POST /admin/*` returns 401 for *everyone* — admin endpoints disabled |
+| `KAFKA_*` | No (streaming deferred) | Streaming flow noop |
+
+Hand-off in practice: the *previous* operator sends the new operator the
+filled-in `.env` over an encrypted channel (1Password vault, Bitwarden Send,
+or `gpg -e`). Plain email and Slack DM are **not** acceptable — both have
+been used to leak the production `PG_PASSWORD` in the past.
+
+After receiving the file, the new operator should:
+
+```bash
+# 1. Rotate every secret you didn't generate yourself.
+python -c "import secrets; print(secrets.token_urlsafe(32))"   # new API_ADMIN_KEY
+# Rotate PG_PASSWORD in the database, then update .env to match.
+
+# 2. Verify connectivity BEFORE building images (faster feedback loop).
+python -c "from accent_fleet.db.engine import get_engine; \
+           import sqlalchemy as sa; \
+           print(get_engine().connect().execute(sa.text('SELECT 1')).scalar())"
+```
+
+### 2. Build and start
+
+```bash
+docker compose build base                          # one-time shared image
+docker compose up -d mlflow api dashboard etl      # the four long-running services
+```
+
+The dashboard now lives at <http://localhost:8501>, the API at
+<http://localhost:8000/docs>, MLflow at <http://localhost:5000>.
+
+### 3. (Optional) Auth-protected deployment
+
+When the host is reachable beyond localhost, put the stack behind nginx
+basic auth before anything else:
+
+```bash
+# Generate the htpasswd file (one user, prompts for password):
+docker run --rm httpd:2.4-alpine htpasswd -nbB admin '<choose-a-password>' \
+  > docker/nginx/htpasswd
+
+# Start nginx alongside the rest:
+docker compose --profile auth up -d nginx
+```
+
+The whole stack is now reachable only through <http://host:8080> (port set by
+`NGINX_PORT`) and requires the basic-auth credentials. The `docker/nginx/`
+directory is gitignored except for `nginx.conf` itself, so the htpasswd file
+never leaves the host. For production, swap nginx for a real OIDC reverse
+proxy — see [`NEXT_STEPS.md`](./NEXT_STEPS.md) §2.2.
+
+### 4. (Optional) Daily MLflow backup
+
+The MLflow tracking server stores everything in two local docker volumes. If
+that host dies, every registered model version is lost. Schedule the backup
+script from host cron:
+
+```cron
+15 3 * * *  cd /opt/accent-fleet-analytics && \
+            docker/scripts/backup_mlflow.sh --retain-days 30 \
+            >> /var/log/accent-mlflow-backup.log 2>&1
+```
+
+Restore is a manual `tar -xzf <backup>.tgz` into the named volumes. The
+script header documents the exact commands. Once the registry moves to
+blob/S3 storage (`NEXT_STEPS.md` §2.5) this script can retire.

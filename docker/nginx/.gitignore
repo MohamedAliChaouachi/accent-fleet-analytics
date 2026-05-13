@@ -1,0 +1,3 @@
+# The basic-auth credentials file is generated locally per deployment.
+# Never commit a real htpasswd: it leaks salted hashes and pins usernames.
+htpasswd

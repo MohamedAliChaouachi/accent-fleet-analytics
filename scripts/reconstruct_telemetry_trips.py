@@ -96,7 +96,9 @@ def _archive_ping_count(tenant_id: int, month_start: datetime, month_end: dateti
         )
 
 
-def _reconstruct_one_month(args, month_start: datetime, month_end: datetime, ping_seconds: int) -> int:
+def _reconstruct_one_month(
+    args, month_start: datetime, month_end: datetime, ping_seconds: int,
+) -> int:
     run_id = begin_run(
         mode="telemetry_trip_reconstruction",
         window_start=month_start,
@@ -198,7 +200,10 @@ def _reconstruct_one_month(args, month_start: datetime, month_end: datetime, pin
             f"{summary['total_duration_hours']} h) "
             f"in {summary['source_month']}"
         )
-        print("recomputed marts: device_monthly_behavior, fleet_daily, vehicle_monthly, tenant_monthly_summary")
+        print(
+            "recomputed marts: device_monthly_behavior, fleet_daily, "
+            "vehicle_monthly, tenant_monthly_summary"
+        )
         return rows_loaded
     except Exception as exc:  # noqa: BLE001
         end_run(run_id, status="failed", error_message=str(exc))

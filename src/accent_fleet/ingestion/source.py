@@ -8,8 +8,9 @@ Kafka topic. That's the whole point of the refactor.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from datetime import datetime
-from typing import Iterator, Protocol
+from typing import Protocol
 
 import polars as pl
 

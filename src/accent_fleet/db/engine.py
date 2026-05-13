@@ -8,9 +8,9 @@ per topic partition — neither needs a large pool.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from contextlib import contextmanager
 from functools import lru_cache
-from typing import Iterator
 
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.engine import Connection

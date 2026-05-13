@@ -9,7 +9,6 @@ psql during debugging (psql also supports :variable via \\set).
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 from sqlalchemy import text

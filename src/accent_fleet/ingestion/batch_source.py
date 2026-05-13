@@ -16,14 +16,13 @@ Performance notes:
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from datetime import datetime
-from typing import Iterator
 
 import polars as pl
 from sqlalchemy import text
 
 from accent_fleet.db import get_engine
-
 
 # Projection maps: table -> columns to pull.
 # Keeping this explicit makes schema drift in staging non-fatal.

@@ -6,7 +6,10 @@ guaranteed valid. Run once:
     python scripts/build_eval_notebooks.py
 """
 from __future__ import annotations
-import json, pathlib, textwrap
+
+import json
+import pathlib
+import textwrap
 
 OUT_DIR = pathlib.Path(__file__).resolve().parents[1] / 'notebooks' / '05_evaluation'
 

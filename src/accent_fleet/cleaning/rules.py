@@ -61,7 +61,7 @@ class CleaningRule:
     clamp_max: float | None = None
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "CleaningRule":
+    def from_dict(cls, d: dict[str, Any]) -> CleaningRule:
         return cls(
             id=d["id"],
             name=d["name"],
