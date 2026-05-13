@@ -1,14 +1,20 @@
 # Accent Fleet Analytics — Post v0.5.0 Roadmap
 
-> Status as of 2026-05-13: v0.8.0 is tagged. Foundation week (v0.7.0)
-> shipped structured logging + `/metrics`, `/v1` API versioning with a
-> deprecation-headed legacy mount, a `pg_dump`-based backup script, the
-> `/devices/{id}/profile` perf fix, and feature-level KL-divergence
-> drift detection. ML maturity (v0.8.0) shipped silhouette-gated
-> retraining with a frozen-dataclass audit trail, plus a compose-managed
-> `retrain-scheduler` service (supercronic) that fires the monthly
-> retrain on the first Monday of each month. Everything below is what
-> is still **not yet** in the platform.
+> Status as of 2026-05-13: v0.9.0 is tagged. Auth + multi-tenancy
+> (§2.2) shipped across six milestones M1–M6: argon2id-hashed users,
+> HS256 JWT with dual-key rotation, opaque refresh tokens with
+> server-side state, `AuthMiddleware` with advisory/enforce/off modes,
+> a `tenant_isolation` RLS policy on every tenant-owning table, and a
+> three-role separation runbook that takes the API to NOBYPASSRLS.
+>
+> Earlier: v0.8.0 shipped silhouette-gated retraining with a
+> frozen-dataclass audit trail and a compose-managed `retrain-
+> scheduler` (supercronic, first Monday of month). v0.7.0 shipped
+> structured logging + `/metrics`, `/v1` API versioning with a
+> deprecation-headed legacy mount, a `pg_dump`-based backup script,
+> the `/devices/{id}/profile` perf fix, and feature-level KL-
+> divergence drift detection. Everything below is what is still **not
+> yet** in the platform.
 
 The remaining work splits cleanly into two halves:
 
@@ -108,34 +114,48 @@ consumes. To turn this on:
 
 Estimated: 3–4 weeks. Mostly architectural decisions, not code volume.
 
-### 2.2 Real auth + multi-tenancy  📍 **NEXT — active workstream**
+### 2.2 Real auth + multi-tenancy  ✅ v0.9.0 — shipped 2026-05-13
 
 Part 1.5 landed "any auth at all" (nginx + htpasswd, single shared
-credential). This phase is "auth that scales" and is the chosen
-next workstream — selected over §2.5 model A/B routing because:
+credential). v0.9.0 replaces that stopgap with platform-grade auth:
 
-  - A/B routing without 30+ days of accumulated silhouette signal from
-    the v0.8.0 scheduler has no story to tell yet. Let the gate run
-    while auth lands.
-  - Auth + multi-tenancy is the architectural artifact that defends
-    well in the graduation report: per-tenant isolation, RLS, JWT
-    handling, OWASP-grade thinking. A/B routing is a feature; auth is
-    a platform property.
+  - **M1** — `auth` schema (tenants, users, refresh_tokens, audit_log)
+    with backfill from `warehouse.dim_tenant`.
+    *(`sql/50_auth.sql`, commit `ab72d32c`.)*
+  - **M2** — `scripts/seed_auth.py` creates one tenant_admin per
+    active tenant + one superadmin, argon2id hashing with OWASP
+    parameters. *(commit `dd7f4315`.)*
+  - **M3** — `app/auth/` package: JWT (HS256, dual-key rotation),
+    refresh tokens (opaque UUID + server-side state), in-process
+    token-bucket rate limiter, `AuthMiddleware`, `/v1/auth/login |
+    refresh | logout | me` and `/v1/admin/tenants | users | users/{id}/
+    disable | users/{id}/reset-password`. Ships in `advisory` mode by
+    default (logs but does not 401). 30 unit + middleware tests.
+    *(commit `08cd7a3a`.)*
+  - **M4** — `docs/runbooks/auth_enforcement_flip.md`: the 7-day
+    watch period + flip-gate procedure to move
+    `AUTH_ENFORCEMENT=advisory → enforce`. No code; the M3 middleware
+    already reads the env var per request. *(commit `8912ccf6`.)*
+  - **M5** — `sql/51_rls_policies.sql` puts a `tenant_isolation`
+    policy on every tenant-owning table in `warehouse.*` and
+    `marts.*` (24 objects total). `src/accent_fleet/db/engine.py`
+    grows a SQLAlchemy `begin` listener that issues `SET LOCAL
+    app.current_tenant` from the request's Principal. Policies are
+    loaded but dormant until M6 swaps the role.
+    *(commit `49ea7e50`.)*
+  - **M6** — `sql/52_role_separation.sql` creates `accent_app`
+    (NOBYPASSRLS), `accent_etl` (BYPASSRLS), `accent_superadmin`
+    (BYPASSRLS + SUPERUSER). The DDL is NOT auto-applied;
+    `docs/runbooks/role_separation_cutover.md` walks the operator
+    through password generation, the `rolbypassrls=f` verification
+    gate, the cross-tenant smoke test, and the symmetric rollback.
+    *(commit `51a99f10`.)*
 
-Scope:
+Deferred to v0.10.0: OIDC / Azure AD swap-in (the JWT claim shape
+is already OIDC-compatible) and a tenant-aware admin UI.
 
-- SSO via OIDC (Azure AD is the natural choice given the Azure Postgres host).
-- Row-level security: a user logged in for tenant X should not see tenant Y
-  data even if they craft the SQL. Postgres RLS policies on `marts.*` views.
-- Per-tenant dashboard URL (`/t/{tenant}/...`) and a `tenant_id` claim in every
-  API token, enforced in `app/deps.py`.
-- Admin panel for managing tenants + users.
-
-Estimated: 4–6 weeks. The hard part is RLS migration on existing data.
-A dedicated design doc lands before implementation — see
-[`docs/auth_design.md`](docs/auth_design.md) for the full RFC including
-threat model, data model, RLS policy examples, and the M1–M6 phased
-rollout plan.
+See [`docs/auth_design.md`](docs/auth_design.md) for the threat
+model, data model, and rejected-alternatives appendix.
 
 ### 2.3 Production frontend (deprecate Streamlit)
 
@@ -201,11 +221,12 @@ Estimated: 1–2 weeks once the upstream data is there.
 
 - **Part 1 is closed at v0.6.0.** The §1.6 residuals are nice-to-haves, not
   gates — they get folded into normal iteration.
-- Inside Part 2, the active order is `2.2 (auth/multi-tenancy) → 2.5 model A/B
-  routing → 2.3 frontend → 2.4 cloud`. §2.2 was chosen over §2.5 model A/B as
-  the immediate next chunk because A/B has no story to tell until the v0.8.0
-  scheduler has accumulated 30+ days of gate decisions. Auth, by contrast, is
-  a platform-property investment with clear graduation-report value.
+- **§2.2 closed at v0.9.0.** Auth + multi-tenancy shipped across M1–M6; the
+  M4 enforce-flip and M6 role-cutover are operator-driven runbooks, not
+  pending code. The next active chunk inside Part 2 is `2.5 model A/B
+  routing → 2.3 frontend → 2.4 cloud`. A/B routing is now unblocked because
+  the v0.8.0 scheduler has been accumulating gate decisions throughout the
+  §2.2 build.
 - Streaming (§2.1) can run in parallel with any of the above but is currently
   deferred pending Kafka data access from the source system.
 - ML maturity (§2.5) — drift detection + retraining cadence already shipped
