@@ -80,6 +80,23 @@ RETURNS void
 LANGUAGE plpgsql
 AS $$
 BEGIN
+    -- Skip with a NOTICE if the table doesn't exist yet. This makes the
+    -- script tolerant of partial schemas (e.g. a dev DB missing the v0.8.0
+    -- marts) — operators see exactly which tables were skipped and can
+    -- re-run after the missing migrations land. The verification block at
+    -- the end of this file flags any count drift.
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = schema_name
+          AND c.relname = table_name
+          AND c.relkind IN ('r', 'p')        -- regular table or partitioned parent
+    ) THEN
+        RAISE NOTICE 'apply_tenant_rls: skipping %.% (table not present)',
+                     schema_name, table_name;
+        RETURN;
+    END IF;
+
     -- Turn RLS on. Idempotent — re-enabling is a no-op.
     EXECUTE format('ALTER TABLE %I.%I ENABLE ROW LEVEL SECURITY',
                    schema_name, table_name);
