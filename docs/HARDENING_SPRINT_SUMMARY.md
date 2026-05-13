@@ -154,28 +154,23 @@ From `NEXT_STEPS.md` §"Definition of Done — Part 1":
 | `docker compose build base` runs in CI to catch Dockerfile breakage | ✅ done (`docker` job in `ci.yml`, commit `52e726db`) |
 | Anyone on the LAN hitting `:8501` or `:8000` gets prompted for credentials | ✅ done (`--profile auth`) |
 | p95 latency benchmarked and documented in README | ✅ done (`scripts/bench_api.py` + README "Performance" section, commit `52e726db`) |
-| Branch protection on `main` requires CI green before merge | ⚠️ manual GitHub-UI step — see below |
+| Branch protection on `main` requires CI green before merge | ⏭️ **declined** — see "Out of scope" below |
 | New developer can `make up` + `make seed` and have a working dashboard in <10 min | ⚠️ not re-verified this sprint |
 | p95 latency for `/score/risk` (<100ms) and `/devices/{id}/profile` (<300ms) documented in README | ✅ done (commit `52e726db`) |
 | Tag `v0.6.0` | ✅ done (this sprint) |
 
-### Branch protection — manual step (5 minutes, GitHub UI)
+### Branch protection — out of scope
 
-CI green-before-merge can only be enforced via GitHub repo settings. Click path:
+`NEXT_STEPS.md` §1.3 listed branch protection on `main` (require CI green
+before merge) as a 5-minute GitHub-UI step. **Declined by repo owner**
+during this sprint — direct pushes to `main` remain allowed. CI still
+runs on every push, but a red CI does not block a merge.
+
+If revisited later, the click path is:
 
 1. `https://github.com/MohamedAliChaouachi/accent-fleet-analytics/settings/branches`
-2. **Add branch ruleset** (or "Add classic branch protection rule")
-3. **Target branches**: `main`
-4. Tick:
-   - **Require status checks to pass before merging** → add the three CI
-     job names: `lint (ruff)`, `test (pytest)`, `docker (build base image)`
-   - **Require branches to be up to date before merging**
-   - **Require pull request before merging**
-   - **Do not allow bypassing the above settings** (optional but recommended)
-5. Save.
-
-After this, direct pushes to `main` are blocked and every merge requires
-the three CI jobs to be green.
+2. Add ruleset → target `main` → require status checks
+   `lint (ruff)`, `test (pytest)`, `docker (build base image)`.
 
 ### Performance findings (commit `52e726db`)
 
