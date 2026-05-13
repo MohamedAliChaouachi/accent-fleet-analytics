@@ -134,7 +134,12 @@ def verify_access_token(token: str) -> dict[str, Any]:
                 token,
                 key,
                 algorithms=[ALGORITHM],
-                options={"require": ["sub", "exp", "tnt", "role"]},
+                # PyJWT treats `null` claim values as "missing" when listed
+                # in `require`, which would reject superadmin tokens whose
+                # `tnt` is legitimately null. We validate `tnt` ourselves in
+                # `principal_from_payload` instead — it accepts null for
+                # superadmin and rejects null for other roles.
+                options={"require": ["sub", "exp", "role"]},
             )
         except jwt.ExpiredSignatureError as exc:
             # Expiry is independent of which key signed — short-circuit

@@ -158,14 +158,13 @@ async def login(
     if needs_rehash(row.password_hash):
         try:
             new_hash = hash_password(body.password)
-            with conn.begin():
-                conn.execute(
-                    text(
-                        "UPDATE auth.users SET password_hash = :h "
-                        "WHERE user_id = :uid"
-                    ),
-                    {"h": new_hash, "uid": row.user_id},
-                )
+            conn.execute(
+                text(
+                    "UPDATE auth.users SET password_hash = :h "
+                    "WHERE user_id = :uid"
+                ),
+                {"h": new_hash, "uid": row.user_id},
+            )
         except Exception as exc:  # pylint: disable=broad-except
             logger.warning(
                 "auth.rehash_failed",
@@ -187,29 +186,28 @@ async def login(
     refresh_expires_at = datetime.now(UTC) + timedelta(
         seconds=settings().jwt_refresh_ttl_seconds
     )
-    with conn.begin():
-        conn.execute(
-            text(
-                "INSERT INTO auth.refresh_tokens "
-                "  (token_id, user_id, expires_at, user_agent, source_ip) "
-                "VALUES (CAST(:tid AS uuid), :uid, :exp, :ua, "
-                "        CAST(:ip AS inet))"
-            ),
-            {
-                "tid": refresh_uuid,
-                "uid": row.user_id,
-                "exp": refresh_expires_at,
-                "ua": user_agent,
-                "ip": ip,
-            },
-        )
-        conn.execute(
-            text(
-                "UPDATE auth.users SET last_login_at = NOW() "
-                "WHERE user_id = :uid"
-            ),
-            {"uid": row.user_id},
-        )
+    conn.execute(
+        text(
+            "INSERT INTO auth.refresh_tokens "
+            "  (token_id, user_id, expires_at, user_agent, source_ip) "
+            "VALUES (CAST(:tid AS uuid), :uid, :exp, :ua, "
+            "        CAST(:ip AS inet))"
+        ),
+        {
+            "tid": refresh_uuid,
+            "uid": row.user_id,
+            "exp": refresh_expires_at,
+            "ua": user_agent,
+            "ip": ip,
+        },
+    )
+    conn.execute(
+        text(
+            "UPDATE auth.users SET last_login_at = NOW() "
+            "WHERE user_id = :uid"
+        ),
+        {"uid": row.user_id},
+    )
 
     write_audit_event(
         action="login_success",
@@ -300,29 +298,28 @@ def refresh(
         seconds=settings().jwt_refresh_ttl_seconds
     )
 
-    with conn.begin():
-        conn.execute(
-            text(
-                "UPDATE auth.refresh_tokens SET revoked_at = NOW() "
-                "WHERE token_id = :tid"
-            ),
-            {"tid": row.token_id},
-        )
-        conn.execute(
-            text(
-                "INSERT INTO auth.refresh_tokens "
-                "  (token_id, user_id, expires_at, user_agent, source_ip) "
-                "VALUES (CAST(:tid AS uuid), :uid, :exp, :ua, "
-                "        CAST(:ip AS inet))"
-            ),
-            {
-                "tid": new_refresh,
-                "uid": row.user_id,
-                "exp": new_refresh_expires,
-                "ua": user_agent,
-                "ip": ip,
-            },
-        )
+    conn.execute(
+        text(
+            "UPDATE auth.refresh_tokens SET revoked_at = NOW() "
+            "WHERE token_id = :tid"
+        ),
+        {"tid": row.token_id},
+    )
+    conn.execute(
+        text(
+            "INSERT INTO auth.refresh_tokens "
+            "  (token_id, user_id, expires_at, user_agent, source_ip) "
+            "VALUES (CAST(:tid AS uuid), :uid, :exp, :ua, "
+            "        CAST(:ip AS inet))"
+        ),
+        {
+            "tid": new_refresh,
+            "uid": row.user_id,
+            "exp": new_refresh_expires,
+            "ua": user_agent,
+            "ip": ip,
+        },
+    )
 
     write_audit_event(
         action="refresh",
@@ -358,20 +355,19 @@ def logout(
     # Mark the row revoked. We don't return 404 on "no such token" —
     # logout is idempotent from the client's perspective. Returning 204
     # for both states avoids leaking whether a token ever existed.
-    with conn.begin():
-        result = conn.execute(
-            text(
-                "UPDATE auth.refresh_tokens "
-                "   SET revoked_at = NOW() "
-                " WHERE token_id = "
-                "       CASE WHEN :tid ~ '^[0-9a-fA-F-]{36}$' "
-                "            THEN CAST(:tid AS uuid) "
-                "            ELSE NULL END "
-                "   AND revoked_at IS NULL "
-                "RETURNING user_id"
-            ),
-            {"tid": body.refresh_token},
-        ).first()
+    result = conn.execute(
+        text(
+            "UPDATE auth.refresh_tokens "
+            "   SET revoked_at = NOW() "
+            " WHERE token_id = "
+            "       CASE WHEN :tid ~ '^[0-9a-fA-F-]{36}$' "
+            "            THEN CAST(:tid AS uuid) "
+            "            ELSE NULL END "
+            "   AND revoked_at IS NULL "
+            "RETURNING user_id"
+        ),
+        {"tid": body.refresh_token},
+    ).first()
 
     if result is not None:
         write_audit_event(

@@ -91,17 +91,16 @@ def create_tenant(
             ),
         )
 
-    with conn.begin():
-        row = conn.execute(
-            text(
-                "INSERT INTO auth.tenants (tenant_id, display_name) "
-                "VALUES (:tid, :name) "
-                "ON CONFLICT (tenant_id) DO UPDATE "
-                "  SET display_name = EXCLUDED.display_name "
-                "RETURNING tenant_id, display_name, is_active, created_at"
-            ),
-            {"tid": body.tenant_id, "name": body.display_name},
-        ).first()
+    row = conn.execute(
+        text(
+            "INSERT INTO auth.tenants (tenant_id, display_name) "
+            "VALUES (:tid, :name) "
+            "ON CONFLICT (tenant_id) DO UPDATE "
+            "  SET display_name = EXCLUDED.display_name "
+            "RETURNING tenant_id, display_name, is_active, created_at"
+        ),
+        {"tid": body.tenant_id, "name": body.display_name},
+    ).first()
 
     write_audit_event(
         action="admin_create_tenant",
@@ -166,21 +165,20 @@ def create_user(
     password_hash = hash_password(body.initial_password)
 
     try:
-        with conn.begin():
-            row = conn.execute(
-                text(
-                    "INSERT INTO auth.users "
-                    "  (tenant_id, email, password_hash, role) "
-                    "VALUES (:tid, :email, :hash, :role) "
-                    "RETURNING user_id, email, tenant_id, role, is_active"
-                ),
-                {
-                    "tid": body.tenant_id,
-                    "email": body.email,
-                    "hash": password_hash,
-                    "role": body.role,
-                },
-            ).first()
+        row = conn.execute(
+            text(
+                "INSERT INTO auth.users "
+                "  (tenant_id, email, password_hash, role) "
+                "VALUES (:tid, :email, :hash, :role) "
+                "RETURNING user_id, email, tenant_id, role, is_active"
+            ),
+            {
+                "tid": body.tenant_id,
+                "email": body.email,
+                "hash": password_hash,
+                "role": body.role,
+            },
+        ).first()
     except Exception as exc:
         # The unique-email constraint is the realistic failure mode;
         # surface it as 409 rather than letting it bubble up as 500.
@@ -260,22 +258,21 @@ def disable_user(
             detail="cannot disable your own account",
         )
 
-    with conn.begin():
-        conn.execute(
-            text(
-                "UPDATE auth.users SET is_active = FALSE "
-                "WHERE user_id = :uid"
-            ),
-            {"uid": user_id},
-        )
-        conn.execute(
-            text(
-                "UPDATE auth.refresh_tokens "
-                "   SET revoked_at = NOW() "
-                " WHERE user_id = :uid AND revoked_at IS NULL"
-            ),
-            {"uid": user_id},
-        )
+    conn.execute(
+        text(
+            "UPDATE auth.users SET is_active = FALSE "
+            "WHERE user_id = :uid"
+        ),
+        {"uid": user_id},
+    )
+    conn.execute(
+        text(
+            "UPDATE auth.refresh_tokens "
+            "   SET revoked_at = NOW() "
+            " WHERE user_id = :uid AND revoked_at IS NULL"
+        ),
+        {"uid": user_id},
+    )
 
     write_audit_event(
         action="admin_disable_user",
@@ -329,22 +326,21 @@ def reset_password(
     new_password = _generate_temp_password()
     new_hash = hash_password(new_password)
 
-    with conn.begin():
-        conn.execute(
-            text(
-                "UPDATE auth.users SET password_hash = :h "
-                "WHERE user_id = :uid"
-            ),
-            {"h": new_hash, "uid": user_id},
-        )
-        conn.execute(
-            text(
-                "UPDATE auth.refresh_tokens "
-                "   SET revoked_at = NOW() "
-                " WHERE user_id = :uid AND revoked_at IS NULL"
-            ),
-            {"uid": user_id},
-        )
+    conn.execute(
+        text(
+            "UPDATE auth.users SET password_hash = :h "
+            "WHERE user_id = :uid"
+        ),
+        {"h": new_hash, "uid": user_id},
+    )
+    conn.execute(
+        text(
+            "UPDATE auth.refresh_tokens "
+            "   SET revoked_at = NOW() "
+            " WHERE user_id = :uid AND revoked_at IS NULL"
+        ),
+        {"uid": user_id},
+    )
 
     write_audit_event(
         action="password_reset",

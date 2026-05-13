@@ -18,10 +18,18 @@ from accent_fleet.ml.inference import ClusterPredictor
 
 
 def get_db() -> Iterator[Connection]:
-    """Yield a short-lived DB connection per request. No transaction — most
-    endpoints only read from views/marts."""
+    """Yield a short-lived DB connection per request, inside a transaction
+    that auto-commits on success and auto-rolls-back on exception.
+
+    SQLAlchemy 2.x autobegins a transaction on the first execute() anyway;
+    using `engine.begin()` makes the boundaries explicit so routes don't
+    need their own `with conn.begin():` blocks (those would now raise
+    "transaction already started"). Treating each request as one
+    transaction is the right granularity for our auth writes (login
+    inserts a refresh token AND updates last_login_at — they should
+    commit together)."""
     engine = get_engine()
-    with engine.connect() as conn:
+    with engine.begin() as conn:
         yield conn
 
 

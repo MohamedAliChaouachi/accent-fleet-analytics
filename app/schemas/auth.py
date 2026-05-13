@@ -5,12 +5,22 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
+
+# Why not EmailStr?
+# ----------------
+# `email-validator` rejects RFC-6761 special-use TLDs like `.local`,
+# `.test`, `.example`. Our seeded system identities use `.local` on
+# purpose (they're not deliverable mailboxes — they're keys into
+# `auth.users.email` with a CITEXT uniqueness constraint). A loose
+# `str` with `@` presence + length bounds matches the DB column.
+EmailLike = Field(..., min_length=3, max_length=320, pattern=r"^[^@\s]+@[^@\s]+$")
+
 
 # --- /v1/auth/login ---------------------------------------------------
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    email: str = EmailLike
     password: str = Field(..., min_length=1, max_length=256)
 
 
@@ -66,7 +76,7 @@ class TenantResponse(BaseModel):
 # --- /v1/admin/users --------------------------------------------------
 
 class CreateUserRequest(BaseModel):
-    email: EmailStr
+    email: str = EmailLike
     role: Literal["tenant_user", "tenant_admin", "superadmin"]
     tenant_id: int | None = None
     initial_password: str = Field(..., min_length=12, max_length=256)

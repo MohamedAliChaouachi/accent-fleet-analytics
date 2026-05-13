@@ -165,19 +165,22 @@ def seed(
                 created.append(("tenant_admin", email, "<dry-run>"))
                 continue
 
-            with conn.begin():
-                conn.execute(
-                    text(
-                        "INSERT INTO auth.users "
-                        "  (tenant_id, email, password_hash, role) "
-                        "VALUES (:tid, :email, :hash, 'tenant_admin')"
-                    ),
-                    {
-                        "tid": tenant_id,
-                        "email": email,
-                        "hash": password_hash,
-                    },
-                )
+            # SQLAlchemy 2.x autobegan a transaction on the first
+            # execute() above; we commit each row explicitly so a later
+            # failure can't roll back already-printed credentials.
+            conn.execute(
+                text(
+                    "INSERT INTO auth.users "
+                    "  (tenant_id, email, password_hash, role) "
+                    "VALUES (:tid, :email, :hash, 'tenant_admin')"
+                ),
+                {
+                    "tid": tenant_id,
+                    "email": email,
+                    "hash": password_hash,
+                },
+            )
+            conn.commit()
             created.append(("tenant_admin", email, password))
 
         # --- Superadmin --------------------------------------------------
@@ -194,15 +197,15 @@ def seed(
             if dry_run:
                 created.append(("superadmin", superadmin_email, "<dry-run>"))
             else:
-                with conn.begin():
-                    conn.execute(
-                        text(
-                            "INSERT INTO auth.users "
-                            "  (tenant_id, email, password_hash, role) "
-                            "VALUES (NULL, :email, :hash, 'superadmin')"
-                        ),
-                        {"email": superadmin_email, "hash": password_hash},
-                    )
+                conn.execute(
+                    text(
+                        "INSERT INTO auth.users "
+                        "  (tenant_id, email, password_hash, role) "
+                        "VALUES (NULL, :email, :hash, 'superadmin')"
+                    ),
+                    {"email": superadmin_email, "hash": password_hash},
+                )
+                conn.commit()
                 created.append(("superadmin", superadmin_email, password))
 
     # --- Report --------------------------------------------------------
