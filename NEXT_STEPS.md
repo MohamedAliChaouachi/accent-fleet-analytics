@@ -132,7 +132,10 @@ Scope:
 - Admin panel for managing tenants + users.
 
 Estimated: 4–6 weeks. The hard part is RLS migration on existing data.
-A dedicated design doc lands before implementation.
+A dedicated design doc lands before implementation — see
+[`docs/auth_design.md`](docs/auth_design.md) for the full RFC including
+threat model, data model, RLS policy examples, and the M1–M6 phased
+rollout plan.
 
 ### 2.3 Production frontend (deprecate Streamlit)
 
