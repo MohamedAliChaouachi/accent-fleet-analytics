@@ -151,22 +151,50 @@ From `NEXT_STEPS.md` §"Definition of Done — Part 1":
 | Criterion | Status |
 |---|---|
 | `pytest` runs in CI on every PR, green before merge | ✅ done (`ci.yml`) |
+| `docker compose build base` runs in CI to catch Dockerfile breakage | ✅ done (`docker` job in `ci.yml`, commit `52e726db`) |
 | Anyone on the LAN hitting `:8501` or `:8000` gets prompted for credentials | ✅ done (`--profile auth`) |
+| p95 latency benchmarked and documented in README | ✅ done (`scripts/bench_api.py` + README "Performance" section, commit `52e726db`) |
+| Branch protection on `main` requires CI green before merge | ⚠️ manual GitHub-UI step — see below |
 | New developer can `make up` + `make seed` and have a working dashboard in <10 min | ⚠️ not re-verified this sprint |
-| p95 latency for `/score/risk` (<100ms) and `/devices/{id}/profile` (<300ms) documented in README | ❌ not done |
-| Tag `v0.6.0` | ❌ not done |
+| p95 latency for `/score/risk` (<100ms) and `/devices/{id}/profile` (<300ms) documented in README | ✅ done (commit `52e726db`) |
+| Tag `v0.6.0` | ✅ done (this sprint) |
 
----
+### Branch protection — manual step (5 minutes, GitHub UI)
 
-## Still open inside Part 1
+CI green-before-merge can only be enforced via GitHub repo settings. Click path:
 
-| Item | Section | Effort |
-|---|---|---|
-| `streamlit-aggrid` declared in `requirements.txt` but never imported — remove the dep or wire it into the risk page table | 1.1 | 15 min |
-| Performance check — measure p95 for `/score/risk` and `/devices/{id}/profile`, document numbers in README | 1.2 | 2 hr |
-| Add `docker compose build base` step to `ci.yml` to catch Dockerfile breakage | 1.3 | 30 min |
-| Branch protection on `main` requiring CI green before merge | 1.3 | 5 min, GitHub UI setting (not code) |
-| Tag `v0.6.0` once the above are closed | — | 5 min |
+1. `https://github.com/MohamedAliChaouachi/accent-fleet-analytics/settings/branches`
+2. **Add branch ruleset** (or "Add classic branch protection rule")
+3. **Target branches**: `main`
+4. Tick:
+   - **Require status checks to pass before merging** → add the three CI
+     job names: `lint (ruff)`, `test (pytest)`, `docker (build base image)`
+   - **Require branches to be up to date before merging**
+   - **Require pull request before merging**
+   - **Do not allow bypassing the above settings** (optional but recommended)
+5. Save.
+
+After this, direct pushes to `main` are blocked and every merge requires
+the three CI jobs to be green.
+
+### Performance findings (commit `52e726db`)
+
+The bench (`scripts/bench_api.py`) measured:
+
+- **`POST /score/risk`** — 3.8 ms p95 single-shot, 54.6 ms p95 at concurrency 16. **Under target.**
+- **`GET /devices/{id}/profile`** — 499.7 ms p95 single-shot, 1692.7 ms p95 at concurrency 16. **OVER the 300 ms target** even at concurrency 1.
+
+The profile endpoint runs two SQL hits per request. The bottleneck is
+`marts.v_device_risk_profile`: a view that does a window-rank over
+`mart_device_monthly_behavior` and is then filtered by `device_id`,
+which forces a rescan on every call. Two fix options (Tier-1 follow-up,
+not Part 2):
+
+1. Materialize the view as a refreshed-by-flow table.
+2. Add a partial index on `(device_id)` and rewrite the view to push
+   the predicate.
+
+The bench script makes this trivially regression-testable once fixed.
 
 ---
 
