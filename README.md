@@ -155,6 +155,48 @@ All 7 cleaning rules (C1–C7) have dedicated unit tests. The incremental-semant
 
 ---
 
+## Performance — API latency
+
+`scripts/bench_api.py` spawns a fresh `uvicorn app.main:app` subprocess, waits
+for `/health`, then drives N requests through C concurrent httpx clients
+per endpoint. Defaults: 500 requests, concurrency 16.
+
+```bash
+python scripts/bench_api.py --requests 1000 --concurrency 16
+python scripts/bench_api.py --no-db          # skip /devices/{id}/profile
+```
+
+### Measured numbers (2026-05-12, local dev box, Postgres on `localhost:5432`)
+
+| Endpoint | Concurrency | n | p50 | p95 | p99 | max | Target | Status |
+|---|---:|---:|---:|---:|---:|---:|---|---|
+| `POST /score/risk` | 1  | 200  | 2.9 ms   | 3.8 ms   | 4.1 ms   | 4.8 ms   | p95 ≤ 100 ms | OK |
+| `POST /score/risk` | 16 | 1000 | 22.3 ms  | 54.6 ms  | 77.1 ms  | 129.7 ms | p95 ≤ 100 ms | OK |
+| `GET /devices/{id}/profile` | 1  | 200  | 340.4 ms  | 499.7 ms  | 748.0 ms  | 813.0 ms  | p95 ≤ 300 ms | **OVER** |
+| `GET /devices/{id}/profile` | 16 | 1000 | 1031.2 ms | 1692.7 ms | 3489.8 ms | 4659.1 ms | p95 ≤ 300 ms | **OVER** |
+
+**`/score/risk`** is pure-Python (no DB hit) and lands well under target —
+the 16× concurrency penalty is a real cost (single uvicorn worker + sync
+route runs in the anyio threadpool) but absolute numbers are still fine.
+
+**`/devices/{id}/profile`** is over target even at single-request load. Two
+SQL hits per request: `marts.v_device_risk_profile` (a view doing a window
+rank over `mart_device_monthly_behavior` then a `WHERE device_id = ?`
+filter) and `marts.mart_device_monthly_behavior` (indexed). The view is
+the bottleneck — the window can't be pushed below the WHERE clause, so
+each request rescans the source table.
+
+**Follow-up to close the gap** — pick one:
+- Materialize `v_device_risk_profile` as a table refreshed by the
+  incremental flow (cheap; we already touch the source on every batch).
+- Or add a partial index `(device_id) WHERE ...` on
+  `mart_device_monthly_behavior` and rewrite the view to push the filter.
+
+Tracked as a Tier-1 follow-up; the bench script makes the regression
+test for it trivial.
+
+---
+
 ## Pipeline modes
 
 | Mode | Trigger | Window | Use case |
