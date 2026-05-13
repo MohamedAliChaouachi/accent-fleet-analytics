@@ -161,7 +161,13 @@ def log_to_mlflow(
     result: TrainResult,
     promote: bool = True,
 ) -> str | None:
-    """Log run + register model. Returns the new model version, or None on error."""
+    """
+    Log run + register model. Returns the new model version string.
+
+    Returns None only on infrastructure failure (mlflow not installed /
+    server unreachable). Returns the version even when promote=False so
+    callers can gate the promotion themselves (see ml/promotion.py).
+    """
     try:
         import mlflow
         import mlflow.sklearn
@@ -201,11 +207,14 @@ def log_to_mlflow(
         )
         run_id = run.info.run_id
 
-    # Promote to the configured stage so the API picks it up on next reload.
+    # Resolve the version number for the run we just logged regardless of
+    # promote — gated retraining (see ml/promotion.py) registers without
+    # immediately transitioning and needs the version to query metrics on.
+    client = MlflowClient()
+    versions = client.search_model_versions(f"name='{s.mlflow_model_name}'")
+    latest = max(versions, key=lambda v: int(v.version))
+
     if promote:
-        client = MlflowClient()
-        versions = client.search_model_versions(f"name='{s.mlflow_model_name}'")
-        latest = max(versions, key=lambda v: int(v.version))
         client.transition_model_version_stage(
             name=s.mlflow_model_name,
             version=latest.version,
@@ -216,9 +225,12 @@ def log_to_mlflow(
             "registered %s v%s -> %s (run=%s)",
             s.mlflow_model_name, latest.version, s.mlflow_model_stage, run_id,
         )
-        return latest.version
-
-    return None
+    else:
+        logger.info(
+            "registered %s v%s (no promotion) (run=%s)",
+            s.mlflow_model_name, latest.version, run_id,
+        )
+    return latest.version
 
 
 # ---------------------------------------------------------------------------

@@ -395,6 +395,82 @@ def task_apply_retention(run_id: int) -> None:   # noqa: ARG001
 
 
 # =============================================================================
+# Retrain task — used by retrain_flow (monthly cadence) and any ad-hoc
+# trigger (e.g. drift alert + human decision). Lazy import keeps sklearn /
+# mlflow off the bootstrap path.
+# =============================================================================
+
+@task(retries=0)
+def task_retrain_with_gate(month_from: str = "2025-01") -> dict:
+    """
+    Run gated retraining: register a candidate, promote IFF the silhouette
+    gate passes. Updates the candidate/production silhouette gauges and
+    the last-promoted timestamp so dashboards can show retrain history
+    without scraping MLflow.
+
+    Returns a dict (not the RetrainResult dataclass) so Prefect's task
+    serialization layer is happy. Never raises — retraining failures
+    are reported in the return dict and as warning logs.
+    """
+    try:
+        import time
+
+        from accent_fleet.ml.promotion import (
+            DEFAULT_SILHOUETTE_TOLERANCE,
+            retrain_with_gate,
+        )
+        from accent_fleet.observability import (
+            ml_candidate_silhouette,
+            ml_last_retrain_promoted_timestamp,
+            ml_production_silhouette,
+        )
+    except ImportError as exc:
+        log.warning("retrain.skipped_import_error", error=str(exc))
+        return {"promoted": False, "reason": f"import_error: {exc}"}
+
+    try:
+        result = retrain_with_gate(
+            month_from=month_from, tolerance=DEFAULT_SILHOUETTE_TOLERANCE
+        )
+    except Exception as exc:  # noqa: BLE001 — retraining must not fail the flow
+        log.warning("retrain.failed", error=str(exc), month_from=month_from)
+        return {"promoted": False, "reason": f"retrain_exception: {exc}"}
+
+    ml_candidate_silhouette.set(result.candidate_silhouette)
+    # When the gate held, the live Production model didn't change — keep
+    # its gauge pointing at the same number we just compared against.
+    if result.current_silhouette is not None:
+        ml_production_silhouette.set(result.current_silhouette)
+    if result.promoted:
+        # After a successful promotion, Production == candidate.
+        ml_production_silhouette.set(result.candidate_silhouette)
+        ml_last_retrain_promoted_timestamp.set_to_current_time()
+        log.info(
+            "retrain.promoted",
+            version=result.candidate_version,
+            candidate_silhouette=result.candidate_silhouette,
+            previous_silhouette=result.current_silhouette,
+            reason=result.reason,
+        )
+    else:
+        log.warning(
+            "retrain.held",
+            version=result.candidate_version,
+            candidate_silhouette=result.candidate_silhouette,
+            current_silhouette=result.current_silhouette,
+            reason=result.reason,
+        )
+
+    return {
+        "promoted": result.promoted,
+        "candidate_version": result.candidate_version,
+        "candidate_silhouette": result.candidate_silhouette,
+        "current_silhouette": result.current_silhouette,
+        "reason": result.reason,
+    }
+
+
+# =============================================================================
 # Flow: bootstrap
 # =============================================================================
 
@@ -539,3 +615,28 @@ def backfill_flow(chunk_days: int | None = None) -> None:
         cursor = next_cursor
 
     log.info("backfill.done")
+
+
+# =============================================================================
+# Flow: monthly retrain (gated promotion)
+# =============================================================================
+
+@flow(name="accent-retrain")
+def retrain_flow(month_from: str = "2025-01") -> dict:
+    """
+    Train a candidate clustering model and promote it only if the silhouette
+    gate passes. Designed to run on a monthly schedule (Prefect deployment
+    or external cron), independent of the incremental flow — keeps the
+    short-cycle data path free of sklearn / mlflow imports.
+
+    Returns the task_retrain_with_gate result dict so a CLI caller can
+    surface the outcome in stdout and CI can assert on it.
+    """
+    run_id = begin_run(mode="retrain")
+    try:
+        result = task_retrain_with_gate(month_from=month_from)
+        end_run(run_id, status="success")
+        return result
+    except Exception as exc:
+        end_run(run_id, status="failed", error_message=str(exc))
+        raise

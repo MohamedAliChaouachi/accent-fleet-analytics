@@ -105,6 +105,29 @@ ml_feature_drift_score = Gauge(
     registry=REGISTRY,
 )
 
+# Retraining metrics. Populated by the monthly retrain flow. Two gauges
+# (candidate + production) instead of one labelled gauge so dashboards
+# can plot them on the same axis without label tricks.
+ml_candidate_silhouette = Gauge(
+    "accent_ml_candidate_silhouette",
+    "Silhouette score of the latest training candidate (gated, not yet promoted).",
+    registry=REGISTRY,
+)
+
+ml_production_silhouette = Gauge(
+    "accent_ml_production_silhouette",
+    "Silhouette score of the current Production-stage clustering model.",
+    registry=REGISTRY,
+)
+
+ml_last_retrain_promoted_timestamp = Gauge(
+    "accent_ml_last_retrain_promoted_timestamp_seconds",
+    "Unix timestamp of the most recent successful promotion to Production. "
+    "Alerting on `time() - this > N` catches a stale model that's been "
+    "training-gated out N retrains in a row.",
+    registry=REGISTRY,
+)
+
 
 def render_metrics() -> tuple[bytes, str]:
     """Return (body, content_type) for the /metrics HTTP response."""
