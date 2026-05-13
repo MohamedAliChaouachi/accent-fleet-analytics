@@ -35,13 +35,18 @@ def device_profile(
 ) -> DeviceProfileResponse:
     """Return rolling risk + recent monthly stats for a single device."""
 
+    # Read from the materialized fact_device_risk_profile (refreshed by the
+    # incremental flow) rather than the view. The view does a ROW_NUMBER()
+    # window across mart_device_monthly_behavior that can't be pushed below
+    # the WHERE clause, so a single-device lookup against it cost ~500ms
+    # p95. The fact table has a per-device index → microseconds.
     rolling_row = conn.execute(
         text(
             """
             SELECT tenant_id, device_id, latest_month, trips_3m, distance_3m,
                    overspeed_3m, severe_overspeed_3m, alerts_3m,
                    risk_score, risk_category
-              FROM marts.v_device_risk_profile
+              FROM marts.fact_device_risk_profile
              WHERE device_id = :device_id
              LIMIT 1
             """

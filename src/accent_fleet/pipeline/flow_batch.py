@@ -161,6 +161,89 @@ def task_recompute_tenant_summary(touched_months: list[str], run_id: int) -> int
 
 
 @task(retries=1)
+def task_refresh_device_risk_profile(touched_months: list[str], run_id: int) -> int:
+    """
+    Refresh marts.fact_device_risk_profile from marts.v_device_risk_profile.
+
+    This is the materialized snapshot the /devices/{id}/profile endpoint reads
+    from. Querying the view directly costs ~500ms p95 because its ROW_NUMBER()
+    window can't be pushed below the WHERE clause; the snapshotted fact table
+    has a per-device index → microseconds.
+
+    Gated on touched_months so it only runs when device-month behavior actually
+    changed. Safe to skip otherwise: the snapshot is a deterministic function
+    of the source view, so if no source rows moved, the snapshot is still
+    correct.
+    """
+    if not touched_months:
+        log.info("device_risk_profile.skip_no_touched_months")
+        return 0
+    with transaction() as conn:
+        conn.execute(text("CALL marts.refresh_fact_device_risk_profile()"))
+        # The procedure does TRUNCATE + INSERT; rowcount is not meaningful
+        # across both, so report the post-state cardinality instead.
+        rows = conn.execute(
+            text("SELECT COUNT(*) FROM marts.fact_device_risk_profile")
+        ).scalar_one()
+        log.info("device_risk_profile.refreshed", rows=rows, months=touched_months)
+        return rows
+
+
+@task(retries=1)
+def task_detect_drift(touched_months: list[str], run_id: int) -> int:   # noqa: ARG001
+    """
+    Compute per-feature PSI between the scored months and a recent reference
+    window. Updates the Prometheus `accent_ml_feature_drift_score` gauge and
+    logs a warning when any feature crosses the alert threshold.
+
+    Returns the count of features that drifted (0 = healthy). Never raises
+    — drift is informational, not fatal: a transient anomaly shouldn't
+    cancel the rest of the flow.
+
+    Lazy import of the drift module mirrors task_score_latest_partition:
+    keeps numpy/pandas off the bootstrap import path for environments
+    that haven't installed the ML extras.
+    """
+    if not touched_months:
+        log.info("drift.skip_no_touched_months")
+        return 0
+    try:
+        from accent_fleet.ml.drift import detect_drift_for_months
+        from accent_fleet.observability import ml_feature_drift_score
+    except ImportError as exc:
+        log.warning("drift.skipped_import_error", error=str(exc))
+        return 0
+
+    try:
+        report = detect_drift_for_months(touched_months)
+    except Exception as exc:  # noqa: BLE001 — drift should never fail the flow
+        log.warning("drift.compute_failed", error=str(exc))
+        return 0
+
+    # Publish per-feature PSI to Prometheus so alerts can fire from the
+    # metrics path even if the log line goes to a black hole.
+    for f in report.features:
+        ml_feature_drift_score.labels(feature=f.feature).set(f.psi)
+
+    if report.any_drifted:
+        log.warning(
+            "drift.alert",
+            drifted_features=report.drifted_features,
+            threshold=report.threshold,
+            n_current_rows=report.n_current_rows,
+            n_reference_rows=report.n_reference_rows,
+        )
+    else:
+        log.info(
+            "drift.healthy",
+            n_features=len(report.features),
+            n_current_rows=report.n_current_rows,
+            n_reference_rows=report.n_reference_rows,
+        )
+    return len(report.drifted_features)
+
+
+@task(retries=1)
 def task_score_latest_partition(touched_months: list[str], run_id: int) -> int:
     """
     Run the clustering model over the touched months and write
@@ -236,6 +319,14 @@ def task_ensure_mart_structure() -> None:
                 if head.startswith("WITH") or head.startswith("INSERT INTO"):
                     break
                 conn.exec_driver_sql(stmt)
+
+        # 41_fact_device_risk_profile.sql is pure DDL (table + indexes +
+        # CREATE OR REPLACE PROCEDURE) — no INSERT tail to guard against,
+        # so apply it whole. The procedure body lives in a $$...$$ block
+        # which split_sql_statements respects.
+        sql = load_sql("41_fact_device_risk_profile.sql")
+        for stmt in split_sql_statements(sql):
+            conn.exec_driver_sql(stmt)
     log.info("mart.structure_ready")
 
 
@@ -368,11 +459,24 @@ def incremental_flow(window_end: datetime | None = None) -> None:
         # tenant_summary rolls up the two BI marts above — must run last.
         task_recompute_tenant_summary(touched, run_id)
 
+        # 3b. Refresh the materialized risk-profile fact AFTER
+        #     mart_device_monthly_behavior — it reads from that mart through
+        #     v_device_risk_profile. Cheap (TRUNCATE + INSERT of a small,
+        #     gate-filtered snapshot) so we re-do it whenever any month moved.
+        task_refresh_device_risk_profile(touched, run_id)
+
         # 4. Score touched partitions against the clustering model and
         #    persist cluster assignments. Runs AFTER all marts because the
         #    scorer reads from marts.v_ml_features_full. If no model is
         #    registered yet this is a no-op (logs and continues).
         task_score_latest_partition(touched, run_id)
+
+        # 4b. Drift check — compares the just-scored months against a
+        #     6-month reference window. Informational only: a warning is
+        #     logged and a Prometheus gauge updated, but the flow continues
+        #     regardless of the result. Drift triggering retraining is a
+        #     human decision in v0.7.
+        task_detect_drift(touched, run_id)
 
         # 5. Views are views — they don't need refreshing, but we keep
         #    the task in case we switch to materialised views later.
