@@ -12,7 +12,14 @@ Examples:
     python scripts/retrain_monthly.py --month-from 2024-06
     python scripts/retrain_monthly.py --tolerance 0.01
 
-Scheduled use (host cron, first Monday of the month at 04:00):
+Scheduled use (preferred — compose-managed supercronic service):
+    docker compose --profile scheduler up -d retrain-scheduler
+
+    The scheduler fires every Monday 04:00 UTC and the wrapper gates on
+    "first Monday of the month" in shell. See docker/retrain.crontab
+    and docker/scripts/run_monthly_retrain.sh.
+
+Scheduled use (alternative — host cron, no docker stack):
     0 4 * * MON [ "$(date +\%d)" -le 7 ] && \
         cd /opt/accent-fleet-analytics && \
         .venv/bin/python scripts/retrain_monthly.py \

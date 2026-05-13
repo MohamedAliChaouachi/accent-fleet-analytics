@@ -1,9 +1,14 @@
 # Accent Fleet Analytics — Post v0.5.0 Roadmap
 
-> Status as of 2026-05-12: v0.5.0 is tagged. The dockerized stack boots clean on
-> a fresh clone, training registers `device-clustering` → Production, API and
-> dashboard serve real responses. Everything below is what is **not yet** in
-> the platform.
+> Status as of 2026-05-13: v0.8.0 is tagged. Foundation week (v0.7.0)
+> shipped structured logging + `/metrics`, `/v1` API versioning with a
+> deprecation-headed legacy mount, a `pg_dump`-based backup script, the
+> `/devices/{id}/profile` perf fix, and feature-level KL-divergence
+> drift detection. ML maturity (v0.8.0) shipped silhouette-gated
+> retraining with a frozen-dataclass audit trail, plus a compose-managed
+> `retrain-scheduler` service (supercronic) that fires the monthly
+> retrain on the first Monday of each month. Everything below is what
+> is still **not yet** in the platform.
 
 The remaining work splits cleanly into two halves:
 
@@ -148,19 +153,21 @@ if not.
 
 ### 2.5 ML platform maturity
 
-- **Drift detection** — `great-expectations` is already in `requirements.txt`.
-  Add a Prefect task that, after each `score_partitions` run, compares the
-  feature distribution of the latest month against the training window and
-  alerts if KL divergence exceeds a threshold.
-- **Retraining cadence** — schedule `train_clustering.py` monthly, gate
-  promotion to Production on silhouette ≥ training-time score − 0.02.
+- ~~**Drift detection** — Prefect task computing PSI per feature against a
+  rolling reference window, threshold 0.25, exposed as
+  `accent_ml_feature_drift_score{feature=...}`.~~ Shipped in v0.7.0.
+- ~~**Retraining cadence** — schedule `train_clustering.py` monthly, gate
+  promotion to Production on silhouette ≥ training-time score − 0.02.~~
+  Shipped in v0.8.0. Scheduler is the compose `retrain-scheduler` service
+  (supercronic, `--profile scheduler`).
 - **Model A/B** — extend the API to optionally route a percentage of traffic
   to the `Staging` model and log both predictions for offline comparison.
+  *Next natural chunk.*
 - **Risk model upgrade** — current risk score is a hand-tuned formula in
   `risk_score.py`. Replace with a supervised model once labelled outcome data
-  (accidents / claims) is available.
+  (accidents / claims) is available. *Blocked on labels.*
 
-Estimated: ongoing. Drift detection is the first 1-week chunk.
+Estimated: ongoing. A/B routing is the next 1–2 week chunk.
 
 ### 2.6 Geo
 

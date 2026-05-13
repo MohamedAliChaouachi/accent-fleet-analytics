@@ -6,6 +6,11 @@
 #                          Skip this on Azure where the DB is hosted externally
 #                          (Azure Database for PostgreSQL or another VM).
 #   --profile streaming -> spins up Redpanda once Kafka work begins.
+#   --profile auth      -> nginx reverse-proxy with HTTP Basic Auth in front.
+#   --profile scheduler -> retrain-scheduler service: fires the monthly
+#                          silhouette-gated retrain on the first Monday of
+#                          each month. Opt-in so dev boxes don't retrain
+#                          on a schedule they didn't ask for.
 #
 # Typical Azure-VM usage:
 #   docker compose build base
@@ -148,6 +153,46 @@ services:
     env_file: .env
     volumes:
       - ./models:/app/models
+    networks: [fleet-net]
+
+  # ---------------------------------------------------------------------------
+  # Monthly retraining scheduler. Opt-in via `--profile scheduler`. Runs
+  # supercronic (cron-compatible, container-friendly) which fires
+  # docker/retrain.crontab. The crontab fires every Monday at 04:00 UTC and
+  # the wrapper short-circuits unless today is the first Monday of the month,
+  # so this container produces exactly one retrain attempt per month.
+  #
+  # Start in production:
+  #   docker compose --profile scheduler up -d retrain-scheduler
+  #
+  # Inspect what it would do:
+  #   docker compose --profile scheduler logs -f retrain-scheduler
+  #
+  # Ad-hoc retrain (bypasses the schedule + first-Monday gate):
+  #   docker compose run --rm etl python scripts/retrain_monthly.py
+  # ---------------------------------------------------------------------------
+  retrain-scheduler:
+    image: accent-fleet-retrain-scheduler:latest
+    build:
+      context: .
+      dockerfile: docker/retrain.Dockerfile
+    container_name: accent_retrain_scheduler
+    restart: unless-stopped
+    profiles: ["scheduler"]
+    env_file: .env
+    environment:
+      # Same MLflow override as api/etl — the .env value typically points at
+      # localhost which only works on the host; inside the compose network we
+      # must hit the mlflow service by name.
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+    volumes:
+      # Same model artefacts directory as etl so a promoted candidate's local
+      # files (kmeans.pkl, scaler.pkl, train_meta.json) appear where the api
+      # expects to mount them.
+      - ./models:/app/models
+    depends_on:
+      mlflow:
+        condition: service_healthy
     networks: [fleet-net]
 
   # ---------------------------------------------------------------------------

@@ -1,0 +1,13 @@
+# Monthly silhouette-gated retraining schedule (supercronic format,
+# identical to vanilla cron).
+#
+# Fires every Monday at 04:00 UTC. The wrapper script
+# (docker/scripts/run_monthly_retrain.sh) then gates execution to only
+# the FIRST Monday of each month — see the script's header comment for
+# why the gate lives in shell rather than in cron syntax.
+#
+# Timezone: the container runs in UTC (python:3.11-slim default, no TZ
+# override in docker/base.Dockerfile). 04:00 UTC was picked so the run
+# finishes before European business hours but after the daily ETL has
+# had time to catch up.
+0 4 * * MON /app/docker/scripts/run_monthly_retrain.sh
