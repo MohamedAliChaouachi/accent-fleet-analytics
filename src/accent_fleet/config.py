@@ -89,10 +89,47 @@ class Settings(BaseSettings):
     dashboard_port: int = Field(8501, alias="DASHBOARD_PORT")
     dashboard_base_url: str = Field("http://localhost:8501", alias="DASHBOARD_BASE_URL")
 
+    # --- v0.9.0 auth (docs/auth_design.md) ---
+    # Enforcement mode for the JWT middleware.
+    #   off       — middleware does nothing (back-compat fallback).
+    #   advisory  — middleware verifies tokens when present and logs
+    #               missing-or-invalid auth, but does NOT reject.
+    #               This is the M3 default: lets us ship the endpoints
+    #               and watch what breaks before flipping to enforce.
+    #   enforce   — every /v1/* request (except /v1/auth/login) must
+    #               carry a valid bearer token. M4 flips here.
+    auth_enforcement: str = Field("advisory", alias="AUTH_ENFORCEMENT")
+
+    # HMAC signing key for HS256 access tokens. 256-bit random. MUST be set
+    # in production; the empty default is detected by the middleware on
+    # startup and refused. Rotation: set JWT_SIGNING_KEY_PREVIOUS to the
+    # outgoing key for a ~24h dual-verify window (see §6, §11 of the
+    # design doc).
+    jwt_signing_key: str = Field("", alias="JWT_SIGNING_KEY")
+    jwt_signing_key_previous: str = Field("", alias="JWT_SIGNING_KEY_PREVIOUS")
+
+    # Token TTLs. Defaults follow §6 of the design doc.
+    jwt_access_ttl_seconds: int = Field(15 * 60, alias="JWT_ACCESS_TTL_SECONDS")
+    jwt_refresh_ttl_seconds: int = Field(
+        7 * 24 * 3600, alias="JWT_REFRESH_TTL_SECONDS"
+    )
+
+    # Rate limiter for /v1/auth/login. Token-bucket per source IP. The
+    # design doc §11 calls for "5 attempts / 15 min"; both knobs are
+    # tunable so tests can crank them down without monkeypatching.
+    auth_login_rate_max: int = Field(5, alias="AUTH_LOGIN_RATE_MAX")
+    auth_login_rate_window_seconds: int = Field(
+        15 * 60, alias="AUTH_LOGIN_RATE_WINDOW_SECONDS"
+    )
+
     @field_validator(
         "pipeline_batch_size",
         "pipeline_overlap_minutes",
         "pipeline_incremental_lookback_minutes",
+        "jwt_access_ttl_seconds",
+        "jwt_refresh_ttl_seconds",
+        "auth_login_rate_max",
+        "auth_login_rate_window_seconds",
         mode="before",
     )
     @classmethod

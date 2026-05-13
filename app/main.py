@@ -22,6 +22,9 @@ from accent_fleet.config import settings
 from accent_fleet.ml.inference import ClusterPredictor, get_risk_scorer
 from accent_fleet.observability import setup_logging
 from app import __version__
+from app.auth.admin_routes import router as auth_admin_router
+from app.auth.middleware import AuthMiddleware
+from app.auth.routes import router as auth_router
 from app.middleware import MetricsMiddleware
 from app.routes import admin, devices, health, metrics, score
 from app.versioning import LEGACY_SUNSET_HUMAN, include_versioned_router
@@ -66,6 +69,12 @@ app = FastAPI(
 # Order matters: middleware wraps requests outside-in, so MetricsMiddleware
 # being added last means it's the outermost wrapper and sees the FINAL
 # response status (after FastAPI's exception handlers convert errors).
+#
+# AuthMiddleware is added BEFORE MetricsMiddleware in source order,
+# meaning at runtime it runs inside MetricsMiddleware — that's the
+# correct order: a 401 from AuthMiddleware should still be observed
+# by metrics + access log. See docs/auth_design.md §7.
+app.add_middleware(AuthMiddleware)
 app.add_middleware(MetricsMiddleware)
 
 # Operational endpoints — never versioned. k8s probes, Prometheus scrapers,
@@ -80,6 +89,13 @@ app.include_router(metrics.router)
 include_versioned_router(app, score.router)
 include_versioned_router(app, devices.router)
 include_versioned_router(app, admin.router)
+
+# Auth routers — same versioning policy. /v1/auth/* canonical, /auth/*
+# legacy (hidden, deprecation headers). The login and refresh paths are
+# exempt from JWT enforcement (see app/auth/middleware.py _EXEMPT_PATHS)
+# so unauthenticated clients can still acquire the first token pair.
+include_versioned_router(app, auth_router)
+include_versioned_router(app, auth_admin_router)
 
 
 @app.get("/", tags=["meta"])
