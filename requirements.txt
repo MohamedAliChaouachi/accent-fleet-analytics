@@ -54,3 +54,17 @@ joblib>=1.4.0
 
 # Dashboard
 streamlit>=1.38.0
+
+# --- v0.9.0 auth + multi-tenancy ---
+# Argon2id is the PHC password-hashing winner and OWASP-recommended primitive
+# (see docs/auth_design.md §1.2 threat #6). argon2-cffi ships the canonical
+# Python binding around the reference C library.
+argon2-cffi>=23.1.0
+# PyJWT is single-responsibility (issue + verify), well-audited, and avoids
+# the heavier python-jose surface area. HS256 is the only algorithm we use
+# at v0.9.0; RS256 swap is documented for §2.4.
+PyJWT>=2.9.0
+# pydantic.EmailStr in our auth schemas (login email, admin create-user)
+# requires this validator. Without it pydantic raises ImportError at class
+# definition time, which would crash app startup.
+email-validator>=2.2.0
