@@ -142,6 +142,13 @@ services:
   # ETL container. Runs the incremental Prefect flow on a loop.
   # Override CMD for bootstrap/backfill:
   #   docker compose run --rm etl python scripts/run_batch.py bootstrap
+  #
+  # B7 (post-M6): the etl service connects as `accent_etl` (BYPASSRLS) rather
+  # than the same role the API uses (`accent_app`, NOBYPASSRLS). We pull
+  # everything else from .env but explicitly override PG_USER / PG_PASSWORD
+  # so a single .env file can drive both api + etl with different DB roles.
+  # ETL_PG_PASSWORD must be set in .env; the `${VAR:?msg}` form makes
+  # `docker compose up etl` fail loudly if it's missing.
   # ---------------------------------------------------------------------------
   etl:
     image: accent-fleet-etl:latest
@@ -151,6 +158,9 @@ services:
     container_name: accent_etl
     restart: unless-stopped
     env_file: .env
+    environment:
+      PG_USER: accent_etl
+      PG_PASSWORD: ${ETL_PG_PASSWORD:?ETL_PG_PASSWORD missing from .env -- set it to the accent_etl role password before starting the etl service}
     volumes:
       - ./models:/app/models
     networks: [fleet-net]
