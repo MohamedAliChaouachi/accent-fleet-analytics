@@ -157,10 +157,21 @@ SELECT pg_temp.apply_tenant_rls('warehouse', t) FROM (VALUES
 ) AS s(t);
 
 -- -----------------------------------------------------------------------------
--- Apply to every tenant-owning marts table. v_* objects are plain (non-
--- materialized) views; Postgres rewrites them into the underlying tables at
--- plan time, so the policies on the base tables below also apply to anyone
--- querying the view. No separate view-level grants needed.
+-- Apply to every tenant-owning marts table.
+--
+-- NOTE on views (corrected 2026-05-14): an earlier version of this comment
+-- claimed that policies on the base tables "automatically" apply when a v_*
+-- view is queried. That is FALSE for the Postgres default view mode. A view's
+-- underlying RLS is evaluated as the VIEW OWNER, and table owners are exempt
+-- from their own RLS — so a marts.v_* view owned by the same role that owns
+-- the base tables (here, `medamine_dev`) bypasses RLS for everyone who reads
+-- it, including a NOBYPASSRLS app role.
+--
+-- The fix lives in sql/53_views_security_invoker.sql, which sets
+-- `security_invoker = true` on every marts.v_* view so RLS is evaluated as
+-- the querier instead of the owner. Keep these two files in sync: if you add
+-- a tenant-owning marts table here, add the corresponding view (if any) to
+-- 53_views_security_invoker.sql too.
 -- -----------------------------------------------------------------------------
 SELECT pg_temp.apply_tenant_rls('marts', t) FROM (VALUES
     ('mart_device_monthly_behavior'),

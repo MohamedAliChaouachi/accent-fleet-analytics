@@ -57,17 +57,39 @@ def _set_tenant_guc(conn: Connection) -> None:
     policies in sql/51_rls_policies.sql can compare against the
     request's tenant.
 
-    Decision matrix:
-      - No Principal (ETL / Prefect / superadmin op tools)   → no-op.
-        These connect as BYPASSRLS today and see all rows.
-      - role == 'superadmin'                                 → no-op,
-        same reasoning.
+    Decision matrix (post-M6, when the API connects as `accent_app`,
+    NOBYPASSRLS):
+      - No Principal (ETL / Prefect / ad-hoc scripts)        → no-op.
+        These do NOT run on the API connection; they connect as a
+        BYPASSRLS role (medamine_dev today, accent_etl after B7) so
+        skipping the GUC is harmless — they see all rows by virtue of
+        the role attribute, not the policy.
+      - role == 'superadmin'                                 → swap to
+        accent_superadmin via `SET LOCAL ROLE`. accent_app is a member
+        of accent_superadmin (sql/54_grant_superadmin_membership.sql)
+        and accent_superadmin has BYPASSRLS — so the transaction sees
+        every tenant's rows. Reverts at COMMIT/ROLLBACK.
       - role in {'tenant_user', 'tenant_admin'}              → set GUC
         to principal.tenant_id. Policies match; cross-tenant rows are
         invisible.
     """
     p = _try_get_principal()
-    if p is None or p.role == "superadmin":
+    if p is None:
+        # ETL / Prefect / ad-hoc scripts: no Principal in scope. Today these
+        # connect as a BYPASSRLS role (medamine_dev, accent_etl) so the lack
+        # of a SET LOCAL is harmless. If you ever route an API-style request
+        # through an ETL connection, this is the place to fix it.
+        return
+    if p.role == "superadmin":
+        # Post-M6 the API connects as accent_app (NOBYPASSRLS), so a superadmin
+        # principal *also* runs through that connection. Without intervention,
+        # the RLS policies on warehouse/marts would filter every row away
+        # (empty GUC compares to no tenant). We elevate the transaction to
+        # accent_superadmin (BYPASSRLS) via SET LOCAL ROLE — this reverts at
+        # COMMIT/ROLLBACK, so the pooled connection returns to accent_app for
+        # the next request. Requires `GRANT accent_superadmin TO accent_app`
+        # (sql/54_grant_superadmin_membership.sql).
+        conn.exec_driver_sql("SET LOCAL ROLE accent_superadmin")
         return
     if p.tenant_id is None:
         # Should be unreachable — Principal.__post_init__ rejects this
