@@ -76,19 +76,19 @@ The non-functional requirements are summarized in Table~\ref{tab:nfr}.
 \centering
 \caption{Non-functional requirements.}
 \label{tab:nfr}
-\begin{tabular}{|l|p{8.6cm}|c|}
+\begin{tabular}{|l|p{5.0cm}|c|p{4.3cm}|}
 \hline
-\textbf{ID} & \textbf{Description} & \textbf{Target} \\
+\textbf{ID} & \textbf{Description} & \textbf{Target} & \textbf{Measurement method} \\
 \hline
-NFR-1 & End-to-end pipeline latency. & $\le 10$ minutes \\
-NFR-2 & Idempotency on full re-runs. & 100\% \\
-NFR-3 & Pipeline availability on the Azure VM. & $\ge 99\%$ \\
-NFR-4 & Mean cycle time for incremental mode. & $\le 60$ seconds \\
-NFR-5 & Coverage of the validation suite (V1--V8). & 100\% per run \\
-NFR-6 & Secure access (SSH key + IP allowlist). & Mandatory \\
-NFR-7 & Reproducibility (random seed, pinned versions). & Mandatory \\
-NFR-8 & Per-tenant fairness of the model quality. & Silhouette $\ge 0.15$ \\
-NFR-9 & Isolation from the operational MySQL workload. & No reads on production peak hours \\
+NFR-1 & End-to-end pipeline latency. & $\le 10$ minutes & Time between dump availability and mart update, recorded in \texttt{etl\_run\_log}. \\
+NFR-2 & Idempotency on full re-runs. & 100\% & Re-running a closed window produces identical row counts and checksums in the warehouse. \\
+NFR-3 & Pipeline availability on the Azure VM. & $\ge 99\%$ & Uptime of the cron job and the API/dashboard services during the observation period. \\
+NFR-4 & Mean cycle time for incremental mode. & $\le 60$ seconds & Average duration of an incremental Prefect run on warm cache. \\
+NFR-5 & Coverage of the validation suite (V1--V8). & 100\% per run & Validation checks executed and logged at every pipeline cycle. \\
+NFR-6 & Secure access (SSH key + IP allowlist). & Mandatory & Network Security Group rules and SSH \texttt{PasswordAuthentication} disabled. \\
+NFR-7 & Reproducibility (random seed, pinned versions). & Mandatory & Seed set in the modeling notebooks; pinned versions in \texttt{requirements.txt}. \\
+NFR-8 & Minimum per-tenant clustering quality. & Silhouette $\ge 0.15$ & Silhouette score computed per tenant on the held-out evaluation window. \\
+NFR-9 & Isolation from the operational MySQL workload. & No reads on production peak hours & Dump-only ingestion (no direct SQL on production MySQL). \\
 \hline
 \end{tabular}
 \end{table}
@@ -127,7 +127,7 @@ The storage tier is organized as a three-layer warehouse: the \emph{bronze} laye
 \section{Technology stack}
 
 \subsection{Operational source: MySQL}
-The operational source of the project is the MySQL stack of \hostorg, which carries the three databases described in Chapter~\ref{chap:context}. The project does not modify these databases in any way; it consumes them through periodic dump files (\texttt{.sql}) provided by the engineering team of \hostorg. The dumps cover the slices of the \texttt{arch\_xxxxx} archive and the \texttt{user\_xxxxx} master data that are required for the analytical scope.
+The operational source of the project is the MySQL stack of \hostorg, which carries the three databases described in Chapter~\ref{chap:context}. The project does not modify these databases in any way; it consumes them through periodic dump files (\texttt{.sql}) provided by the engineering team of \hostorg. The dumps cover the slices of the \texttt{arch\_xxxxx} archive and the \texttt{user\_xxxxx} master data that are required for the analytical scope. The five-minute cron schedule referenced in FR-9 (Table~\ref{tab:fr}) checks for newly available dump slices and processes only the data that has not yet been loaded; it does not imply direct extraction from production MySQL every five minutes.
 
 \subsection{Analytical warehouse: PostgreSQL~16}
 The analytical warehouse is implemented in PostgreSQL~16, chosen for its strong support of analytical workloads, its ACID guarantees, its advanced indexing, its scalability to large datasets, its extensibility and its first-class compatibility with the Python data ecosystem and with standard BI tools. The detailed justification of this choice is given in \S\ref{ssec:why-postgres}. PostgreSQL is hosted on the Azure VM, with public ports closed and access mediated by SSH tunnelling.
