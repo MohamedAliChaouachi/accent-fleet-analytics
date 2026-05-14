@@ -5,7 +5,7 @@
 \label{chap:prep}
 
 \section{Introduction}
-Building on the data understanding of Chapter~\ref{chap:data}, the present chapter formalizes the data preparation phase of CRISP-DM. The chapter organizes the work into seven sections: (i) the conversion bridge that transforms the MySQL dump files of \hostorg{} into a PostgreSQL-importable representation; (ii) the construction of the ETL pipeline; (iii) the eleven-rule cleaning engine; (iv) the dimensional modeling of the warehouse; (v) the materialization of the analytical marts; (vi) the engineering of the feature registry; and (vii) the validation of the prepared dataset. Each section is illustrated by SQL or Python excerpts, the full versions of which are listed in the appendices.
+Building on the data understanding of Chapter~\ref{chap:data}, the present chapter formalizes the data preparation phase of CRISP-DM. The chapter organizes the work into seven sections: (i) the conversion bridge that transforms the MySQL dump files of \hostorg{} into a PostgreSQL-importable representation; (ii) the construction of the ETL pipeline; (iii) the cleaning rule engine (eleven operational rules \texttt{C1}--\texttt{C11}, consolidating the thirteen data-quality issues surfaced in Chapter~\ref{chap:data}); (iv) the dimensional modeling of the warehouse; (v) the materialization of the analytical marts; (vi) the engineering of the feature registry; and (vii) the validation of the prepared dataset. Each section is illustrated by SQL or Python excerpts, the full versions of which are listed in the appendices.
 
 \section{From MySQL dumps to a PostgreSQL staging layer}
 
@@ -52,7 +52,7 @@ DO UPDATE SET last_event_ts = EXCLUDED.last_event_ts;
 \end{lstlisting}
 
 \subsection{Idempotency and replay}
-Idempotency is guaranteed by an \texttt{INSERT~\dots~ON~CONFLICT~DO~UPDATE} pattern on the natural key of every fact and dimension. A replay of the same window therefore produces the same final state, regardless of the number of repetitions. This property is essential for the binomial collaboration mode: either student can re-trigger a run on the shared Azure VM without risking divergence between the two members' working copies of the warehouse.
+Idempotency is guaranteed by an \texttt{INSERT~\dots~ON~CONFLICT~DO~UPDATE} pattern on the natural key of every fact and dimension. A replay of the same window therefore produces the same final state, regardless of the number of repetitions. This property is essential for the two-student collaboration mode: either student can re-trigger a run on the shared Azure VM without risking divergence between the two members' working copies of the warehouse.
 
 \section{Cleaning rule engine}
 
@@ -211,18 +211,18 @@ Telemetry & \texttt{avg\_rpm} & Mean RPM across day \\
 \end{table}
 
 \subsection{Aggregation strategy}
-The aggregation strategy follows three principles: \emph{normalization by exposure} (most counters are divided by 100~km of distance), \emph{operational interpretability} (each feature corresponds to an indicator that a fleet manager recognizes) and \emph{declarative specification} (the registry is the single source of truth between the SQL transformations and the Python feature consumption).
+The aggregation strategy follows three principles: \emph{normalization by exposure} (most counters are divided by 100~km of distance), \emph{operational interpretability} (each feature corresponds to an indicator that a fleet manager recognizes) and \emph{declarative specification} (the registry is the single source of truth between the SQL transformations and the Python feature consumption). The 100~km denominator was selected because it is commonly used in fleet and road-safety reporting and makes event rates comparable across devices with different mileage.
 
 \subsection{Transformations}
-The categorical features (vehicle class, manufacturer family) are encoded with a one-hot scheme; the ordinal features (vehicle class) are encoded with an explicit ordinal scheme; the quantitative features used by the unsupervised models are standardized per tenant by means of \texttt{StandardScaler}. An exploratory supervised track applies SMOTE to neutralize an anticipated class imbalance.
+The categorical features (vehicle class, manufacturer family) are encoded with a one-hot scheme; the ordinal features (vehicle class) are encoded with an explicit ordinal scheme; the quantitative features used by the unsupervised models are standardized per tenant by means of \texttt{StandardScaler}. SMOTE was only considered in an exploratory supervised track and was not retained in the final unsupervised modeling pipeline.
 
 \section{Validation of the prepared dataset}
 
 \subsection{Validation suite design}
-The validation suite is implemented in \texttt{sql/99\_validation\_suite.sql} and gathers eight check categories \texttt{V1}--\texttt{V8}: dimension population (V1), referential integrity (V2), enforcement of \texttt{C1} (V3), enforcement of \texttt{C2}--\texttt{C3} (V4), enforcement of \texttt{C5} (V5), null-rate budgets on critical columns (V6), mart grain coverage (V7) and risk score distribution sanity (V8).
+The validation suite is implemented in \texttt{sql/99\_validation\_suite.sql} and gathers eight check categories \texttt{V1}--\texttt{V8}: dimension population (V1), referential integrity (V2), enforcement of \texttt{C1} (V3), enforcement of \texttt{C2}--\texttt{C3} (V4), enforcement of \texttt{C5} (V5), null-rate budgets on critical columns (V6), mart grain coverage (V7) and risk score distribution sanity (V8). V8 only checks the numerical validity (bounds, monotonicity, absence of NaNs) of the risk-profile view used as input by the modeling and serving layers; the final interpretation of the score is discussed in Chapter~\ref{chap:model}.
 
 \subsection{Final dataset summary}
-At the conclusion of the data preparation phase, the modeling-ready dataset comprises approximately \textbf{2{,}157 device-month observations} on the period 2025-01--2026-04, after applying the threshold of 100~km of total distance, positive ignition-on telemetry, and a minimum number of trips per device-month. This total includes tenant~\texttt{7486}, which is recovered through the telemetry-to-trip reconstruction path before the full ML feature view is consumed by Chapter~\ref{chap:model}.
+At the conclusion of the data preparation phase, the modeling-ready dataset comprises approximately \textbf{2{,}157 device-month observations} on the period 2025-01--2026-04, after applying the threshold of 100~km of total distance, positive ignition-on telemetry, and a minimum number of trips per device-month. These thresholds remove inactive or insufficiently observed device-months whose behavioral indicators would be statistically unstable. This total includes tenant~\texttt{7486}, which is recovered through the telemetry-to-trip reconstruction path before the full ML feature view is consumed by Chapter~\ref{chap:model}.
 
 \section{Conclusion}
-This chapter has described the full preparation chain --- from the conversion of the MySQL dump files of \hostorg{} into PostgreSQL-importable artefacts, through the watermark-driven ETL pipeline and the eleven-rule cleaning engine, to the dimensional modeling of the warehouse, the materialization of the analytical marts, the engineering of the feature registry and the validation of the prepared dataset. The next chapter exploits the ML-ready dataset to train and to evaluate the unsupervised models that produce the behavioural segmentation and the risk score.
+This chapter has described the full preparation chain --- from the conversion of the MySQL dump files of \hostorg{} into PostgreSQL-importable artefacts, through the watermark-driven ETL pipeline and the cleaning rule engine (eleven operational rules \texttt{C1}--\texttt{C11}, consolidating the thirteen data-quality issues from Chapter~\ref{chap:data}), to the dimensional modeling of the warehouse, the materialization of the analytical marts, the engineering of the feature registry and the validation of the prepared dataset. The next chapter exploits the ML-ready dataset to train and to evaluate the unsupervised models that produce the behavioural segmentation and the risk score.
