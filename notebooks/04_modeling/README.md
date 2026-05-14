@@ -25,8 +25,9 @@ The EDA against the live warehouse on 2026-04-30 found that this path is
 3. **Archive-derived signals (harsh / RPM / idle) are 99% absent before
    2025-01.** The realistic modeling window is 16 months (2025-01 to
    2026-04), ~5,000 device-month training rows, not "millions".
-4. **Tenants 264 (overspeed-rich) and 1787 (harsh-rich)** are different
-   operating regimes. A global model averages them out.
+4. **Tenants 264 (overspeed-rich), 1787 (harsh-rich), and 7486
+   (telemetry-first before trip reconstruction)** are different operating
+   regimes. A global model averages them out.
 
 ## Current direction
 
@@ -35,6 +36,10 @@ Two unsupervised, per-tenant notebooks. Each enforces:
 - per-tenant fitting (F4)
 - device-month grain (F5)
 - no proxy labels (F6)
+- tenant 7486 must be present after telemetry-to-trip reconstruction; if it
+  disappears from `marts.v_ml_features_full`, run
+  `scripts/reconstruct_telemetry_trips.py --tenant-id 7486 --from-month 2025-01`
+  and rebuild the dependent marts.
 
 | Notebook | Approach | Output | Project goal addressed |
 |---|---|---|---|

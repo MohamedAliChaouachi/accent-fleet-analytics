@@ -137,111 +137,109 @@
 \contentsline {subsection}{\numberline {4.8.1}Validation suite design}{47}{subsection.4.8.1}%
 \contentsline {subsection}{\numberline {4.8.2}Final dataset summary}{47}{subsection.4.8.2}%
 \contentsline {section}{\numberline {4.9}Conclusion}{47}{section.4.9}%
-\contentsline {chapter}{\numberline {5}Modeling, Evaluation and Final Justification}{49}{chapter.5}%
+\contentsline {chapter}{\numberline {5}Modeling and Evaluation of Device Behaviour Signals}{49}{chapter.5}%
 \contentsline {section}{\numberline {5.1}Introduction}{49}{section.5.1}%
-\contentsline {section}{\numberline {5.2}Test design}{49}{section.5.2}%
-\contentsline {subsection}{\numberline {5.2.1}Temporal split}{49}{subsection.5.2.1}%
-\contentsline {subsection}{\numberline {5.2.2}Per-tenant fitting protocol}{50}{subsection.5.2.2}%
-\contentsline {subsection}{\numberline {5.2.3}Reproducibility}{50}{subsection.5.2.3}%
-\contentsline {section}{\numberline {5.3}Baseline models}{50}{section.5.3}%
-\contentsline {subsection}{\numberline {5.3.1}Statistical baseline}{50}{subsection.5.3.1}%
-\contentsline {subsection}{\numberline {5.3.2}Linear baseline}{50}{subsection.5.3.2}%
-\contentsline {section}{\numberline {5.4}Machine learning candidates}{50}{section.5.4}%
-\contentsline {subsection}{\numberline {5.4.1}K-Means clustering}{50}{subsection.5.4.1}%
-\contentsline {subsection}{\numberline {5.4.2}Hierarchical clustering}{51}{subsection.5.4.2}%
-\contentsline {subsection}{\numberline {5.4.3}DBSCAN}{51}{subsection.5.4.3}%
-\contentsline {subsection}{\numberline {5.4.4}Isolation Forest for anomaly detection}{51}{subsection.5.4.4}%
-\contentsline {subsection}{\numberline {5.4.5}One-Class SVM and Local Outlier Factor}{51}{subsection.5.4.5}%
-\contentsline {section}{\numberline {5.5}Deep learning baseline}{51}{section.5.5}%
-\contentsline {subsection}{\numberline {5.5.1}Autoencoder}{51}{subsection.5.5.1}%
-\contentsline {subsection}{\numberline {5.5.2}Multi-Layer Perceptron}{52}{subsection.5.5.2}%
-\contentsline {subsection}{\numberline {5.5.3}Comparison with classical ML}{52}{subsection.5.5.3}%
-\contentsline {section}{\numberline {5.6}Evaluation metrics}{52}{section.5.6}%
-\contentsline {subsection}{\numberline {5.6.1}Internal clustering metrics}{52}{subsection.5.6.1}%
-\contentsline {subsection}{\numberline {5.6.2}Anomaly metrics}{52}{subsection.5.6.2}%
-\contentsline {subsection}{\numberline {5.6.3}Business proxies}{52}{subsection.5.6.3}%
-\contentsline {section}{\numberline {5.7}Model comparison and final justification}{53}{section.5.7}%
-\contentsline {subsection}{\numberline {5.7.1}Comparative table}{53}{subsection.5.7.1}%
-\contentsline {subsection}{\numberline {5.7.2}Per-tenant K-Means results}{53}{subsection.5.7.2}%
-\contentsline {subsection}{\numberline {5.7.3}Justification of the final choice}{53}{subsection.5.7.3}%
-\contentsline {section}{\numberline {5.8}Results interpretation}{54}{section.5.8}%
-\contentsline {subsection}{\numberline {5.8.1}Behavioural profiles}{54}{subsection.5.8.1}%
-\contentsline {subsection}{\numberline {5.8.2}Risk score distribution}{54}{subsection.5.8.2}%
-\contentsline {subsection}{\numberline {5.8.3}Confusion matrix against the rule baseline}{54}{subsection.5.8.3}%
-\contentsline {subsection}{\numberline {5.8.4}Feature importance}{54}{subsection.5.8.4}%
-\contentsline {section}{\numberline {5.9}Dashboards and analytical artefacts}{55}{section.5.9}%
-\contentsline {section}{\numberline {5.10}Conclusion}{56}{section.5.10}%
-\contentsline {chapter}{\numberline {6}Deployment, API, Dashboard and Azure Operations}{57}{chapter.6}%
-\contentsline {section}{\numberline {6.1}Introduction}{57}{section.6.1}%
-\contentsline {section}{\numberline {6.2}Deployment strategy}{57}{section.6.2}%
-\contentsline {subsection}{\numberline {6.2.1}Industrialization principles}{57}{subsection.6.2.1}%
-\contentsline {subsection}{\numberline {6.2.2}Operating modes}{57}{subsection.6.2.2}%
-\contentsline {section}{\numberline {6.3}Microsoft Azure infrastructure}{58}{section.6.3}%
-\contentsline {subsection}{\numberline {6.3.1}Azure Virtual Machine}{58}{subsection.6.3.1}%
-\contentsline {subsection}{\numberline {6.3.2}Network Security Group and IP allowlist}{58}{subsection.6.3.2}%
-\contentsline {subsection}{\numberline {6.3.3}Secure remote collaboration via SSH tunnelling}{58}{subsection.6.3.3}%
-\contentsline {subsection}{\numberline {6.3.4}Service accounts}{59}{subsection.6.3.4}%
-\contentsline {section}{\numberline {6.4}PostgreSQL integration}{59}{section.6.4}%
-\contentsline {subsection}{\numberline {6.4.1}Analytical PostgreSQL on the VM}{59}{subsection.6.4.1}%
-\contentsline {subsection}{\numberline {6.4.2}Connection management}{59}{subsection.6.4.2}%
-\contentsline {subsection}{\numberline {6.4.3}Backups and snapshots}{59}{subsection.6.4.3}%
-\contentsline {section}{\numberline {6.5}API and backend}{60}{section.6.5}%
-\contentsline {subsection}{\numberline {6.5.1}API design}{60}{subsection.6.5.1}%
-\contentsline {subsection}{\numberline {6.5.2}Backend architecture}{60}{subsection.6.5.2}%
-\contentsline {subsection}{\numberline {6.5.3}Reverse proxy and TLS}{60}{subsection.6.5.3}%
-\contentsline {section}{\numberline {6.6}Dashboard and frontend}{60}{section.6.6}%
-\contentsline {subsection}{\numberline {6.6.1}Dashboard implementation}{60}{subsection.6.6.1}%
-\contentsline {subsection}{\numberline {6.6.2}Pages and visualizations}{61}{subsection.6.6.2}%
-\contentsline {section}{\numberline {6.7}Automation}{61}{section.6.7}%
-\contentsline {subsection}{\numberline {6.7.1}Cron entry}{61}{subsection.6.7.1}%
-\contentsline {subsection}{\numberline {6.7.2}Prefect flow}{61}{subsection.6.7.2}%
-\contentsline {subsection}{\numberline {6.7.3}Backfill orchestration}{62}{subsection.6.7.3}%
-\contentsline {section}{\numberline {6.8}Monitoring and alerting}{62}{section.6.8}%
-\contentsline {subsection}{\numberline {6.8.1}Run log and lineage}{62}{subsection.6.8.1}%
-\contentsline {subsection}{\numberline {6.8.2}Data quality monitoring}{62}{subsection.6.8.2}%
-\contentsline {subsection}{\numberline {6.8.3}Model drift monitoring}{62}{subsection.6.8.3}%
-\contentsline {subsection}{\numberline {6.8.4}Alerting}{62}{subsection.6.8.4}%
-\contentsline {subsection}{\numberline {6.8.5}Operations runbook}{62}{subsection.6.8.5}%
-\contentsline {section}{\numberline {6.9}Production deployment workflow}{63}{section.6.9}%
-\contentsline {subsection}{\numberline {6.9.1}Code deployment}{63}{subsection.6.9.1}%
-\contentsline {subsection}{\numberline {6.9.2}Database migrations}{63}{subsection.6.9.2}%
-\contentsline {subsection}{\numberline {6.9.3}Model deployment}{63}{subsection.6.9.3}%
-\contentsline {subsection}{\numberline {6.9.4}Diagram of the deployment pipeline}{63}{subsection.6.9.4}%
-\contentsline {section}{\numberline {6.10}Conclusion}{63}{section.6.10}%
-\contentsline {chapter}{General Conclusion}{65}{chapter*.40}%
-\contentsline {chapter}{Bibliography}{68}{chapter*.41}%
-\contentsline {chapter}{\numberline {A}SQL Exploration Scripts}{69}{appendix.A}%
-\contentsline {section}{\numberline {A.1}Schema inspection}{69}{section.A.1}%
-\contentsline {section}{\numberline {A.2}Data profiling}{69}{section.A.2}%
-\contentsline {section}{\numberline {A.3}Null analysis}{69}{section.A.3}%
-\contentsline {section}{\numberline {A.4}Distributions}{69}{section.A.4}%
-\contentsline {section}{\numberline {A.5}KPI extraction}{70}{section.A.5}%
-\contentsline {section}{\numberline {A.6}Metadata analysis}{70}{section.A.6}%
-\contentsline {section}{\numberline {A.7}Validation suite}{70}{section.A.7}%
-\contentsline {chapter}{\numberline {B}Python Scripts and Figure Generation}{71}{appendix.B}%
-\contentsline {section}{\numberline {B.1}Automated extraction to CSV}{71}{section.B.1}%
-\contentsline {section}{\numberline {B.2}Figure generation}{71}{section.B.2}%
-\contentsline {section}{\numberline {B.3}Modeling scripts}{72}{section.B.3}%
-\contentsline {chapter}{\numberline {C}Azure Operations Runbook}{73}{appendix.C}%
-\contentsline {section}{\numberline {C.1}VM provisioning}{73}{section.C.1}%
-\contentsline {subsection}{\numberline {C.1.1}VM specification}{73}{subsection.C.1.1}%
-\contentsline {subsection}{\numberline {C.1.2}Network Security Group}{73}{subsection.C.1.2}%
-\contentsline {subsection}{\numberline {C.1.3}IP allowlist management}{73}{subsection.C.1.3}%
-\contentsline {section}{\numberline {C.2}SSH access}{74}{section.C.2}%
-\contentsline {subsection}{\numberline {C.2.1}Account types}{74}{subsection.C.2.1}%
-\contentsline {subsection}{\numberline {C.2.2}SSH tunnel}{74}{subsection.C.2.2}%
-\contentsline {subsection}{\numberline {C.2.3}Key rotation}{74}{subsection.C.2.3}%
-\contentsline {section}{\numberline {C.3}Pipeline operations}{74}{section.C.3}%
-\contentsline {subsection}{\numberline {C.3.1}Cron entry}{74}{subsection.C.3.1}%
-\contentsline {subsection}{\numberline {C.3.2}Inspecting the run log}{74}{subsection.C.3.2}%
-\contentsline {subsection}{\numberline {C.3.3}Triggering a backfill}{75}{subsection.C.3.3}%
-\contentsline {section}{\numberline {C.4}Database operations}{75}{section.C.4}%
-\contentsline {subsection}{\numberline {C.4.1}Backup}{75}{subsection.C.4.1}%
-\contentsline {subsection}{\numberline {C.4.2}Credential rotation}{75}{subsection.C.4.2}%
-\contentsline {section}{\numberline {C.5}API and dashboard operations}{75}{section.C.5}%
-\contentsline {subsection}{\numberline {C.5.1}Service management}{75}{subsection.C.5.1}%
-\contentsline {subsection}{\numberline {C.5.2}TLS certificate renewal}{76}{subsection.C.5.2}%
-\contentsline {section}{\numberline {C.6}Monitoring and alerting}{76}{section.C.6}%
-\contentsline {subsection}{\numberline {C.6.1}Pipeline alerts}{76}{subsection.C.6.1}%
-\contentsline {subsection}{\numberline {C.6.2}Data quality alerts}{76}{subsection.C.6.2}%
-\contentsline {subsection}{\numberline {C.6.3}Drift alerts}{76}{subsection.C.6.3}%
+\contentsline {section}{\numberline {5.2}Reformulation of the Modeling Problem}{49}{section.5.2}%
+\contentsline {subsection}{\numberline {5.2.1}Initial target}{49}{subsection.5.2.1}%
+\contentsline {subsection}{\numberline {5.2.2}Evidence from the data understanding phase}{50}{subsection.5.2.2}%
+\contentsline {subsection}{\numberline {5.2.3}Adopted modeling objective}{50}{subsection.5.2.3}%
+\contentsline {section}{\numberline {5.3}Modeling Dataset and Protocol}{50}{section.5.3}%
+\contentsline {subsection}{\numberline {5.3.1}Input view}{50}{subsection.5.3.1}%
+\contentsline {subsection}{\numberline {5.3.2}Filtering rules}{51}{subsection.5.3.2}%
+\contentsline {subsection}{\numberline {5.3.3}Tenant-aware fitting}{51}{subsection.5.3.3}%
+\contentsline {subsection}{\numberline {5.3.4}Reproducibility}{51}{subsection.5.3.4}%
+\contentsline {section}{\numberline {5.4}Candidate Modeling Techniques}{52}{section.5.4}%
+\contentsline {subsection}{\numberline {5.4.1}Rule and statistical baselines}{52}{subsection.5.4.1}%
+\contentsline {subsection}{\numberline {5.4.2}K-Means clustering}{52}{subsection.5.4.2}%
+\contentsline {subsection}{\numberline {5.4.3}Alternative clustering methods}{52}{subsection.5.4.3}%
+\contentsline {subsection}{\numberline {5.4.4}Anomaly scoring}{52}{subsection.5.4.4}%
+\contentsline {subsection}{\numberline {5.4.5}Deferred candidates}{53}{subsection.5.4.5}%
+\contentsline {section}{\numberline {5.5}Evaluation Design}{53}{section.5.5}%
+\contentsline {subsection}{\numberline {5.5.1}CRISP-DM evaluation gates}{53}{subsection.5.5.1}%
+\contentsline {subsection}{\numberline {5.5.2}External validation limitation}{53}{subsection.5.5.2}%
+\contentsline {subsection}{\numberline {5.5.3}Fallback validation}{54}{subsection.5.5.3}%
+\contentsline {section}{\numberline {5.6}Experimental Results}{54}{section.5.6}%
+\contentsline {subsection}{\numberline {5.6.1}Cluster quality}{54}{subsection.5.6.1}%
+\contentsline {subsection}{\numberline {5.6.2}Risk-score internal consistency}{54}{subsection.5.6.2}%
+\contentsline {subsection}{\numberline {5.6.3}Temporal stability}{55}{subsection.5.6.3}%
+\contentsline {section}{\numberline {5.7}Model Decision and Final Justification}{56}{section.5.7}%
+\contentsline {subsection}{\numberline {5.7.1}Decision table}{56}{subsection.5.7.1}%
+\contentsline {subsection}{\numberline {5.7.2}Why the final solution is mixed}{56}{subsection.5.7.2}%
+\contentsline {subsection}{\numberline {5.7.3}Operational caveat}{56}{subsection.5.7.3}%
+\contentsline {section}{\numberline {5.8}Model Outputs for Deployment}{57}{section.5.8}%
+\contentsline {section}{\numberline {5.9}Conclusion}{57}{section.5.9}%
+\contentsline {chapter}{\numberline {6}Deployment, API, Dashboard and Azure Operations}{58}{chapter.6}%
+\contentsline {section}{\numberline {6.1}Introduction}{58}{section.6.1}%
+\contentsline {section}{\numberline {6.2}Deployment strategy}{58}{section.6.2}%
+\contentsline {subsection}{\numberline {6.2.1}Industrialization principles}{58}{subsection.6.2.1}%
+\contentsline {subsection}{\numberline {6.2.2}Operating modes}{58}{subsection.6.2.2}%
+\contentsline {section}{\numberline {6.3}Microsoft Azure infrastructure}{59}{section.6.3}%
+\contentsline {subsection}{\numberline {6.3.1}Azure Virtual Machine}{59}{subsection.6.3.1}%
+\contentsline {subsection}{\numberline {6.3.2}Network Security Group and IP allowlist}{59}{subsection.6.3.2}%
+\contentsline {subsection}{\numberline {6.3.3}Secure remote collaboration via SSH tunnelling}{59}{subsection.6.3.3}%
+\contentsline {subsection}{\numberline {6.3.4}Service accounts}{60}{subsection.6.3.4}%
+\contentsline {section}{\numberline {6.4}PostgreSQL integration}{60}{section.6.4}%
+\contentsline {subsection}{\numberline {6.4.1}Analytical PostgreSQL on the VM}{60}{subsection.6.4.1}%
+\contentsline {subsection}{\numberline {6.4.2}Connection management}{60}{subsection.6.4.2}%
+\contentsline {subsection}{\numberline {6.4.3}Backups and snapshots}{60}{subsection.6.4.3}%
+\contentsline {section}{\numberline {6.5}API and backend}{61}{section.6.5}%
+\contentsline {subsection}{\numberline {6.5.1}API design}{61}{subsection.6.5.1}%
+\contentsline {subsection}{\numberline {6.5.2}Backend architecture}{61}{subsection.6.5.2}%
+\contentsline {subsection}{\numberline {6.5.3}Reverse proxy and TLS}{61}{subsection.6.5.3}%
+\contentsline {section}{\numberline {6.6}Dashboard and frontend}{61}{section.6.6}%
+\contentsline {subsection}{\numberline {6.6.1}Dashboard implementation}{61}{subsection.6.6.1}%
+\contentsline {subsection}{\numberline {6.6.2}Pages and visualizations}{62}{subsection.6.6.2}%
+\contentsline {section}{\numberline {6.7}Automation}{62}{section.6.7}%
+\contentsline {subsection}{\numberline {6.7.1}Cron entry}{62}{subsection.6.7.1}%
+\contentsline {subsection}{\numberline {6.7.2}Prefect flow}{62}{subsection.6.7.2}%
+\contentsline {subsection}{\numberline {6.7.3}Backfill orchestration}{63}{subsection.6.7.3}%
+\contentsline {subsection}{\numberline {6.7.4}Telemetry reconstruction for tenant 7486}{63}{subsection.6.7.4}%
+\contentsline {section}{\numberline {6.8}Monitoring and alerting}{63}{section.6.8}%
+\contentsline {subsection}{\numberline {6.8.1}Run log and lineage}{63}{subsection.6.8.1}%
+\contentsline {subsection}{\numberline {6.8.2}Data quality monitoring}{63}{subsection.6.8.2}%
+\contentsline {subsection}{\numberline {6.8.3}Model drift monitoring}{63}{subsection.6.8.3}%
+\contentsline {subsection}{\numberline {6.8.4}Alerting}{64}{subsection.6.8.4}%
+\contentsline {subsection}{\numberline {6.8.5}Operations runbook}{64}{subsection.6.8.5}%
+\contentsline {section}{\numberline {6.9}Production deployment workflow}{64}{section.6.9}%
+\contentsline {subsection}{\numberline {6.9.1}Code deployment}{64}{subsection.6.9.1}%
+\contentsline {subsection}{\numberline {6.9.2}Database migrations}{64}{subsection.6.9.2}%
+\contentsline {subsection}{\numberline {6.9.3}Model deployment}{64}{subsection.6.9.3}%
+\contentsline {subsection}{\numberline {6.9.4}Diagram of the deployment pipeline}{65}{subsection.6.9.4}%
+\contentsline {section}{\numberline {6.10}Conclusion}{65}{section.6.10}%
+\contentsline {chapter}{General Conclusion}{66}{chapter*.40}%
+\contentsline {chapter}{Bibliography}{69}{chapter*.41}%
+\contentsline {chapter}{\numberline {A}SQL Exploration Scripts}{70}{appendix.A}%
+\contentsline {section}{\numberline {A.1}Schema inspection}{70}{section.A.1}%
+\contentsline {section}{\numberline {A.2}Data profiling}{70}{section.A.2}%
+\contentsline {section}{\numberline {A.3}Null analysis}{70}{section.A.3}%
+\contentsline {section}{\numberline {A.4}Distributions}{70}{section.A.4}%
+\contentsline {section}{\numberline {A.5}KPI extraction}{71}{section.A.5}%
+\contentsline {section}{\numberline {A.6}Metadata analysis}{71}{section.A.6}%
+\contentsline {section}{\numberline {A.7}Validation suite}{71}{section.A.7}%
+\contentsline {chapter}{\numberline {B}Python Scripts and Figure Generation}{72}{appendix.B}%
+\contentsline {section}{\numberline {B.1}Automated extraction to CSV}{72}{section.B.1}%
+\contentsline {section}{\numberline {B.2}Figure generation}{72}{section.B.2}%
+\contentsline {section}{\numberline {B.3}Modeling scripts}{73}{section.B.3}%
+\contentsline {chapter}{\numberline {C}Azure Operations Runbook}{74}{appendix.C}%
+\contentsline {section}{\numberline {C.1}VM provisioning}{74}{section.C.1}%
+\contentsline {subsection}{\numberline {C.1.1}VM specification}{74}{subsection.C.1.1}%
+\contentsline {subsection}{\numberline {C.1.2}Network Security Group}{74}{subsection.C.1.2}%
+\contentsline {subsection}{\numberline {C.1.3}IP allowlist management}{74}{subsection.C.1.3}%
+\contentsline {section}{\numberline {C.2}SSH access}{75}{section.C.2}%
+\contentsline {subsection}{\numberline {C.2.1}Account types}{75}{subsection.C.2.1}%
+\contentsline {subsection}{\numberline {C.2.2}SSH tunnel}{75}{subsection.C.2.2}%
+\contentsline {subsection}{\numberline {C.2.3}Key rotation}{75}{subsection.C.2.3}%
+\contentsline {section}{\numberline {C.3}Pipeline operations}{75}{section.C.3}%
+\contentsline {subsection}{\numberline {C.3.1}Cron entry}{75}{subsection.C.3.1}%
+\contentsline {subsection}{\numberline {C.3.2}Inspecting the run log}{75}{subsection.C.3.2}%
+\contentsline {subsection}{\numberline {C.3.3}Triggering a backfill}{76}{subsection.C.3.3}%
+\contentsline {section}{\numberline {C.4}Database operations}{76}{section.C.4}%
+\contentsline {subsection}{\numberline {C.4.1}Backup}{76}{subsection.C.4.1}%
+\contentsline {subsection}{\numberline {C.4.2}Credential rotation}{76}{subsection.C.4.2}%
+\contentsline {section}{\numberline {C.5}API and dashboard operations}{76}{section.C.5}%
+\contentsline {subsection}{\numberline {C.5.1}Service management}{76}{subsection.C.5.1}%
+\contentsline {subsection}{\numberline {C.5.2}TLS certificate renewal}{77}{subsection.C.5.2}%
+\contentsline {section}{\numberline {C.6}Monitoring and alerting}{77}{section.C.6}%
+\contentsline {subsection}{\numberline {C.6.1}Pipeline alerts}{77}{subsection.C.6.1}%
+\contentsline {subsection}{\numberline {C.6.2}Data quality alerts}{77}{subsection.C.6.2}%
+\contentsline {subsection}{\numberline {C.6.3}Drift alerts}{77}{subsection.C.6.3}%

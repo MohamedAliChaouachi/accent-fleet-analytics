@@ -27,7 +27,7 @@ from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import StandardScaler
 from sqlalchemy import text
 
-from accent_fleet.config import PROJECT_ROOT, settings
+from accent_fleet.config import PROJECT_ROOT, load_pipeline_config, settings
 from accent_fleet.db.engine import get_engine
 
 logger = logging.getLogger("accent_fleet.ml.train_clustering")
@@ -68,7 +68,44 @@ class TrainResult:
     n_rows: int
     feature_order: list[str]
     cluster_sizes: dict[int, int] = field(default_factory=dict)
+    tenants: list[int] = field(default_factory=list)
+    rows_by_tenant: dict[int, int] = field(default_factory=dict)
     training_window: str = ""
+
+
+# ---------------------------------------------------------------------------
+def _configured_tenants(key: str) -> tuple[int, ...]:
+    cfg = load_pipeline_config().get("modeling") or {}
+    return tuple(int(t) for t in cfg.get(key, []) or [])
+
+
+def _rows_by_tenant(df: pd.DataFrame) -> dict[int, int]:
+    if df.empty or "tenant_id" not in df:
+        return {}
+    counts = df["tenant_id"].value_counts().sort_index()
+    return {int(tenant_id): int(n) for tenant_id, n in counts.items()}
+
+
+def _validate_tenant_coverage(df: pd.DataFrame) -> None:
+    rows_by_tenant = _rows_by_tenant(df)
+    present = set(rows_by_tenant)
+    expected = set(_configured_tenants("expected_tenants"))
+    required = set(_configured_tenants("required_tenants"))
+
+    logger.info("training tenant coverage: %s", rows_by_tenant)
+
+    missing_expected = sorted(expected - present)
+    if missing_expected:
+        logger.warning("expected modeling tenant(s) absent after filters: %s", missing_expected)
+
+    missing_required = sorted(required - present)
+    if missing_required:
+        raise ValueError(
+            "training frame is missing required tenant(s) "
+            f"{missing_required}. Tenant 7486 depends on telemetry-to-trip "
+            "reconstruction; run scripts/reconstruct_telemetry_trips.py "
+            "--tenant-id 7486 --from-month 2025-01, then rebuild the marts."
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -86,6 +123,7 @@ def load_training_frame(month_from: str = "2025-01") -> pd.DataFrame:
     with get_engine().connect() as conn:
         df = pd.read_sql(sql, conn, params={"month_from": month_from})
     logger.info("loaded %d rows for clustering (window >= %s)", len(df), month_from)
+    _validate_tenant_coverage(df)
     return df
 
 
@@ -129,6 +167,8 @@ def fit_clustering(
         n_rows=len(df),
         feature_order=list(FEATURES),
         cluster_sizes=sizes,
+        tenants=sorted(_rows_by_tenant(df)),
+        rows_by_tenant=_rows_by_tenant(df),
     )
     return best_km, scaler, result
 
@@ -147,6 +187,8 @@ def save_local(kmeans: KMeans, scaler: StandardScaler, result: TrainResult) -> N
         "n_rows": result.n_rows,
         "feature_order": result.feature_order,
         "cluster_sizes": result.cluster_sizes,
+        "tenants": result.tenants,
+        "rows_by_tenant": result.rows_by_tenant,
         "random_state": RANDOM_STATE,
         "training_window": result.training_window,
     }
@@ -192,6 +234,7 @@ def log_to_mlflow(
             "random_state": RANDOM_STATE,
             "n_features": len(result.feature_order),
             "n_rows": result.n_rows,
+            "n_tenants": len(result.tenants),
         })
         mlflow.log_metric("silhouette", result.silhouette)
         for cid, size in result.cluster_sizes.items():

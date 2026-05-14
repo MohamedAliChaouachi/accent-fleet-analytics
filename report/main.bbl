@@ -19,6 +19,69 @@
 
 \refsection{0}
   \datalist[entry]{none/global//global/global/global}
+    \entry{macqueen1967kmeans}{article}{}{}
+      \name{author}{1}{}{%
+        {{hash=1c80931c8f086c94a4655483e35042d3}{%
+           family={MacQueen},
+           familyi={M\bibinitperiod},
+           given={James},
+           giveni={J\bibinitperiod}}}%
+      }
+      \strng{namehash}{1c80931c8f086c94a4655483e35042d3}
+      \strng{fullhash}{1c80931c8f086c94a4655483e35042d3}
+      \strng{fullhashraw}{1c80931c8f086c94a4655483e35042d3}
+      \strng{bibnamehash}{1c80931c8f086c94a4655483e35042d3}
+      \strng{authorbibnamehash}{1c80931c8f086c94a4655483e35042d3}
+      \strng{authornamehash}{1c80931c8f086c94a4655483e35042d3}
+      \strng{authorfullhash}{1c80931c8f086c94a4655483e35042d3}
+      \strng{authorfullhashraw}{1c80931c8f086c94a4655483e35042d3}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{journaltitle}{Proceedings of the Fifth Berkeley Symposium on Mathematical Statistics and Probability}
+      \field{title}{Some methods for classification and analysis of multivariate observations}
+      \field{volume}{1}
+      \field{year}{1967}
+      \field{pages}{281\bibrangedash 297}
+      \range{pages}{17}
+    \endentry
+    \entry{liu2008isolation}{inproceedings}{}{}
+      \name{author}{3}{}{%
+        {{hash=231b376c1eeea575643f44deb86338c4}{%
+           family={Liu},
+           familyi={L\bibinitperiod},
+           given={Fei\bibnamedelima Tony},
+           giveni={F\bibinitperiod\bibinitdelim T\bibinitperiod}}}%
+        {{hash=9bc17f24d02724c02d418a27dfea50bb}{%
+           family={Ting},
+           familyi={T\bibinitperiod},
+           given={Kai\bibnamedelima Ming},
+           giveni={K\bibinitperiod\bibinitdelim M\bibinitperiod}}}%
+        {{hash=6b1a37e820a730061851a81dcca2d154}{%
+           family={Zhou},
+           familyi={Z\bibinitperiod},
+           given={Zhi-Hua},
+           giveni={Z\bibinithyphendelim H\bibinitperiod}}}%
+      }
+      \strng{namehash}{b38d2601a5a1a63e9c41ca76b68a2df4}
+      \strng{fullhash}{b38d2601a5a1a63e9c41ca76b68a2df4}
+      \strng{fullhashraw}{b38d2601a5a1a63e9c41ca76b68a2df4}
+      \strng{bibnamehash}{b38d2601a5a1a63e9c41ca76b68a2df4}
+      \strng{authorbibnamehash}{b38d2601a5a1a63e9c41ca76b68a2df4}
+      \strng{authornamehash}{b38d2601a5a1a63e9c41ca76b68a2df4}
+      \strng{authorfullhash}{b38d2601a5a1a63e9c41ca76b68a2df4}
+      \strng{authorfullhashraw}{b38d2601a5a1a63e9c41ca76b68a2df4}
+      \field{sortinit}{2}
+      \field{sortinithash}{8b555b3791beccb63322c22f3320aa9a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{booktitle}{Proceedings of the 8th IEEE International Conference on Data Mining (ICDM)}
+      \field{title}{Isolation Forest}
+      \field{year}{2008}
+      \field{pages}{413\bibrangedash 422}
+      \range{pages}{10}
+    \endentry
     \entry{rousseeuw1987silhouettes}{article}{}{}
       \name{author}{1}{}{%
         {{hash=72d8129c9f4e6afddacb834fb2d8226f}{%
@@ -35,8 +98,8 @@
       \strng{authornamehash}{72d8129c9f4e6afddacb834fb2d8226f}
       \strng{authorfullhash}{72d8129c9f4e6afddacb834fb2d8226f}
       \strng{authorfullhashraw}{72d8129c9f4e6afddacb834fb2d8226f}
-      \field{sortinit}{1}
-      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
+      \field{sortinit}{3}
+      \field{sortinithash}{ad6fe7482ffbd7b9f99c9e8b5dccd3d7}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{journaltitle}{Journal of Computational and Applied Mathematics}
@@ -67,8 +130,8 @@
       \strng{authornamehash}{4ce4c2976c5cf0d48fca53858a43efda}
       \strng{authorfullhash}{4ce4c2976c5cf0d48fca53858a43efda}
       \strng{authorfullhashraw}{4ce4c2976c5cf0d48fca53858a43efda}
-      \field{sortinit}{2}
-      \field{sortinithash}{8b555b3791beccb63322c22f3320aa9a}
+      \field{sortinit}{3}
+      \field{sortinithash}{ad6fe7482ffbd7b9f99c9e8b5dccd3d7}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{journaltitle}{IEEE Transactions on Pattern Analysis and Machine Intelligence}

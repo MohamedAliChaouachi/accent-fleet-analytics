@@ -5,7 +5,7 @@
 \label{chap:deploy}
 
 \section{Introduction}
-The evaluation of Chapter~\ref{chap:model} has confirmed the readiness of the K-Means segmentation and of the Isolation Forest risk score for industrialization. The present chapter executes the deployment phase of CRISP-DM. The chapter describes the deployment strategy, the API and the dashboard exposing the model outputs, the integration with the analytical PostgreSQL warehouse populated from the converted MySQL dumps of \hostorg, the cron-driven automation, the monitoring and alerting layer, and finally the Microsoft Azure infrastructure on which the platform runs --- with a particular focus on the secure remote collaboration setup that allows the binomial of student engineers to operate the platform from separate workstations through SSH tunnelling, IP allowlisting on the Azure Network Security Group, and dedicated service accounts.
+The evaluation of Chapter~\ref{chap:model} has confirmed the readiness of the behavioural segmentation and of the transparent risk profile for controlled industrialization, while keeping the Isolation Forest anomaly score as a caveated evaluation artefact. The present chapter executes the deployment phase of CRISP-DM. The chapter describes the deployment strategy, the API and the dashboard exposing the analytical outputs, the integration with the analytical PostgreSQL warehouse populated from the converted MySQL dumps of \hostorg, the cron-driven automation, the monitoring and alerting layer, and finally the Microsoft Azure infrastructure on which the platform runs --- with a particular focus on the secure remote collaboration setup that allows the binomial of student engineers to operate the platform from separate workstations through SSH tunnelling, IP allowlisting on the Azure Network Security Group, and dedicated service accounts.
 
 \section{Deployment strategy}
 
@@ -110,10 +110,13 @@ The incremental mode is triggered every five minutes by a cron entry installed u
 \end{lstlisting}
 
 \subsection{Prefect flow}
-Internally, the pipeline is implemented as a Prefect flow defined in \texttt{src/accent\_fleet/pipeline/flow.py}. The flow chains the extraction tasks, the cleaning rule engine, the loading of dimensions and facts, the materialization of the marts, the validation suite and the export of the model artefacts. Each task is idempotent and emits structured logs.
+Internally, the pipeline is implemented as a Prefect flow defined in \path{src/accent_fleet/pipeline/flow_batch.py}. The flow chains the extraction tasks, the cleaning rule engine, the loading of dimensions and facts, the materialization of the marts, the validation suite and the export of the model artefacts. Each task is idempotent and emits structured logs.
 
 \subsection{Backfill orchestration}
 The backfill mode reuses the same Prefect flow but iterates over fixed-size chunks (default of 30~days) of the staging history. The mode is invoked manually by an operator after a schema change, after a model retraining or after a substantial cleaning-rule revision.
+
+\subsection{Telemetry reconstruction for tenant 7486}
+Tenant~\texttt{7486} is present in the archive telemetry before it is present in the original trip table. The deployment therefore includes the reconstruction command \path{scripts/reconstruct_telemetry_trips.py}, which rebuilds trip-like records from ignition-on telemetry, recomputes the trip-side and telemetry-side marts, refreshes the materialized risk profile and attempts cluster scoring for the touched months. This step prevents tenant~\texttt{7486} from disappearing from the modeling and dashboard views after a fresh backfill.
 
 \section{Monitoring and alerting}
 
@@ -141,7 +144,7 @@ The deployment of new code follows a simple workflow: a pull request is reviewed
 DDL changes follow a versioned migration pattern. Every change is shipped as a numbered SQL file under \texttt{sql/} and is applied by the bootstrap mode of the pipeline (or by a manual \texttt{psql} invocation under operator control). The migration scripts are idempotent: a re-execution does not corrupt the schema.
 
 \subsection{Model deployment}
-Model deployment relies on the artefact store described in Chapter~\ref{chap:model}. A new model is published as a versioned \texttt{joblib} artefact in a dedicated directory of the VM. The API picks up the most recent artefact at startup or upon receipt of an explicit reload signal.
+Model deployment relies on the artefact store described in Chapter~\ref{chap:model}. A new clustering candidate is logged with its scaler, feature order and metrics, then promoted only if the evaluation gate accepts it. The API loads the promoted model from the registry when available, or from the local \texttt{models/clustering/} fallback directory, and can reload the artefact without changing the database contract.
 
 \subsection{Diagram of the deployment pipeline}
 The deployment pipeline is summarized in Figure~\ref{fig:deploy-pipeline}.

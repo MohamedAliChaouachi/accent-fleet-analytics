@@ -5,8 +5,9 @@ Default use:
     python scripts/reconstruct_telemetry_trips.py --tenant-id 7486
 
 The SQL backfill inserts rows into warehouse.fact_trip with
-trip_source='telemetry_reconstructed', then recomputes the dependent marts
-for the touched month/days so ML and dashboard views see the tenant.
+trip_source='telemetry_reconstructed', then recomputes the dependent marts,
+refreshes the materialized risk profile, and attempts cluster scoring for
+the touched month/days so ML and dashboard views see the tenant.
 """
 
 from __future__ import annotations
@@ -170,6 +171,12 @@ def _reconstruct_one_month(
                 "20_mart_device_monthly_behavior.sql",
                 params={"touched_months": touched_months, "etl_run_id": run_id},
             )
+            print("recomputing mart_device_monthly_telemetry", flush=True)
+            run_sql_file(
+                conn,
+                "25_mart_device_monthly_telemetry.sql",
+                params={"touched_months": touched_months, "etl_run_id": run_id},
+            )
             print(f"recomputing mart_fleet_daily for {len(touched_dates)} dates", flush=True)
             run_sql_file(
                 conn,
@@ -188,6 +195,28 @@ def _reconstruct_one_month(
                 "32_mart_tenant_monthly_summary.sql",
                 params={"touched_months": touched_months, "etl_run_id": run_id},
             )
+            print("refreshing fact_device_risk_profile", flush=True)
+            conn.execute(text("CALL marts.refresh_fact_device_risk_profile()"))
+
+        try:
+            from accent_fleet.ml.batch_scoring import score_partitions
+
+            score_result = score_partitions(touched_months, run_id)
+            if score_result.skipped_reason:
+                print(
+                    "cluster scoring skipped: "
+                    f"{score_result.skipped_reason}",
+                    flush=True,
+                )
+            else:
+                print(
+                    "cluster scoring wrote "
+                    f"{score_result.rows_scored} assignments "
+                    f"(model {score_result.model_version})",
+                    flush=True,
+                )
+        except Exception as exc:  # noqa: BLE001
+            print(f"cluster scoring skipped after reconstruction: {exc}", flush=True)
 
         rows_loaded = int(summary["reconstructed_trips"] or 0)
         end_run(run_id, status="success", rows_loaded=rows_loaded)
@@ -201,8 +230,9 @@ def _reconstruct_one_month(
             f"in {summary['source_month']}"
         )
         print(
-            "recomputed marts: device_monthly_behavior, fleet_daily, "
-            "vehicle_monthly, tenant_monthly_summary"
+            "recomputed marts: device_monthly_behavior, device_monthly_telemetry, "
+            "fleet_daily, vehicle_monthly, tenant_monthly_summary; "
+            "refreshed device risk profile"
         )
         return rows_loaded
     except Exception as exc:  # noqa: BLE001

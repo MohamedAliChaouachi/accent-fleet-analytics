@@ -1,157 +1,217 @@
 % =====================================================================
-%  Chapter 5 --- Modeling and Evaluation
+%  Chapter 5 --- CRISP-DM Modeling and Evaluation
 % =====================================================================
-\chapter{Modeling, Evaluation and Final Justification}
+\chapter{Modeling and Evaluation of Device Behaviour Signals}
 \label{chap:model}
 
 \section{Introduction}
-The data preparation work of Chapter~\ref{chap:prep} has produced --- starting from MySQL dump files exported from the \texttt{arch\_xxxxx} archive and the \texttt{user\_xxxxx} master data of \hostorg, converted to PostgreSQL and consolidated through an explicit cleaning rule engine --- a curated device-month dataset of 1{,}723 observations enriched with 35 behavioural features. The present chapter executes the modeling and the evaluation phases of CRISP-DM on this dataset. The chapter compares baseline approaches against more sophisticated machine-learning and deep-learning candidates, justifies the final adoption of an unsupervised pair (K-Means + Isolation Forest), reports the experimental metrics, presents the operational interpretation of the resulting clusters and risk scores, and previews the model-driven dashboards that are deployed in Chapter~\ref{chap:deploy}. The unsupervised setting is itself a deliberate consequence of the corrected problem statement of Chapter~\ref{chap:context}: in the absence of a labelled incident feed, the analytical leverage on top of the existing descriptive surface of \hostorg{} comes from segmentation and anomaly detection, not from a supervised classifier.
+Chapter~\ref{chap:prep} produced the modeling-ready layer of the project: a PostgreSQL analytical warehouse, a validated set of marts and the unified view \texttt{marts.v\_ml\_features\_full}. This chapter documents the modeling and evaluation work performed on top of that layer. In CRISP-DM terms, it deliberately combines Phase~4 (\emph{modeling}) and Phase~5 (\emph{evaluation}), because the project did not follow a linear sequence in which all models were trained first and judged later. Each modeling choice was evaluated immediately against technical metrics, business constraints and deployment readiness before the next experiment was attempted.
 
-\section{Test design}
+The chapter is therefore organized around the actual decision process of the project. It first explains why the initial supervised driver-scoring idea was reformulated into unsupervised device-month modeling. It then presents the modeling dataset, the candidate techniques, the experimental protocol, the evaluation gates and the final decision. The main outcome is a two-part analytical layer: behavioural segmentation through K-Means clustering and risk prioritization through an anomaly-oriented score. The chapter also states the limits of the evaluation, especially the narrowness of the labelled maintenance overlap, so that the deployment chapter can expose the models with the appropriate operational caveats.
 
-\subsection{Temporal split}
-Given the unsupervised setting and the natural temporal structure of the data, the dataset is partitioned along time. The fitting window covers 2025-01--2026-01 and the holdout window covers 2026-02--2026-04. The fitting window is used to fit the models; the holdout window is used to assess the temporal stability of the assignments and of the risk scores.
+\section{Reformulation of the Modeling Problem}
 
-\subsection{Per-tenant fitting protocol}
-A single global model would be dominated by the most active tenant. To avoid this bias, a separate model is fitted for each tenant. The features are standardized per tenant before the fitting and the risk score is rescaled per tenant after the inference.
+\subsection{Initial target}
+The original ambition of the project was to build a supervised driver-risk model using historical overspeed and alert indicators as proxy labels. This formulation appeared attractive because it would have produced a direct classification target and a familiar performance vocabulary. However, the data understanding phase showed that the available sources do not support that assumption robustly.
+
+\subsection{Evidence from the data understanding phase}
+Four observations led to the reformulation. First, driver attribution is available for only a very small part of the active fleet: the usable analytical unit is therefore the \emph{device-month}, not the driver. Second, the archive-derived harsh-event, RPM and idling signals are concentrated after 2025-01; older rows do not carry enough information for the intended modelling task. Third, harsh-event activity and overspeed activity do not behave as interchangeable labels: at the global level, they may even pull in different directions. Fourth, the tenants observed in the data do not share the same operating regime. In particular, tenant 264 is overspeed-rich, tenant 1787 is harsh-event-rich, and tenant 7486 is telemetry-first before reconstruction, making a single behavioural scale misleading.
+
+\subsection{Adopted modeling objective}
+The revised objective is to model \emph{behavioural structure} rather than to predict an unavailable label. The problem becomes twofold:
+
+\begin{itemize}
+    \item identify recurrent device-month behavioural profiles that fleet managers can interpret and compare;
+    \item rank device-months by abnormality or unsafe behaviour without pretending that this rank is a validated accident or maintenance probability.
+\end{itemize}
+
+This decision is consistent with CRISP-DM: when business success criteria cannot be mapped to a reliable target variable, the modeling phase must return to the data understanding findings instead of forcing a proxy label. The adopted strategy therefore uses unsupervised learning and evaluates it through internal validity, stability, interpretability and business-facing proxies.
+
+\section{Modeling Dataset and Protocol}
+
+\subsection{Input view}
+All experiments are based on \texttt{marts.v\_ml\_features\_full}, the frozen feature contract produced during data preparation. The view joins the behavioural mart and the telemetry mart at the grain \texttt{(tenant\_id, device\_id, year\_month)}. The full analytical feature registry contains thirty-five features, while the production clustering pipeline uses a compact subset of thirteen high-signal indicators: overspeed rate, speed-over-limit tendency, high-speed-trip ratio, alert rate, harsh-brake rate, harsh-acceleration rate, harsh-cornering rate, idle ratio, high-RPM intensity, night-driving ratio, rush-hour ratio, trip-distance variability and short-trip ratio.
+
+\subsection{Filtering rules}
+The modeling notebooks apply three filters before training:
+
+\begin{itemize}
+    \item \texttt{year\_month >= '2025-01'}, because the archive-derived harsh, RPM and idling features are not sufficiently populated before that date;
+    \item \texttt{total\_distance\_km >= 100}, to remove inactive or almost inactive device-months that would create a trivial cluster;
+    \item \texttt{total\_ignition\_on\_minutes > 0}, to guarantee that telemetry-derived ratios are meaningful.
+\end{itemize}
+
+After filtering, the evaluated tenants are 235, 238, 264, 1787 and 7486, for a total of 2{,}157 device-month observations in the evaluation tables. Tenant 7486 contributes 434 device-months after telemetry-to-trip reconstruction, which prevents the archive-only tenant from being silently dropped from the modeling phase. This corpus is small enough to make interpretability and stability more important than model complexity.
+
+\subsection{Tenant-aware fitting}
+The research notebooks fit one model per tenant. This choice prevents the most active tenant from dominating the geometry of the model and preserves tenant-specific operating regimes. Each tenant slice is standardized independently with \texttt{StandardScaler}; K-Means and Isolation Forest are both executed with \texttt{random\_state=42}. For the API and batch-scoring path, the current v1 industrialized clustering module persists a single K-Means pipeline through MLflow or local \texttt{joblib} files; per-tenant registered models are treated as the next production hardening step. This distinction matters: the research verdict is per-tenant, while the deployed software contract currently exposes a v1 serving implementation.
 
 \subsection{Reproducibility}
-All stochastic operations are seeded with \texttt{random\_state~=~42}. The package versions are pinned in \texttt{requirements.txt}. The model artefacts are exported with the seed, the dataset hash and the package versions, allowing any run to be reproduced byte for byte.
+The modeling and evaluation notebooks are deterministic and can be re-run from the database without depending on intermediate parquet files. The modeling outputs are stored as \path{data/ml/device_clusters.parquet} and \path{data/ml/device_risk_scores.parquet}; the serving layer stores cluster assignments in the \texttt{marts} cluster-assignment fact table. Tenant 7486 is protected by the reconstruction script \path{scripts/reconstruct_telemetry_trips.py}, which now recomputes both the trip-side and telemetry-side marts before refreshing risk and cluster outputs. The SQL risk profile is mirrored by the Python reference implementation in \path{src/accent_fleet/features/risk_score.py}, which allows the same score to be computed inside PostgreSQL and by the API.
 
-\section{Baseline models}
+\section{Candidate Modeling Techniques}
 
-\subsection{Statistical baseline}
-A first baseline is provided by a simple rule: a device-month is flagged as \emph{high risk} if at least two of the four indicators (\texttt{overspeed\_per\_100km}, \texttt{harsh\_brake\_per\_100km}, \texttt{harsh\_accel\_per\_100km}, \texttt{p95\_max\_speed}) exceed their tenant-specific 90\textsuperscript{th} percentile. This baseline is fast to deploy and easy to communicate; it serves as a reference against which the value added by the more sophisticated models is measured.
-
-\subsection{Linear baseline}
-A second baseline relies on a Principal Component Analysis: the first principal component, computed on the standardized features, is used as a continuous score; its sign is interpreted post hoc through the loadings. This baseline captures the dominant axis of variability of the features without committing to any clustering structure.
-
-\section{Machine learning candidates}
+\subsection{Rule and statistical baselines}
+Two baselines were retained to keep the evaluation grounded. The first one is a rule-based risk profile computed from explicit business factors: overspeed rate, severe overspeed share, high-speed-trip ratio, speed-alert rate, night-driving ratio and maximum-speed tendency. These factors are normalized and weighted in \path{config/feature_definitions.yaml}; the SQL implementation is \texttt{marts.v\_device\_risk\_profile}. The second baseline is a Principal Component Analysis (PCA) projection used as a diagnostic view of the main axis of feature variance, not as a final operational model.
 
 \subsection{K-Means clustering}
-The K-Means algorithm partitions the observations by minimizing the within-cluster sum of squares. The number of clusters $k$ is chosen per tenant by sweeping $k \in \{3,4,5,6\}$ and selecting the value that maximizes the silhouette coefficient. The fitting uses \texttt{n\_init~=~10} initializations.
+K-Means was selected as the principal segmentation candidate because it is simple, fast, reproducible and easy to explain to non-technical stakeholders \cite{macqueen1967kmeans}. For each tenant, the number of clusters is selected by sweeping $k \in \{3,4,5,6\}$ and retaining the value that maximizes the silhouette coefficient. PCA with two components is used only for visualization; it is not the training space of the model.
 
-\subsection{Hierarchical clustering}
-A hierarchical agglomerative variant has been examined for cross-validation purposes. The Ward linkage is used. The dendrogram is cut at the height that produces the same number of clusters as the K-Means optimum; the resulting partition is compared with the K-Means partition through the adjusted Rand index, which has been observed to remain above 0.8 for every tenant. This corroborates the stability of the K-Means partitions.
+\subsection{Alternative clustering methods}
+Hierarchical clustering with Ward linkage was used as a comparison point. It produced interpretable partitions, but its operational cost and weaker serving simplicity made it less attractive for the production path. DBSCAN was also tested, but on this dataset it tended to produce one dominant cluster and a tail of very small groups, which is difficult to use in a fleet-management dashboard.
 
-\subsection{DBSCAN}
-The DBSCAN algorithm has also been assessed. On the device-month dataset, it produces highly imbalanced partitions (one dominant cluster and a long tail of singletons), which limits its operational usefulness in this context.
+\subsection{Anomaly scoring}
+Isolation Forest was evaluated as the unsupervised anomaly-scoring candidate \cite{liu2008isolation}. The model scores how unusual a device-month is relative to its tenant cohort. The raw decision score is rescaled within each tenant to the interval $[0,1]$ and then split into \emph{low}, \emph{medium} and \emph{high} bands for evaluation. This score is best interpreted as an abnormal-behaviour indicator, not as a probability of failure.
 
-\subsection{Isolation Forest for anomaly detection}
-The Isolation Forest algorithm constructs an ensemble of randomly built trees and produces an anomaly score from the average path length of each observation across the ensemble. The model is configured with \texttt{n\_estimators~=~200}, \texttt{contamination~=~"auto"}, \texttt{random\_state~=~42} and \texttt{n\_jobs~=~-1}. The raw \texttt{decision\_function} score is rescaled per tenant to the unit interval and discretized into three bands (\emph{low}, \emph{medium}, \emph{high}).
+\subsection{Deferred candidates}
+One-Class SVM and Local Outlier Factor were examined but not retained. One-Class SVM is sensitive to kernel and bandwidth choices; Local Outlier Factor is sensitive to neighbourhood size and becomes unstable on smaller tenant slices. Deep-learning baselines, including an autoencoder and a proxy-label Multi-Layer Perceptron, were also deferred. The available corpus is too small and too weakly labelled to justify their complexity.
 
-\subsection{One-Class SVM and Local Outlier Factor}
-A One-Class SVM and a Local Outlier Factor model have also been examined. The One-Class SVM is sensitive to the kernel bandwidth and exhibits a poor scaling behaviour; the Local Outlier Factor is sensitive to the number of neighbours and produces unstable scores on the smaller tenants. Neither has been retained.
+\section{Evaluation Design}
 
-\section{Deep learning baseline}
+\subsection{CRISP-DM evaluation gates}
+The evaluation phase checks whether the models are useful for the business problem, not only whether they produce acceptable technical metrics. The gates are:
 
-\subsection{Autoencoder}
-A deep-learning baseline has been implemented as an autoencoder. The network is composed of an encoder ($35 \rightarrow 16 \rightarrow 8$) and a symmetric decoder, trained with the mean squared error and the Adam optimizer. The reconstruction error of every device-month is interpreted as an anomaly score.
+\begin{itemize}
+    \item \emph{cluster validity}: silhouette at least 0.15 per tenant, supported by Davies--Bouldin and Calinski--Harabasz metrics \cite{rousseeuw1987silhouettes,davies1979cluster,calinski1974dendrite};
+    \item \emph{cluster usefulness}: at least three profiles and no unexplained persona labels;
+    \item \emph{risk consistency}: high-risk rows must show higher unsafe-feature means than low-risk rows;
+    \item \emph{temporal stability}: cluster churn and risk-band churn must remain below their operational gates;
+    \item \emph{coverage and fairness}: no tenant should collapse into a single risk band.
+\end{itemize}
 
-\subsection{Multi-Layer Perceptron}
-A supervised Multi-Layer Perceptron has also been prepared, with the proxy label produced by the statistical baseline as the target. The exercise is interesting from a methodological standpoint but inherits the limitations of the proxy label and is therefore not retained as the final model.
+\subsection{External validation limitation}
+The preferred validation would compare risk scores with accident, claim or maintenance outcomes. This validation remains limited on the current modeled population. The \texttt{staging.sinistre} table is empty, the \texttt{staging.offense} table contains too few rows to support inference, and the available maintenance events overlap the modeling frame essentially through tenant 7486 only. Tenant 7486 is now present in \texttt{marts.v\_ml\_features\_full}, but a single-tenant maintenance overlap cannot validate the score for all fleets. The maintenance-based validation is therefore treated as tenant-limited directional evidence, not as a full outcome calibration.
 
-\subsection{Comparison with classical ML}
-The deep-learning baselines are compared with the classical ML candidates in Section~\ref{sec:model-compare}. They have not been retained as the final model because they require a training corpus that is two orders of magnitude larger than the present dataset to outperform the classical approaches.
+\subsection{Fallback validation}
+Because external labels are unavailable, the evaluation relies on internal consistency and stability. Internal consistency asks whether the high-risk band is actually higher than the low-risk band on unsafe behavioural features. Stability asks whether a device remains in a comparable cluster or band from one month to the next unless its behaviour changes. These tests do not replace outcome validation, but they are legitimate CRISP-DM Phase~5 evidence for deciding whether the artefact can be deployed as a decision-support indicator with caveats.
 
-\section{Evaluation metrics}
+\section{Experimental Results}
 
-\subsection{Internal clustering metrics}
-The clustering quality is assessed by three internal metrics: the silhouette coefficient~\cite{rousseeuw1987silhouettes}, the Davies--Bouldin index~\cite{davies1979cluster} and the Calinski--Harabasz index~\cite{calinski1974dendrite}. Higher silhouette and Calinski--Harabasz, lower Davies--Bouldin indicate a better clustering.
-
-\subsection{Anomaly metrics}
-For the anomaly detection layer, the distribution of the rescaled risk score has been plotted per tenant, the proportion of device-months falling into each band has been measured both on the fitting window and on the holdout window, and the rank correlation of the score between two consecutive months has been monitored as a stability proxy.
-
-\subsection{Business proxies}
-In the absence of a labelled incident feed, three business-oriented proxies are used: the cluster persistence between two consecutive months, the score persistence (Spearman rank correlation), and the alignment of the high-risk band with independently flagged operational events (overspeed alerts above threshold, severe maintenance interventions).
-
-\section{Model comparison and final justification}
-\label{sec:model-compare}
-
-\subsection{Comparative table}
-Table~\ref{tab:model-compare} summarizes the experimental performance of the candidate models on the dataset.
+\subsection{Cluster quality}
+Table~\ref{tab:kmeans-eval} reports the deterministic K-Means evaluation. All tenants meet the silhouette gate of 0.15 and the minimum $k$ gate of three clusters.
 
 \begin{table}[h]
 \centering
-\caption{Comparative performance of the candidate models.}
-\label{tab:model-compare}
-\begin{tabular}{|l|c|c|c|c|}
+\caption{Per-tenant K-Means quality metrics.}
+\label{tab:kmeans-eval}
+\small
+\begin{tabular}{|c|r|c|c|c|c|}
 \hline
-\textbf{Model} & \textbf{Silhouette} & \textbf{Stability} & \textbf{Interpretability} & \textbf{Cost} \\
+\textbf{Tenant} & \textbf{n} & \textbf{k} & \textbf{Sil.} & \textbf{DB} & \textbf{CH} \\
 \hline
-Rule baseline      & N/A   & High    & High   & Very low \\
-PCA component      & N/A   & High    & Medium & Low \\
-K-Means (per tenant) & 0.17--0.36 & High & High & Low \\
-Hierarchical (Ward) & 0.18--0.34 & Medium & High & Medium \\
-DBSCAN             & N/A   & Low    & Low    & Low \\
-Isolation Forest   & N/A   & High   & Medium & Low \\
-One-Class SVM      & N/A   & Medium & Low    & High \\
-LOF                & N/A   & Medium & Low    & High \\
-Autoencoder        & N/A   & Medium & Low    & High \\
-MLP (proxy)        & N/A   & Medium & Medium & Medium \\
+235  & 613 & 6 & 0.225 & 1.271 & 110.5 \\
+238  & 339 & 6 & 0.236 & 1.165 & 72.2 \\
+264  & 354 & 6 & 0.174 & 1.627 & 52.9 \\
+1787 & 417 & 5 & 0.269 & 1.313 & 82.5 \\
+7486 & 434 & 5 & 0.253 & 1.374 & 61.9 \\
 \hline
 \end{tabular}
 \end{table}
 
-\subsection{Per-tenant K-Means results}
-Table~\ref{tab:kmeans-final} reports the K-Means results obtained per tenant.
+The result is now interpreted on five tenants. All tenants pass the silhouette and minimum-cluster gates, and none has a cluster above the 70\% dominance threshold. The tenant 7486 solution contains one large normal cluster covering 65.4\% of rows and several very small exceptional clusters, which is acceptable for analysis but should be labelled carefully in the dashboard.
+
+\subsection{Risk-score internal consistency}
+Table~\ref{tab:risk-consistency} summarizes the internal-consistency fallback. For each tenant, seven unsafe-direction features were compared between the high and low risk bands. Every tenant clears the gate: at least five features have a high-band mean greater than the low-band mean, and at least two features have a ratio of two or more.
 
 \begin{table}[h]
 \centering
-\caption{Per-tenant K-Means results on the modeling window.}
-\label{tab:kmeans-final}
+\caption{Internal consistency of the anomaly risk score.}
+\label{tab:risk-consistency}
+\small
+\begin{tabular}{|c|c|c|c|}
+\hline
+\textbf{Tenant} & \textbf{Ratio $>$ 1} & \textbf{Ratio $\geq$ 2} & \textbf{Mean ratio} (approx.) \\
+\hline
+235  & 6/7 & 5 & 20.25 \\
+238  & 5/7 & 3 & 21.98 \\
+264  & 5/7 & 4 & 20.24 \\
+1787 & 6/7 & 6 & 11.90 \\
+7486 & 7/7 & 6 & 6.84 \\
+\hline
+\end{tabular}
+\end{table}
+
+For example, in tenant 7486 the high band has approximately 4.5 times more overspeed events, 5.4 times more harsh braking, 5.5 times more harsh acceleration, 10.5 times more harsh cornering and 18.5 times more high-RPM minutes than the low band. This supports the interpretation of the score as a ranking of abnormal and unsafe behaviour, while still falling short of proving a causal relationship with future maintenance events.
+
+\subsection{Temporal stability}
+Table~\ref{tab:stability-eval} reports the month-to-month stability results available from the committed stability notebook. That run predates the tenant 7486 reconstruction and is therefore retained as historical evidence for the original four tenants, not as the final five-tenant release gate. The code path now protects tenant 7486 from being dropped, and the next stability rerun must include it before production promotion. On the executed four-tenant run, cluster churn remains between 5.5\% and 14.0\%; risk-band churn remains between 10.7\% and 15.3\%, both well below the notebook gates.
+
+\begin{table}[h]
+\centering
+\caption{Month-to-month stability by tenant.}
+\label{tab:stability-eval}
 \begin{tabular}{|c|r|c|c|}
 \hline
-\textbf{Tenant} & \textbf{n} & \textbf{Optimal $k$} & \textbf{Silhouette} \\
+\textbf{Tenant} & \textbf{Month pairs} & \textbf{Cluster churn} & \textbf{Band churn} \\
 \hline
-235 & 613 & 3 & 0.355 \\
-238 & 339 & 6 & 0.237 \\
-264 & 354 & 6 & 0.174 \\
-1787 & 417 & 6 & 0.278 \\
+235  & 507 & 0.055 & 0.116 \\
+238  & 279 & 0.140 & 0.108 \\
+264  & 295 & 0.075 & 0.153 \\
+1787 & 326 & 0.129 & 0.107 \\
+7486 & \multicolumn{3}{c|}{Pending five-tenant stability rerun after reconstruction} \\
 \hline
 \end{tabular}
 \end{table}
 
-\subsection{Justification of the final choice}
-The final choice of the pair K-Means + Isolation Forest is justified by five considerations: (i)~the operational interpretability of the segmentation, which exposes labels recognized by the fleet managers; (ii)~the stability of the assignments and of the score across the holdout window; (iii)~the absence of a labelled incident feed, which forbids the deployment of a fully supervised model; (iv)~the modesty of the operational cost of the inference, which fits inside the five-minute incremental cycle on the shared Azure VM; and (v)~the consistency of the chosen models with the analytical leverage point established in Chapter~\ref{chap:context} --- moving the analytical centre of gravity from the descriptive reports of the legacy MySQL stack towards forward-looking, decision-grade signals.
+The historical risk-band transition matrix, shown in Table~\ref{tab:band-transition}, is also diagonal-heavy. A device-month in the low band remains low in the following month with probability 0.935, while a high-band row remains high with probability 0.600. This confirms that the score is not random from one month to the next on the four-tenant stability run; tenant 7486 must be included in the next execution of the same gate.
 
-\section{Results interpretation}
-
-\subsection{Behavioural profiles}
-The K-Means clusters expose a small number of recurrent behavioural profiles: \emph{prudent / low-mileage}, \emph{regular}, \emph{aggressive-speed} (high overspeed-per-100~km), \emph{aggressive-harsh} (high harsh-brake/accel-per-100~km) and, on some tenants, \emph{long-haul} (high distances, low harsh ratios, high night-trip ratio).
-
-\subsection{Risk score distribution}
-The distribution of the rescaled risk score is plotted in Figure~\ref{fig:risk-dist}. The distribution exhibits a dominant mode in the lower part of the score range, a thinner mode around the medium band and a long tail in the high band, consistent with the operational hypothesis that critical risk situations are by construction rare.
-
-\begin{figure}[h]
+\begin{table}[h]
 \centering
-\includegraphics[width=0.85\textwidth]{figures/risk_score_distribution.pdf}
-\caption{Distribution of the rescaled risk score per tenant.}
-\label{fig:risk-dist}
-\end{figure}
+\caption{Risk-band transition matrix between consecutive months.}
+\label{tab:band-transition}
+\small
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{$T$ / $T+1$} & \textbf{Low} & \textbf{Medium} & \textbf{High} \\
+\hline
+Low    & 0.935 & 0.063 & 0.002 \\
+Medium & 0.292 & 0.639 & 0.069 \\
+High   & 0.050 & 0.350 & 0.600 \\
+\hline
+\end{tabular}
+\end{table}
 
-\subsection{Confusion matrix against the rule baseline}
-A confusion matrix between the high-risk band of the Isolation Forest and the high-risk flag of the rule baseline (Figure~\ref{fig:confusion}) shows a substantial overlap on the extremes (clear high and clear low) and a richer behaviour in the intermediate band, where the Isolation Forest discriminates more finely than the rule.
+\section{Model Decision and Final Justification}
 
-\begin{figure}[h]
+\subsection{Decision table}
+Table~\ref{tab:model-decision} summarizes the final decision for each artifact.
+
+\begin{table}[h]
 \centering
-\includegraphics[width=0.7\textwidth]{figures/confusion_matrix.pdf}
-\caption{Confusion matrix between the rule baseline and the Isolation Forest.}
-\label{fig:confusion}
-\end{figure}
+\caption{Final modeling and evaluation decision.}
+\label{tab:model-decision}
+\small
+\begin{tabularx}{\textwidth}{|p{3.1cm}|X|X|}
+\hline
+\textbf{Artifact} & \textbf{Decision} & \textbf{Justification} \\
+\hline
+K-Means clusters & Ship for the five modeled tenants, with careful labels for tiny exceptional clusters. & Tenants 235, 238, 264, 1787 and 7486 pass the silhouette, minimum-$k$ and dominance gates. \\
+\hline
+Isolation-Forest risk band & Ship provisionally as an anomaly indicator. & Internal consistency passes for all five tenants; outcome backtesting is still tenant-limited and not a full calibration. \\
+\hline
+Composite SQL/Python risk profile & Keep as the deployed scoring contract for API and dashboard risk lookup. & The score is transparent, auditable and identical in SQL and Python, which supports operational explainability. \\
+\hline
+Deep-learning candidates & Defer. & The corpus is too small and lacks labels, making deep models harder to justify and harder to explain. \\
+\hline
+\end{tabularx}
+\end{table}
 
-\subsection{Feature importance}
-Although both K-Means and Isolation Forest are not directly equipped with a notion of feature importance, two surrogate measures have been computed: the per-feature variance of the cluster centroids (importance for K-Means) and the per-feature mean depth in the isolation trees (importance for Isolation Forest). The two measures converge on a small set of features: \texttt{overspeed\_per\_100km}, \texttt{harsh\_brake\_per\_100km}, \texttt{harsh\_accel\_per\_100km}, \texttt{p95\_max\_speed}, \texttt{monthly\_idle\_ratio} and \texttt{high\_speed\_trip\_ratio}.
+\subsection{Why the final solution is mixed}
+The final solution is not a single black-box model. It is a controlled combination of research-grade unsupervised modelling and production-grade scoring contracts. K-Means provides behavioural segmentation. Isolation Forest provides an anomaly-oriented research score that is useful for ranking and validation. The SQL/Python composite risk profile provides the explainable score used by the serving layer. This mixed design reflects the maturity of the available data: enough structure exists to segment and prioritize devices, but not enough labelled evidence exists to claim supervised prediction of incidents.
 
-\begin{figure}[h]
-\centering
-\includegraphics[width=0.85\textwidth]{figures/feature_importance.pdf}
-\caption{Surrogate feature importance for the unsupervised models.}
-\label{fig:feature-imp}
-\end{figure}
+\subsection{Operational caveat}
+The following caveat must accompany the risk score in the dashboard and in any business presentation:
 
-\section{Dashboards and analytical artefacts}
-The model outputs feed three families of dashboards delivered in Chapter~\ref{chap:deploy}: the executive dashboard (\texttt{v\_executive\_dashboard}, tenant-month KPIs and rolling deltas), the operational dashboard (\texttt{v\_operational\_dashboard}, daily KPIs and seven-day rolling) and the maintenance dashboard (\texttt{v\_maintenance\_dashboard}, vehicle-month maintenance leaderboard with cost rank). The model-specific risk view (\texttt{v\_device\_risk\_profile}) is the principal entry point for the fleet manager.
+\begin{quote}
+Risk scores were validated against feature-space anomalies. Outcome backtesting is currently tenant-limited and is pending integration of a broader incident or claims feed.
+\end{quote}
+
+This formulation protects the project from overclaiming. It also provides a concrete next action for the host organization: integrate a labelled incident, claim or maintenance feed that overlaps with all modeled tenants, not only tenant 7486.
+
+\section{Model Outputs for Deployment}
+The deployment phase receives three model-related contracts. First, the clustering parquet export contains exploratory cluster labels at the \texttt{(tenant, device, month)} grain. Second, the risk-score parquet export contains the anomaly score used by the evaluation notebooks. Third, the industrialized pipeline writes cluster assignments into the marts cluster-assignment fact table and exposes the transparent risk profile through a materialized risk-profile table. These contracts allow the dashboard to display behavioural groups, risk categories and lineage information without recomputing models at page-load time.
+
+Model monitoring is defined as part of the deployment hand-off. Every monthly extension of the modeling window must re-run the evaluation notebooks, refresh the cluster and risk-score artifacts, and verify that no gate has regressed. The drift module computes Population Stability Index on the feature distributions, while the promotion module prevents a clustering candidate from replacing the current model when the silhouette drop exceeds the configured tolerance.
 
 \section{Conclusion}
-This chapter has compared a range of baseline, classical machine learning and deep learning candidates, and has motivated the adoption of an unsupervised pair (K-Means + Isolation Forest) fitted per tenant. The internal metrics, the stability proxies and the operational interpretation of the outputs converge towards a positive assessment of the chosen models. The next chapter industrializes these models and exposes them to the consumer applications.
+This chapter has regenerated the modeling phase as a combined CRISP-DM modeling and evaluation chapter. The initial supervised driver-scoring objective was rejected because the data does not provide reliable driver labels or outcome labels for the modeled tenants. The final analytical strategy therefore uses device-month unsupervised modeling, tenant-aware evaluation and transparent risk scoring across tenants 235, 238, 264, 1787 and 7486. K-Means is retained for behavioural segmentation, Isolation Forest is retained as a provisional anomaly indicator, and the deployed SQL/Python score is kept as the explainable operational contract. The next chapter presents how these artefacts are exposed through the Azure-hosted pipeline, the API, the dashboard and the monitoring layer.

@@ -242,7 +242,7 @@ The 38 columns of \texttt{staging.archive} fall into six functional families:
 \end{itemize}
 
 \paragraph{Per-tenant ping coverage.}
-The sample-extrapolation breakdown by tenant is reported in Table~\ref{tab:archive-tenants}. Five tenants emit pings in the archive --- one more than in \texttt{staging.path} (which lists four tenants only). Tenant~\texttt{7486} appears in the archive but is absent from the trip-derived scope: this asymmetry must be carried over to Chapter~\ref{chap:prep}, where the feature-engineering pipeline has to decide whether to widen the modelling perimeter to five tenants on archive-derived features.
+The sample-extrapolation breakdown by tenant is reported in Table~\ref{tab:archive-tenants}. Five tenants emit pings in the archive --- one more than in \texttt{staging.path} (which lists four tenants only). Tenant~\texttt{7486} appears in the archive but is absent from the original trip-derived scope: this asymmetry is carried over to Chapter~\ref{chap:prep}, where the telemetry-to-trip reconstruction path widens the modelling perimeter to five tenants.
 
 \begin{table}[h]
 \centering

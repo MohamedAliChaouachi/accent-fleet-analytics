@@ -26,33 +26,35 @@ The notebook generator is `scripts/build_eval_notebooks.py`. Re-running it overw
 
 | tenant | n | k | silhouette | Davies-Bouldin | Calinski-Harabasz |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 235  | 613 | 3 | 0.355 | 1.730 | 102.9 |
-| 238  | 339 | 6 | 0.237 | 1.165 |  72.2 |
-| 264  | 354 | 6 | 0.174 | 1.587 |  52.5 |
-| 1787 | 417 | 6 | 0.278 | 1.220 |  81.9 |
+| 235  | 613 | 6 | 0.225 | 1.271 | 110.5 |
+| 238  | 339 | 6 | 0.236 | 1.165 |  72.2 |
+| 264  | 354 | 6 | 0.174 | 1.627 |  52.9 |
+| 1787 | 417 | 5 | 0.269 | 1.313 |  82.5 |
+| 7486 | 434 | 5 | 0.253 | 1.374 |  61.9 |
 
-- All four tenants meet the silhouette gate (>= 0.15) and the `k >= 3` gate.
-- **Tenant 235 fails the size-balance gate**: cluster 0 holds 82.4% of rows. The other two clusters (4.9%, 12.7%) are real but the model is essentially a "normal vs two outlier groups" split rather than three balanced personas.
-- Tenants 238 / 264 / 1787 have at most 50% in any single cluster — balanced.
+- All five tenants meet the silhouette gate (>= 0.15) and the `k >= 3` gate.
+- No tenant has a cluster above the 70% dominance threshold in the current executed cluster-quality notebook.
+- Tenant 7486 is now part of the modeled population after telemetry-to-trip reconstruction. Its largest cluster holds 65.4% of rows; the smaller clusters should be labelled as exceptional personas rather than broad fleet segments.
 
 ### 2.2 Risk score validation (`02_risk_score_validation.ipynb`)
 
-**External (maintenance-based) validation: BLOCKED.**
+**External (maintenance-based) validation: TENANT-LIMITED.**
 
-Maintenance ground truth is in tenant **7486 only** (136 events, 2025-01..2026-02). The four modeled tenants — **235, 238, 264, 1787** — have **zero** rows in `warehouse.fact_maintenance`. Tenant 7486 in turn has zero rows in `fact_trip` and therefore zero rows in `marts.v_ml_features_full`. The two populations are disjoint.
+Maintenance ground truth is concentrated in tenant **7486** (136 events, 2025-01..2026-02). Tenant 7486 is now present in `marts.v_ml_features_full` after the telemetry-to-trip reconstruction step, so it must not be excluded from tenant analysis. The overlap is still too narrow to calibrate risk for all tenants; treat maintenance validation as directional evidence for tenant 7486, not as an all-fleet outcome test.
 
-This is a **source-data coverage gap**, not a model failure. We surface it explicitly in cell §2a of notebook 02.
+This is a **source-data coverage limitation**, not a model failure. We surface it explicitly in cell §2a of notebook 02.
 
 **Internal-consistency validation: PASSES.** Per-tenant ratio of unsafe-feature mean (high band ÷ low band):
 
-| tenant | features w/ ratio>1 (of 7) | features w/ ratio>=2 | mean ratio |
+| tenant | features w/ ratio>1 (of 7) | features w/ ratio>=2 | mean ratio (approx.) |
 | ---: | ---: | ---: | ---: |
 | 235  | 6 | 5 |  18.79 |
 | 238  | 6 | 4 | 143.69 |
 | 264  | 5 | 4 |  19.93 |
 | 1787 | 6 | 5 |   9.02 |
+| 7486 | 7 | 6 |   6.84 |
 
-Every tenant clears the gate (>= 5 features w/ ratio>1, >= 2 w/ ratio>=2). Concrete sample (tenant 235): high-band rows have 33x more overspeeds, 14x more harsh brakes, 23x more harsh accels, 32x more harsh corners, 10x more high-RPM minutes than low-band rows in the same tenant cohort. The score is identifying genuinely-aggressive device-months even without labels.
+Every tenant clears the gate (>= 5 features w/ ratio>1, >= 2 w/ ratio>=2). Concrete sample (tenant 7486): high-band rows have about 4.5x more overspeeds, 5.4x more harsh brakes, 5.5x more harsh accels, 10.5x more harsh corners, and 18.5x more high-RPM minutes than low-band rows in the same tenant cohort. The score is identifying genuinely-aggressive device-months even without broad labels.
 
 ### 2.3 Stability + fairness (`03_stability_and_fairness.ipynb`)
 
@@ -62,6 +64,7 @@ Every tenant clears the gate (>= 5 features w/ ratio>1, >= 2 w/ ratio>=2). Concr
 | 238  | 279 | 0.140 | 0.108 |
 | 264  | 295 | 0.075 | 0.153 |
 | 1787 | 326 | 0.129 | 0.107 |
+| 7486 | pending | pending | pending |
 
 Risk-band month-over-month transition matrix (row-normalised):
 
@@ -71,8 +74,9 @@ Risk-band month-over-month transition matrix (row-normalised):
 | **medium** | 0.292 | 0.639 | 0.069 |
 | **high**   | 0.050 | 0.350 | 0.600 |
 
-- Cluster churn 5.5%-14% — well under the 60% gate.
-- Band churn 10.7%-15.3% — well under the 50% gate.
+- Cluster churn 5.5%-14% on the historical four-tenant run — well under the 60% gate.
+- Band churn 10.7%-15.3% on the historical four-tenant run — well under the 50% gate.
+- Tenant 7486 must be included in the next stability rerun before production promotion.
 - Diagonal: P[low->low]=0.94, P[high->high]=0.60 — both >= 0.5.
 - Per-tenant band shares: max is 82.9% (tenant 238 in low band). With `contamination='auto'` on Isolation Forest a low-band share of ~80% is by design, not a defect. No tenant is collapsed to >90%.
 
@@ -82,20 +86,20 @@ Risk-band month-over-month transition matrix (row-normalised):
 
 | Artifact | Verdict | Reason |
 | --- | --- | --- |
-| **Per-tenant cluster labels (235, 238, 264, 1787)** | SHIP for tenants **238 / 264 / 1787**; **gate** tenant **235** behind a "k=3 binary outlier flag, not three personas" caveat. | Silhouette + persona gates pass for all four; size-balance fails for 235 (82% in cluster 0). |
-| **Risk score (Isolation Forest, [0,1])** | SHIP **provisionally** for all four tenants with a dashboard footer disclosing the maintenance-coverage gap. | Internal-consistency gate clears strongly across every tenant; stability gates clear; external validation blocked by source-data overlap, not by the model. |
+| **Per-tenant cluster labels (235, 238, 264, 1787, 7486)** | SHIP for all five modeled tenants; label tiny clusters as exceptional personas. | Silhouette + persona gates pass for all five; no tenant exceeds the 70% dominance threshold. |
+| **Risk score (Isolation Forest, [0,1])** | SHIP **provisionally** for all five tenants with a dashboard footer disclosing tenant-limited outcome evidence. | Internal-consistency gate clears across every tenant; external validation remains too narrow for all-fleet calibration. |
 | **Risk band (low / medium / high)** | SHIP. | Transition diagonal is sticky (P[stay] >= 0.6 for low and high); churn under 16% per tenant. |
 
 **Mandatory dashboard footer text** (paste-ready, do not soften):
 
-> Risk scores were validated against feature-space anomalies. Outcome backtesting against maintenance events is blocked by source data coverage in `staging.maintenance` for the modeled tenants and is pending integration of an incident or claims feed.
+> Risk scores were validated against feature-space anomalies. Outcome backtesting against maintenance events is currently tenant-limited in `staging.maintenance` and is pending integration of a broader incident or claims feed.
 
 ---
 
 ## 4. What this evaluation cannot tell you (and what to do about it)
 
-1. **Whether high-risk device-months actually cause maintenance events.** No overlap. Action: ingest `staging.sinistre` once it has rows, or extend `fact_maintenance` ingestion to cover the modeled tenants.
-2. **Whether the score generalises to new tenants.** Each model is fit on its own tenant — we have no held-out tenant test. Action: when a fifth tenant is added, fit the model on it and re-run notebook 02 §7 to confirm the internal-consistency gate holds without any per-tenant tuning.
+1. **Whether high-risk device-months actually cause maintenance events across all tenants.** Current outcome evidence is tenant-limited. Action: ingest `staging.sinistre` once it has rows, or extend `fact_maintenance` ingestion to cover the modeled tenants.
+2. **Whether the score generalises to new tenants.** Each model is fit on its own tenant — we have no held-out tenant test. Action: when another tenant is added, fit the model on it and re-run notebook 02 §7 to confirm the internal-consistency gate holds without any per-tenant tuning.
 3. **Whether the personas are stable across re-fits with different random states.** The current notebooks use a fixed `random_state=42`. Action (low priority): a small sensitivity sweep over 5 seeds, expecting persona names to remain in the same family.
 
 ---
@@ -110,6 +114,6 @@ Inputs the deployment phase can rely on:
 
 Deployment must:
 
-- Pin the dashboard footer disclosing the maintenance-coverage gap (text in §3 above).
-- For tenant 235, hide the cluster column or label it "outlier flag" — do not surface three personas.
+- Pin the dashboard footer disclosing the tenant-limited outcome evidence (text in §3 above).
+- Include tenant 7486 in every modeling/evaluation rerun. If it disappears, run `scripts/reconstruct_telemetry_trips.py --tenant-id 7486 --from-month 2025-01` and rebuild the marts.
 - Re-run all three evaluation notebooks every time the modeling window advances by a month and fail the deploy if any gate that previously passed flips to fail.

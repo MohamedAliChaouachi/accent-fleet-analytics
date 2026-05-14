@@ -20,11 +20,14 @@
 \contentsline {table}{\numberline {4.2}{\ignorespaces Fact tables produced by the warehouse layer.}}{45}{table.caption.30}%
 \contentsline {table}{\numberline {4.3}{\ignorespaces Sample of the 35-feature registry (selected groups).}}{47}{table.caption.31}%
 \addvspace {10\p@ }
-\contentsline {table}{\numberline {5.1}{\ignorespaces Comparative performance of the candidate models.}}{53}{table.caption.32}%
-\contentsline {table}{\numberline {5.2}{\ignorespaces Per-tenant K-Means results on the modeling window.}}{53}{table.caption.33}%
+\contentsline {table}{\numberline {5.1}{\ignorespaces Per-tenant K-Means quality metrics.}}{54}{table.caption.32}%
+\contentsline {table}{\numberline {5.2}{\ignorespaces Internal consistency of the anomaly risk score.}}{55}{table.caption.33}%
+\contentsline {table}{\numberline {5.3}{\ignorespaces Month-to-month stability by tenant.}}{55}{table.caption.34}%
+\contentsline {table}{\numberline {5.4}{\ignorespaces Risk-band transition matrix between consecutive months.}}{55}{table.caption.35}%
+\contentsline {table}{\numberline {5.5}{\ignorespaces Final modeling and evaluation decision.}}{56}{table.caption.36}%
 \addvspace {10\p@ }
-\contentsline {table}{\numberline {6.1}{\ignorespaces API endpoints exposed by the platform.}}{60}{table.caption.37}%
+\contentsline {table}{\numberline {6.1}{\ignorespaces API endpoints exposed by the platform.}}{61}{table.caption.37}%
 \addvspace {10\p@ }
 \addvspace {10\p@ }
-\contentsline {table}{\numberline {B.1}{\ignorespaces Figure-generation scripts referenced in the thesis.}}{71}{table.caption.42}%
+\contentsline {table}{\numberline {B.1}{\ignorespaces Figure-generation scripts referenced in the thesis.}}{72}{table.caption.42}%
 \addvspace {10\p@ }

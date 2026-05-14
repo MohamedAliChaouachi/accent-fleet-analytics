@@ -258,7 +258,9 @@ nb02 = nb([
 
 - `staging.sinistre` is empty (0 rows). No accident ground truth.
 - `staging.offense` has 4 rows globally. Statistically useless.
-- `warehouse.fact_maintenance` has ~150 events linkable to a device in the modeling window. This is **directional evidence**, not a tight statistical claim.
+- `warehouse.fact_maintenance` overlaps the modeling frame only when tenant `7486`
+  has been reconstructed into the trip-side mart. This is **tenant-limited
+  directional evidence**, not a tight all-tenant statistical claim.
 
 That is why we report **lift** and **per-band rates**, not p-values. We also avoid claiming precision @ k for k smaller than 30."""),
     md("## 1. Bootstrap (re-pull features, re-fit Isolation Forest)"),
@@ -473,7 +475,7 @@ We treat any of the following as *passing evidence* for the risk score:
     md("""**Go / No-go.**
 
 - If any of the **external** rows pass → ship as a directional risk indicator without caveats.
-- If only the **internal-consistency** + **cluster-agreement** rows pass (and external are NaN due to no overlap) → ship as a **provisional** indicator with an explicit dashboard footer:  *"validated against feature-space anomalies, not against incident outcomes — outcome backtesting blocked by source data coverage in `staging.maintenance` for the modeled tenants."*
+- If only the **internal-consistency** + **cluster-agreement** rows pass (and external evidence is absent or too tenant-limited) → ship as a **provisional** indicator with an explicit dashboard footer:  *"validated against feature-space anomalies, not against incident outcomes — outcome backtesting remains tenant-limited in `staging.maintenance` and is pending a broader incident or claims feed."*
 - If neither external nor internal gates pass → do not put `risk_score` in front of a customer; surface only cluster personas.
 
 **Next action.** Run `03_stability_and_fairness.ipynb` to confirm the score is stable month-over-month and balanced across tenants before any production deployment."""),

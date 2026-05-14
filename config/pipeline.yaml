@@ -166,6 +166,18 @@ marts:
     depends_on_marts: [vehicle_monthly, fleet_daily]
 
 # ---------------------------------------------------------------------------
+# Modeling cohort controls
+# ---------------------------------------------------------------------------
+# Tenant 7486 is telemetry-first in the source system. It appears in
+# staging.archive and enters the ML feature view only after the
+# telemetry-to-trip reconstruction path has rebuilt the trip-side mart. Keep it
+# explicit here so retraining fails loudly instead of silently dropping it from
+# tenant analysis.
+modeling:
+  expected_tenants: [235, 238, 264, 1787, 7486]
+  required_tenants: [7486]
+
+# ---------------------------------------------------------------------------
 # Monitoring thresholds
 # ---------------------------------------------------------------------------
 monitoring:

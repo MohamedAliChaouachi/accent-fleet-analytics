@@ -16,12 +16,9 @@
 \contentsline {figure}{\numberline {3.9}{\ignorespaces Per-tenant behavioural signatures derived from staging tables (since 2025-01-01).}}{36}{figure.caption.27}%
 \addvspace {10\p@ }
 \addvspace {10\p@ }
-\contentsline {figure}{\numberline {5.1}{\ignorespaces Distribution of the rescaled risk score per tenant.}}{54}{figure.caption.34}%
-\contentsline {figure}{\numberline {5.2}{\ignorespaces Confusion matrix between the rule baseline and the Isolation Forest.}}{55}{figure.caption.35}%
-\contentsline {figure}{\numberline {5.3}{\ignorespaces Surrogate feature importance for the unsupervised models.}}{55}{figure.caption.36}%
 \addvspace {10\p@ }
-\contentsline {figure}{\numberline {6.1}{\ignorespaces Architecture of the BI dashboard.}}{61}{figure.caption.38}%
-\contentsline {figure}{\numberline {6.2}{\ignorespaces End-to-end deployment pipeline of the platform.}}{63}{figure.caption.39}%
+\contentsline {figure}{\numberline {6.1}{\ignorespaces Architecture of the BI dashboard.}}{62}{figure.caption.38}%
+\contentsline {figure}{\numberline {6.2}{\ignorespaces End-to-end deployment pipeline of the platform.}}{65}{figure.caption.39}%
 \addvspace {10\p@ }
 \addvspace {10\p@ }
 \addvspace {10\p@ }
