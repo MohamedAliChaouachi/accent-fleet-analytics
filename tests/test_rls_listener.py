@@ -58,14 +58,24 @@ class TestNoPrincipal:
 
 
 class TestSuperadmin:
-    def test_superadmin_emits_nothing(self, conn: _RecordingConn) -> None:
-        """superadmin bypasses RLS via role attribute — no GUC needed."""
+    def test_superadmin_emits_set_local_role(self, conn: _RecordingConn) -> None:
+        """
+        Post-M6 the API connects as `accent_app` (NOBYPASSRLS), so superadmin
+        principals must elevate within the transaction. The listener issues
+        `SET LOCAL ROLE accent_superadmin` (which has BYPASSRLS); the role
+        swap reverts at COMMIT/ROLLBACK. See engine.py docstring and
+        sql/54_grant_superadmin_membership.sql.
+
+        Earlier versions of this test asserted `conn.calls == []` on the
+        assumption that superadmin connected as a BYPASSRLS role directly —
+        that became wrong the moment M6 cut the API over to accent_app.
+        """
         set_principal(
             Principal(user_id=1, tenant_id=None,
                       role="superadmin", email="sa@x")
         )
         _set_tenant_guc(conn)  # type: ignore[arg-type]
-        assert conn.calls == []
+        assert conn.calls == ["SET LOCAL ROLE accent_superadmin"]
 
 
 class TestTenantUser:
