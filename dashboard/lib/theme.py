@@ -73,8 +73,74 @@ class Filters:
         }
 
 
+def _ensure_dashboard_principal() -> None:
+    """
+    Stamp a "dashboard service" superadmin Principal into the request-scoped
+    ContextVar that drives the RLS listener in
+    src/accent_fleet/db/engine.py:_set_tenant_guc.
+
+    Why this exists
+    ---------------
+    The dashboard reuses the same SQLAlchemy engine as the API and connects
+    as `accent_app` (NOBYPASSRLS). Post-B7 + FORCE RLS (sql/55_force_rls.sql),
+    a query fired without a Principal in scope hits the listener's "no
+    principal" branch, no GUC / role-swap is emitted, and the RLS policies
+    in sql/51_rls_policies.sql evaluate to NULL ⇒ zero rows. The dashboard
+    is an internal ops console with no per-user login, so the natural fit
+    is a single ambient "service superadmin" Principal — same pattern an
+    authenticated superadmin user would produce, just stamped at page-init
+    instead of by the API's auth middleware. The listener then emits
+    `SET LOCAL ROLE accent_superadmin`, the transaction runs with
+    BYPASSRLS via the membership granted in
+    sql/54_grant_superadmin_membership.sql, and the role reverts at COMMIT.
+
+    Idempotency
+    -----------
+    Streamlit re-runs the page script on every interaction. Whether the
+    ContextVar survives between runs depends on threading; either way we
+    only set when empty, so this is safe to call at the top of every page.
+
+    Import-failure mode
+    -------------------
+    If `app.auth.principal` isn't importable (e.g. an older dashboard
+    image built before this fix), we log loudly and return rather than
+    crashing the page render. The listener will then soft-fail and the
+    user will see the same empty-data symptom — but at least the cause
+    appears in container logs.
+    """
+    try:
+        from app.auth.principal import (
+            Principal,
+            current_principal,
+            set_principal,
+        )
+    except ImportError:
+        import logging
+
+        logging.getLogger(__name__).error(
+            "dashboard: app.auth.principal not importable; "
+            "RLS will clamp every query — rebuild the dashboard image"
+        )
+        return
+
+    if current_principal() is None:
+        set_principal(
+            Principal(
+                user_id=0,
+                tenant_id=None,
+                role="superadmin",
+                email="dashboard@service",
+            )
+        )
+
+
 def apply_layout(*, page_title: str, page_icon: str = "🚚") -> None:
     """Page-level config; safe to call at the top of every page."""
+    # Must run before any read_sql() so the engine's RLS listener picks up
+    # a superadmin Principal and emits SET LOCAL ROLE accent_superadmin
+    # for every transaction. See _ensure_dashboard_principal() for the
+    # full rationale.
+    _ensure_dashboard_principal()
     st.set_page_config(
         page_title=page_title,
         page_icon=page_icon,

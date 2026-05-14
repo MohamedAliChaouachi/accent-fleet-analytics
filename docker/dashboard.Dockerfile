@@ -2,6 +2,27 @@
 # Build from repo root:  docker build -f docker/dashboard.Dockerfile -t accent-fleet-dashboard .
 FROM accent-fleet-base:latest
 
+# v0.9.0 (post-B7 + FORCE RLS): the dashboard reuses the shared SQLAlchemy
+# engine (dashboard/lib/db.py -> accent_fleet.db.engine), which has the RLS
+# GUC setter wired on its `begin` event. The listener does
+# `from app.auth.principal import current_principal` to fetch the request-
+# scoped Principal. Without `app/` in the dashboard image, that import
+# soft-fails and the listener no-ops; with `accent_app` (NOBYPASSRLS) +
+# FORCE RLS that means every dashboard query is RLS-clamped to zero rows.
+# Bundling `app/` lets dashboard/lib/theme.py stamp a service superadmin
+# Principal at page init so the listener emits SET LOCAL ROLE
+# accent_superadmin and the transaction sees all tenants.
+#
+# We ALSO overlay src/ on top of the base image (same pattern as
+# api.Dockerfile) so the dashboard picks up v0.9.0 changes to
+# accent_fleet.db.engine — specifically the superadmin role-swap branch
+# added in M5. Without this overlay, the dashboard inherits whatever
+# snapshot of src/ was baked into accent-fleet-base:latest when it was
+# last built, which can be older than HEAD on a slow rebuild cycle and
+# silently breaks the RLS listener even when the Principal IS stamped
+# correctly.
+COPY --chown=fleet:fleet src ./src
+COPY --chown=fleet:fleet app ./app
 COPY --chown=fleet:fleet dashboard ./dashboard
 
 EXPOSE 8501
