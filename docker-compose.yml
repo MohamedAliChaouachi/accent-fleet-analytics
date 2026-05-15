@@ -131,6 +131,13 @@ services:
     env_file: .env
     environment:
       API_BASE_URL: http://api:8000
+      # The What-If page (and any future page that hits /v1/score/*, /devices/*,
+      # /admin/*) needs a bearer token. Dashboard logs in as DASHBOARD_API_EMAIL
+      # on first call and caches the JWT; see dashboard/lib/api.py. EMAIL has a
+      # sensible default that matches scripts/seed_auth.py; PASSWORD is the
+      # plaintext printed by seed_auth.py stdout and must come from .env.
+      DASHBOARD_API_EMAIL: ${DASHBOARD_API_EMAIL:-superadmin@accent.local}
+      DASHBOARD_API_PASSWORD: ${DASHBOARD_API_PASSWORD:-}
     ports:
       - "${DASHBOARD_PORT:-8501}:8501"
     depends_on:

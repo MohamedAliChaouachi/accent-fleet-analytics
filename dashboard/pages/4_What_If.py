@@ -9,24 +9,20 @@ re-running the SQL view or batch scorer.
 
 from __future__ import annotations
 
-import os
-
-import httpx
 import pandas as pd
 import plotly.express as px
 import streamlit as st
 
+from dashboard.lib.api import API_BASE, post_json
 from dashboard.lib.theme import RISK_COLORS, apply_layout, render_sidebar_filters
 
 apply_layout(page_title="What-if scoring")
 render_sidebar_filters()  # filters not strictly used, but keep sidebar consistent
 
-API_BASE = os.environ.get("API_BASE_URL", "http://api:8000")
-
 st.title("What-if scoring")
 st.caption(
-    f"Hits `POST {API_BASE}/score/risk` and `/score/cluster`. "
-    "Tweak the sliders and re-score."
+    f"Hits `POST {API_BASE}/v1/score/risk` and `/v1/score/cluster` "
+    "(bearer auth handled by `dashboard.lib.api`). Tweak the sliders and re-score."
 )
 
 with st.form("what_if"):
@@ -61,7 +57,7 @@ payload = {
 
 # ---- Risk score ----
 try:
-    r = httpx.post(f"{API_BASE}/score/risk", json=payload, timeout=5.0)
+    r = post_json("/v1/score/risk", payload)
     r.raise_for_status()
     risk_data = r.json()
 except Exception as exc:  # noqa: BLE001
@@ -94,7 +90,7 @@ if components:
 # ---- Cluster prediction (best-effort; 503 if no model is registered) ----
 st.subheader("Cluster prediction")
 try:
-    r = httpx.post(f"{API_BASE}/score/cluster", json=payload, timeout=5.0)
+    r = post_json("/v1/score/cluster", payload)
     if r.status_code == 503:
         st.info(
             "Cluster model not yet available — the API returned 503. "
