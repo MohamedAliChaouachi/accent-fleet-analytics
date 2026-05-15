@@ -1,11 +1,11 @@
 % =====================================================================
-%  Chapter 6 --- Deployment, API, Dashboard & Azure Operations
+%  Chapter 6: Deployment, API, Dashboard and Azure Operations
 % =====================================================================
 \chapter{Deployment, API, Dashboard and Azure Operations}
 \label{chap:deploy}
 
 \section{Introduction}
-The evaluation of Chapter~\ref{chap:model} has confirmed the readiness of the behavioural segmentation and of the transparent risk profile for controlled industrialization, while keeping the Isolation Forest anomaly score as a caveated evaluation artefact. The present chapter executes the deployment phase of CRISP-DM. The chapter describes the deployment strategy, the API and the dashboard exposing the analytical outputs, the integration with the analytical PostgreSQL warehouse populated from the converted MySQL dumps of \hostorg, the cron-driven automation, the monitoring and alerting layer, and finally the Microsoft Azure infrastructure on which the platform runs --- with a particular focus on the secure remote collaboration setup that allows the two-student team of engineers to operate the platform from separate workstations through SSH tunnelling, IP allowlisting on the Azure Network Security Group, and dedicated service accounts.
+The evaluation of Chapter~\ref{chap:model} has confirmed the readiness of the behavioural segmentation and of the transparent risk profile for controlled industrialization, while keeping the Isolation Forest anomaly score as a caveated evaluation artefact. The present chapter executes the deployment phase of CRISP-DM. The chapter describes the deployment strategy, the API and the dashboard exposing the analytical outputs, the integration with the analytical PostgreSQL warehouse populated from the converted MySQL dumps of \hostorg, the cron-driven automation, the monitoring and alerting layer, and finally the Microsoft Azure infrastructure on which the platform runs, with a particular focus on the secure remote collaboration setup that allows the two-student team of engineers to operate the platform from separate workstations through SSH tunnelling, IP allowlisting on the Azure Network Security Group, and dedicated service accounts.
 
 \section{Deployment strategy}
 

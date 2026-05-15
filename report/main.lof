@@ -7,8 +7,8 @@
 \addvspace {10\p@ }
 \contentsline {figure}{\numberline {3.1}{\ignorespaces Logical schema map of the staging tables, after conversion of the MySQL dumps.}}{26}{figure.caption.13}%
 \contentsline {figure}{\numberline {3.2}{\ignorespaces Data quality profile of \texttt {staging.path}: percentage of rows failing each completeness and validity check.}}{28}{figure.caption.16}%
-\contentsline {figure}{\numberline {3.3}{\ignorespaces \texttt {staging.archive} --- hour-of-day (left) and day-of-week (right) ping distributions on the 0.1~\% sample.}}{32}{figure.caption.20}%
-\contentsline {figure}{\numberline {3.4}{\ignorespaces \texttt {staging.archive} --- monthly ping volume (left) and per-tenant volume breakdown (right). Device counts in the sample annotated above each tenant bar.}}{33}{figure.caption.21}%
+\contentsline {figure}{\numberline {3.3}{\ignorespaces \texttt {staging.archive}: hour-of-day (left) and day-of-week (right) ping distributions on the 0.1~\% sample.}}{32}{figure.caption.20}%
+\contentsline {figure}{\numberline {3.4}{\ignorespaces \texttt {staging.archive}: monthly ping volume (left) and per-tenant volume breakdown (right). Device counts in the sample annotated above each tenant bar.}}{33}{figure.caption.21}%
 \contentsline {figure}{\numberline {3.5}{\ignorespaces Monthly trip volume and active-device count on \texttt {staging.path}, between 2024-01 and 2026-04.}}{34}{figure.caption.22}%
 \contentsline {figure}{\numberline {3.6}{\ignorespaces Hour-of-day (left) and day-of-week (right) trip distributions on \texttt {staging.path}, Sep--Nov 2025 segment.}}{35}{figure.caption.23}%
 \contentsline {figure}{\numberline {3.7}{\ignorespaces Trip-duration distribution from \texttt {staging.path}: raw scale (left) and Normal fit on $\log (\text {duration})$ (right).}}{35}{figure.caption.24}%
