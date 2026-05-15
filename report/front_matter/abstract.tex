@@ -1,5 +1,5 @@
 % =====================================================================
-%  Abstract: English and French
+%  Abstract: English
 % =====================================================================
 \chapter*{Abstract}
 \addcontentsline{toc}{chapter}{Abstract}
@@ -12,12 +12,5 @@ This thesis describes the design, the implementation and the deployment of an en
 \bigskip
 \hrule
 \bigskip
-
-\begin{otherlanguage}{french}
-\noindent\textbf{Résumé.}
-Ce mémoire présente la conception, la mise en œuvre et le déploiement d'une plateforme complète d'ingénierie de données et d'apprentissage automatique pour la flotte télématique multi-tenant de \hostorg{}. L'entreprise exploite trois bases de données MySQL complémentaires : une base de flux brut, dans laquelle les trames envoyées par les boîtiers GPS/IoT via leurs cartes SIM sont stockées sous forme hexadécimale ; une base d'archive décodée dont les tables suivent la convention \texttt{arch\_xxxxx} et conservent environ six mois de télémétrie lisible ; et une base de référentiel utilisateurs dont les tables suivent la convention \texttt{user\_xxxxx} et portent les clients, véhicules et conducteurs par tenant. \hostorg{} dispose déjà de tableaux de bord et de rapports descriptifs sur ces sources, mais la valeur analytique de l'archive historique reste largement inexploitée : il n'existe ni segmentation comportementale, ni score d'anomalie, ni indicateur de risque continu permettant d'anticiper le risque opérationnel plutôt que de simplement constater l'activité passée. Suivant la méthodologie CRISP-DM, le projet introduit une couche analytique qui comble explicitement ce manque. Des extractions de la base MySQL opérationnelle sont fournies sous forme de fichiers \texttt{.sql}, converties par un pont MySQL\,$\to$\,PostgreSQL dédié, puis chargées dans un entrepôt à trois couches (staging, warehouse, marts) hébergé sur Microsoft Azure. PostgreSQL~16 a été retenu pour son fort support des charges analytiques, sa conformité ACID, son indexation avancée, sa scalabilité, son extensibilité et sa compatibilité avec l'écosystème Python et les outils décisionnels. Le projet étant mené par un binôme d'ingénieurs travaillant chacun depuis sa machine, la base est hébergée sur une machine virtuelle Azure accessible par tunnel SSH, avec une liste blanche d'adresses IP appliquée au niveau du \emph{Network Security Group}. Le mémoire couvre la compréhension métier, la compréhension des données via le profilage PostgreSQL, la préparation des données via un moteur de règles de nettoyage explicite, l'ingénierie de 35~indicateurs comportementaux au grain dispositif--mois, l'entraînement d'une segmentation K-Means tenant-aware, l'évaluation d'un indicateur d'anomalie par forêt d'isolement avec des réserves explicites, et le déploiement en production du profil de risque transparent via un flux Prefect ordonnancé par cron, exposé par une API FastAPI et un tableau de bord Streamlit.
-
-\noindent\textbf{Mots-clés :} CRISP-DM, télématique, analyse de flotte, analytique avancée, MySQL, PostgreSQL, ingénierie de données, ETL, ingénierie de variables, K-Means, forêt d'isolement, Microsoft Azure, tunnel SSH, supervision.
-\end{otherlanguage}
 
 \cleardoublepage
