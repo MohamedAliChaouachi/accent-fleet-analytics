@@ -1,5 +1,5 @@
 % =====================================================================
-%  Chapter 4 --- Data Preparation
+%  Chapter 4: Data Preparation
 % =====================================================================
 \chapter{Data Preparation: Conversion, ETL and Feature Engineering}
 \label{chap:prep}
@@ -111,12 +111,12 @@ The quarantine table is structured as \texttt{(rule\_id, rejected\_at, payload~J
 The warehouse layer hosts five dimensions and one bridge:
 
 \begin{itemize}
-    \item \texttt{dim\_tenant} --- billing entities, derived from the \texttt{user\_xxxxx} master data;
-    \item \texttt{dim\_vehicle} --- vehicles, with normalized manufacturer and class;
-    \item \texttt{dim\_device} --- GPS devices, restricted to the 616 devices linked to a vehicle;
-    \item \texttt{dim\_driver} --- drivers (294 individuals);
-    \item \texttt{dim\_date} --- calendar from 2019-10-01;
-    \item \texttt{bridge\_device\_driver} --- SCD~Type~2 mapping between devices and drivers.
+    \item \texttt{dim\_tenant}: billing entities, derived from the \texttt{user\_xxxxx} master data;
+    \item \texttt{dim\_vehicle}: vehicles, with normalized manufacturer and class;
+    \item \texttt{dim\_device}: GPS devices, restricted to the 616 devices linked to a vehicle;
+    \item \texttt{dim\_driver}: drivers (294 individuals);
+    \item \texttt{dim\_date}: calendar from 2019-10-01;
+    \item \texttt{bridge\_device\_driver}: SCD~Type~2 mapping between devices and drivers.
 \end{itemize}
 
 \subsection{Facts}
@@ -225,4 +225,4 @@ The validation suite is implemented in \texttt{sql/99\_validation\_suite.sql} an
 At the conclusion of the data preparation phase, the modeling-ready dataset comprises approximately \textbf{2{,}157 device-month observations} on the period 2025-01--2026-04, after applying the threshold of 100~km of total distance, positive ignition-on telemetry, and a minimum number of trips per device-month. These thresholds remove inactive or insufficiently observed device-months whose behavioral indicators would be statistically unstable. This total includes tenant~\texttt{7486}, which is recovered through the telemetry-to-trip reconstruction path before the full ML feature view is consumed by Chapter~\ref{chap:model}.
 
 \section{Conclusion}
-This chapter has described the full preparation chain --- from the conversion of the MySQL dump files of \hostorg{} into PostgreSQL-importable artefacts, through the watermark-driven ETL pipeline and the cleaning rule engine (eleven operational rules \texttt{C1}--\texttt{C11}, consolidating the thirteen data-quality issues from Chapter~\ref{chap:data}), to the dimensional modeling of the warehouse, the materialization of the analytical marts, the engineering of the feature registry and the validation of the prepared dataset. The next chapter exploits the ML-ready dataset to train and to evaluate the unsupervised models that produce the behavioural segmentation and the risk score.
+This chapter has described the full preparation chain, from the conversion of the MySQL dump files of \hostorg{} into PostgreSQL-importable artefacts, through the watermark-driven ETL pipeline and the cleaning rule engine (eleven operational rules \texttt{C1}--\texttt{C11}, consolidating the thirteen data-quality issues from Chapter~\ref{chap:data}), to the dimensional modeling of the warehouse, the materialization of the analytical marts, the engineering of the feature registry and the validation of the prepared dataset. The next chapter exploits the ML-ready dataset to train and to evaluate the unsupervised models that produce the behavioural segmentation and the risk score.
