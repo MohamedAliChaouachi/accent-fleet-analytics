@@ -162,7 +162,7 @@ def fetch_executive(conn: Connection, f: DashboardFilters) -> ExecutiveDashboard
     # of summing per-tenant ratios — see the comment block in
     # dashboard/pages/0_Executive_Overview.py for the rationale.
     by_month: dict[str, dict[str, float]] = defaultdict(
-        lambda: {c: 0.0 for c in _ADDITIVE_EXEC_COLS}
+        lambda: dict.fromkeys(_ADDITIVE_EXEC_COLS, 0.0)
     )
     tenants_in_month: dict[str, set[int | None]] = defaultdict(set)
     for r in rows:
@@ -286,7 +286,8 @@ def fetch_risk(conn: Connection, f: DashboardFilters) -> RiskDashboardResponse:
          WHERE 1=1
            {f.tenant_clause()}
     """
-    fleet = [FleetRiskRow(**dict(r)) for r in conn.execute(text(fleet_sql), f.params()).mappings().all()]
+    fleet_rows = conn.execute(text(fleet_sql), f.params()).mappings().all()
+    fleet = [FleetRiskRow(**dict(r)) for r in fleet_rows]
 
     # Device-level — filter on latest_month (CHAR(7)).
     device_sql = f"""
@@ -299,7 +300,8 @@ def fetch_risk(conn: Connection, f: DashboardFilters) -> RiskDashboardResponse:
            {f.month_clause('latest_month')}
          ORDER BY risk_score DESC NULLS LAST
     """
-    devices = [DeviceRiskRow(**dict(r)) for r in conn.execute(text(device_sql), f.params()).mappings().all()]
+    device_rows = conn.execute(text(device_sql), f.params()).mappings().all()
+    devices = [DeviceRiskRow(**dict(r)) for r in device_rows]
 
     # Risk category distribution (preserves insertion order; React can
     # color-map). Skip None categories to match the Streamlit page.

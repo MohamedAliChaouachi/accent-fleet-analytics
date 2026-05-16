@@ -22,6 +22,7 @@ once the React app is the only consumer.
 from __future__ import annotations
 
 from datetime import date
+from typing import Annotated
 
 from fastapi import APIRouter, Query
 from sqlalchemy.engine import Connection
@@ -43,6 +44,24 @@ from app.services.dashboards import (
 
 router = APIRouter(prefix="/dashboards", tags=["dashboards"])
 
+# Annotated aliases keep the four route signatures short and let ruff's B008
+# rule see the Query(...) call outside of a default-value position. The
+# rule's built-in immutable allowlist doesn't include `datetime.date`, so
+# the older `start: date | None = Query(default=None)` form trips B008
+# even though FastAPI is the canonical consumer of that pattern.
+StartParam = Annotated[
+    date | None,
+    Query(description="Inclusive window start; defaults to 90 days ago."),
+]
+EndParam = Annotated[
+    date | None,
+    Query(description="Inclusive window end; defaults to today."),
+]
+TenantIdsParam = Annotated[
+    list[int] | None,
+    Query(description="Optional tenant scope; omit for all tenants."),
+]
+
 
 def _tenant_ids(raw: list[int] | None) -> list[int]:
     """FastAPI passes [] when the param is omitted entirely with default=None
@@ -52,9 +71,9 @@ def _tenant_ids(raw: list[int] | None) -> list[int]:
 
 @router.get("/executive", response_model=ExecutiveDashboardResponse)
 def executive_overview(
-    start: date | None = Query(default=None, description="Inclusive window start; defaults to 90 days ago."),
-    end: date | None = Query(default=None, description="Inclusive window end; defaults to today."),
-    tenant_ids: list[int] | None = Query(default=None, description="Optional tenant scope; omit for all tenants."),
+    start: StartParam = None,
+    end: EndParam = None,
+    tenant_ids: TenantIdsParam = None,
     conn: Connection = DbDep,
 ) -> ExecutiveDashboardResponse:
     f = parse_filters(start, end, _tenant_ids(tenant_ids))
@@ -63,9 +82,9 @@ def executive_overview(
 
 @router.get("/operations", response_model=OperationsDashboardResponse)
 def operations_overview(
-    start: date | None = Query(default=None),
-    end: date | None = Query(default=None),
-    tenant_ids: list[int] | None = Query(default=None),
+    start: StartParam = None,
+    end: EndParam = None,
+    tenant_ids: TenantIdsParam = None,
     conn: Connection = DbDep,
 ) -> OperationsDashboardResponse:
     f = parse_filters(start, end, _tenant_ids(tenant_ids))
@@ -74,9 +93,9 @@ def operations_overview(
 
 @router.get("/maintenance", response_model=MaintenanceDashboardResponse)
 def maintenance_overview(
-    start: date | None = Query(default=None),
-    end: date | None = Query(default=None),
-    tenant_ids: list[int] | None = Query(default=None),
+    start: StartParam = None,
+    end: EndParam = None,
+    tenant_ids: TenantIdsParam = None,
     conn: Connection = DbDep,
 ) -> MaintenanceDashboardResponse:
     f = parse_filters(start, end, _tenant_ids(tenant_ids))
@@ -85,9 +104,9 @@ def maintenance_overview(
 
 @router.get("/risk", response_model=RiskDashboardResponse)
 def risk_overview(
-    start: date | None = Query(default=None),
-    end: date | None = Query(default=None),
-    tenant_ids: list[int] | None = Query(default=None),
+    start: StartParam = None,
+    end: EndParam = None,
+    tenant_ids: TenantIdsParam = None,
     conn: Connection = DbDep,
 ) -> RiskDashboardResponse:
     f = parse_filters(start, end, _tenant_ids(tenant_ids))

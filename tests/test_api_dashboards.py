@@ -97,7 +97,8 @@ def test_operations_shape(client, db_available):
     assert r.status_code == 200, r.text
     body = r.json()
     assert {"rows", "kpi"} <= body.keys()
-    assert {"total_trips", "total_distance_km", "total_alerts", "total_overspeed"} <= body["kpi"].keys()
+    expected_kpis = {"total_trips", "total_distance_km", "total_alerts", "total_overspeed"}
+    assert expected_kpis <= body["kpi"].keys()
 
 
 def test_maintenance_top_cost_vehicles_capped_at_20(client, db_available):
@@ -108,7 +109,11 @@ def test_maintenance_top_cost_vehicles_capped_at_20(client, db_available):
     body = r.json()
     assert len(body["top_cost_vehicles"]) <= 20
     # Top list is sorted desc by total_cost.
-    costs = [row["total_cost"] for row in body["top_cost_vehicles"] if row["total_cost"] is not None]
+    costs = [
+        row["total_cost"]
+        for row in body["top_cost_vehicles"]
+        if row["total_cost"] is not None
+    ]
     assert costs == sorted(costs, reverse=True)
 
 
@@ -146,7 +151,10 @@ def test_executive_respects_tenant_filter(client, db_available):
         pytest.skip("postgres not reachable")
     with get_engine().connect() as c:
         row = c.execute(
-            text("SELECT tenant_id FROM marts.v_executive_dashboard WHERE tenant_id IS NOT NULL LIMIT 1")
+            text(
+                "SELECT tenant_id FROM marts.v_executive_dashboard "
+                "WHERE tenant_id IS NOT NULL LIMIT 1"
+            )
         ).first()
     if row is None:
         pytest.skip("no rows in v_executive_dashboard")
