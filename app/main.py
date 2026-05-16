@@ -26,7 +26,7 @@ from app.auth.admin_routes import router as auth_admin_router
 from app.auth.middleware import AuthMiddleware
 from app.auth.routes import router as auth_router
 from app.middleware import MetricsMiddleware
-from app.routes import admin, devices, health, metrics, score
+from app.routes import admin, dashboards, devices, health, metrics, score
 from app.versioning import LEGACY_SUNSET_HUMAN, include_versioned_router
 
 # Configure structured logging once at import time so anything that runs
@@ -88,6 +88,7 @@ app.include_router(metrics.router)
 # stamped on every response). See app/versioning.py for the policy.
 include_versioned_router(app, score.router)
 include_versioned_router(app, devices.router)
+include_versioned_router(app, dashboards.router)
 include_versioned_router(app, admin.router)
 
 # Auth routers — same versioning policy. /v1/auth/* canonical, /auth/*

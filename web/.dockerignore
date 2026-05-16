@@ -1,0 +1,8 @@
+node_modules
+dist
+dist-tsbuild-node
+.git
+.vscode
+.idea
+npm-debug.log*
+*.tsbuildinfo
