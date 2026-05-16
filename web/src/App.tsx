@@ -10,6 +10,7 @@ import { Operations } from "@/pages/Operations";
 import { Maintenance } from "@/pages/Maintenance";
 import { RiskAndBehavior } from "@/pages/RiskAndBehavior";
 import { WhatIf } from "@/pages/WhatIf";
+import { AIChat } from "@/pages/AIChat";
 
 // staleTime mirrors the Streamlit @st.cache_data ttl (5 min): the marts
 // views are refreshed by the Prefect incremental flow on the same cadence
@@ -39,6 +40,7 @@ export function App() {
                   <Route path="/maintenance" element={<Maintenance />} />
                   <Route path="/risk" element={<RiskAndBehavior />} />
                   <Route path="/what-if" element={<WhatIf />} />
+                  <Route path="/ai" element={<AIChat />} />
                 </Route>
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />

@@ -9,6 +9,7 @@ const NAV_ITEMS: ReadonlyArray<{ to: string; label: string }> = [
   { to: "/maintenance", label: "Maintenance" },
   { to: "/risk", label: "Risk & behavior" },
   { to: "/what-if", label: "What-if" },
+  { to: "/ai", label: "Ask the data" },
 ];
 
 function navClass({ isActive }: { isActive: boolean }) {

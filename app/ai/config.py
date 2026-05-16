@@ -63,6 +63,19 @@ class AISettings(BaseSettings):
     # changes the quality of a one-sentence answer.
     summary_sample_rows: int = Field(20, alias="AI_SUMMARY_SAMPLE_ROWS", ge=1, le=200)
 
+    # --- Rate limiting ---
+    # Two independent ceilings, both enforced before the LLM call.
+    # See app/ai/services/rate_limit.py for the rationale of two scopes.
+    rate_limit_user_max: int = Field(
+        20, alias="AI_RATE_LIMIT_USER_MAX", ge=1, le=10_000
+    )
+    rate_limit_tenant_max: int = Field(
+        60, alias="AI_RATE_LIMIT_TENANT_MAX", ge=1, le=100_000
+    )
+    rate_limit_window_seconds: int = Field(
+        60, alias="AI_RATE_LIMIT_WINDOW_S", ge=1, le=3600
+    )
+
 
 @lru_cache(maxsize=1)
 def ai_settings() -> AISettings:

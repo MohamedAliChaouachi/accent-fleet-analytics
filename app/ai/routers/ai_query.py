@@ -21,7 +21,12 @@ from app.ai.config import ai_settings
 from app.ai.providers.base import LLMProviderError
 from app.ai.providers.factory import get_provider
 from app.ai.schemas.ai import AIQueryError, AIQueryRequest, AIQueryResponse
+from app.ai.services.audit import write_ai_query_event
 from app.ai.services.pipeline import PipelineError, PipelineInput, run
+from app.ai.services.rate_limit import (
+    AIRateLimitExceededError,
+    get_ai_rate_limiter,
+)
 from app.auth.deps import CurrentPrincipalDep
 from app.auth.principal import Principal
 
@@ -57,8 +62,33 @@ def ai_query(
 ) -> AIQueryResponse:
     """Run one natural-language question through the Text2SQL pipeline."""
     tenant_id = _resolve_tenant(principal=principal, requested=body.tenant_id)
+
+    # Rate limit AFTER tenant resolution so the tenant bucket sees the
+    # effective tenant (matters for the superadmin path, where the
+    # principal has tenant_id=None but the request is charged to the
+    # selected tenant). The check raises before any LLM call so a
+    # throttled request burns zero tokens.
     try:
-        return run(
+        get_ai_rate_limiter().check(
+            user_id=principal.user_id,
+            tenant_id=tenant_id,
+        )
+    except AIRateLimitExceededError as e:
+        write_ai_query_event(
+            user_id=principal.user_id,
+            tenant_id=tenant_id,
+            question=body.question,
+            stage="rate_limited",
+            error_detail=f"scope={e.scope}",
+        )
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"AI query rate limit exceeded ({e.scope}); retry later",
+            headers={"Retry-After": str(e.retry_after_seconds)},
+        ) from e
+
+    try:
+        response = run(
             inp=PipelineInput(question=body.question, tenant_id=tenant_id),
             provider=get_provider(),
             settings=ai_settings(),
@@ -67,15 +97,50 @@ def ai_query(
         # The factory raises this when the provider can't be built
         # (missing API key, missing SDK). Surface as 500 — it's a
         # configuration error, not a user error.
+        write_ai_query_event(
+            user_id=principal.user_id,
+            tenant_id=tenant_id,
+            question=body.question,
+            stage="config",
+            error_detail=str(e),
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=AIQueryError(stage="config", detail=str(e)).model_dump(),
         ) from e
     except PipelineError as e:
+        # One audit row per failed pipeline run. `sql_text` captures the
+        # offending SQL when the failure came after generation (guard /
+        # execution stages); it stays None when the LLM itself failed.
+        write_ai_query_event(
+            user_id=principal.user_id,
+            tenant_id=tenant_id,
+            question=body.question,
+            stage=e.stage,
+            sql_text=e.sql,
+            error_detail=e.detail,
+        )
         raise HTTPException(
             status_code=_STAGE_STATUS.get(e.stage, 500),
             detail=AIQueryError(stage=e.stage, detail=e.detail, sql=e.sql).model_dump(),
         ) from e
+
+    # Happy path — one row recording what we ran, how long it took, and
+    # which provider/model answered. Volume bound is "one row per /ai/query
+    # call", which is exactly what we want for cost reporting.
+    write_ai_query_event(
+        user_id=principal.user_id,
+        tenant_id=tenant_id,
+        question=body.question,
+        stage="success",
+        sql_text=response.sql,
+        row_count=response.row_count,
+        elapsed_ms=response.elapsed_ms,
+        chart_type=response.chart_type,
+        provider=response.provider,
+        model=response.model,
+    )
+    return response
 
 
 # ---------------------------------------------------------------------------
