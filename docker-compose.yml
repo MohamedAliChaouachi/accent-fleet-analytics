@@ -146,6 +146,26 @@ services:
     networks: [fleet-net]
 
   # ---------------------------------------------------------------------------
+  # React SPA. Served by nginx; reverse-proxies /v1/* to the api service so the
+  # browser sees a single origin. Coexists with the Streamlit dashboard during
+  # cutover — delete this comment + the `dashboard` service once parity is
+  # signed off (see plans/now-i-want-to-cozy-fairy.md "Out of scope").
+  # ---------------------------------------------------------------------------
+  web:
+    image: accent-fleet-web:latest
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+    container_name: accent_web
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-3000}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks: [fleet-net]
+
+  # ---------------------------------------------------------------------------
   # ETL container. Runs the incremental Prefect flow on a loop.
   # Override CMD for bootstrap/backfill:
   #   docker compose run --rm etl python scripts/run_batch.py bootstrap

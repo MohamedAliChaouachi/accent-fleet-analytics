@@ -12,28 +12,42 @@ COMPOSE := docker compose
 .PHONY: help
 help:
 	@echo "Common targets:"
-	@echo "  build         build all docker images (base + api + dashboard + etl)"
-	@echo "  up            start the application stack (api, dashboard, mlflow, etl)"
-	@echo "  down          stop the stack"
-	@echo "  logs          tail logs"
-	@echo "  ps            show container status"
-	@echo "  seed          run ETL bootstrap + small backfill against the configured DB"
-	@echo "  train         train + register the clustering model in MLflow"
-	@echo "  test          run pytest (skips integration unless PG is reachable)"
-	@echo "  lint          run ruff"
+	@echo "  build           build all docker images (base + api + dashboard + etl + web)"
+	@echo "  up              start the application stack (api, dashboard, web, mlflow, etl)"
+	@echo "  down            stop the stack"
+	@echo "  logs            tail logs"
+	@echo "  ps              show container status"
+	@echo "  seed            run ETL bootstrap + small backfill against the configured DB"
+	@echo "  train           train + register the clustering model in MLflow"
+	@echo "  test            run pytest (skips integration unless PG is reachable)"
+	@echo "  lint            run ruff"
 	@echo ""
-	@echo "  up-localdb    spin up a local Postgres alongside the stack (no Azure DB)"
-	@echo "  down-localdb  stop the local Postgres"
+	@echo "  web-dev         run the React SPA dev server (vite, port 5173)"
+	@echo "  web-typecheck   run tsc --noEmit on the React SPA"
+	@echo ""
+	@echo "  up-localdb      spin up a local Postgres alongside the stack (no Azure DB)"
+	@echo "  down-localdb    stop the local Postgres"
 
 # ---------------------------------------------------------------------------
 .PHONY: build
 build:
 	$(COMPOSE) build base
-	$(COMPOSE) build api dashboard etl
+	$(COMPOSE) build api dashboard etl web
 
 .PHONY: up
 up:
-	$(COMPOSE) up -d mlflow api dashboard etl
+	$(COMPOSE) up -d mlflow api dashboard etl web
+
+# Run the React SPA against a locally running API (port 8000). Hot reload,
+# proxies /v1/* to localhost:8000 by default (override with VITE_API_TARGET).
+.PHONY: web-dev
+web-dev:
+	cd web && npm install && npm run dev
+
+# Quick TypeScript check without bundling — mirrors what CI should run.
+.PHONY: web-typecheck
+web-typecheck:
+	cd web && npm install && npm run typecheck
 
 .PHONY: down
 down:
@@ -76,7 +90,7 @@ lint:
 .PHONY: up-localdb
 up-localdb:
 	$(COMPOSE) --profile localdb up -d postgres
-	$(COMPOSE) up -d mlflow api dashboard etl
+	$(COMPOSE) up -d mlflow api dashboard etl web
 
 .PHONY: down-localdb
 down-localdb:
