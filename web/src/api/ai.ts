@@ -25,10 +25,26 @@ export type AIStage =
   | "summarization"
   | "config";
 
+/**
+ * One prior turn of the current chat session. Sent back to the API so
+ * the model can resolve follow-ups like "and last week?" against
+ * earlier exchanges. Assistant `content` should be the summary text
+ * only (not SQL/rows) — the backend doesn't reuse prior SQL.
+ */
+export interface ChatTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
+/** Server caps history to the last 6 turns; we trim client-side to match. */
+export const MAX_HISTORY_TURNS = 6;
+
 export interface AIQueryRequest {
   question: string;
   /** Superadmin-only override. Ignored / rejected for tenant users. */
   tenant_id?: number;
+  /** Prior turns, oldest first. Optional — empty = one-shot Q&A. */
+  history?: ReadonlyArray<ChatTurn>;
 }
 
 export interface AIQueryResponse {

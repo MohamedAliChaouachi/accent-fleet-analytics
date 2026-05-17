@@ -20,7 +20,12 @@ from fastapi import APIRouter, HTTPException, status
 from app.ai.config import ai_settings
 from app.ai.providers.base import LLMProviderError
 from app.ai.providers.factory import get_provider
-from app.ai.schemas.ai import AIQueryError, AIQueryRequest, AIQueryResponse
+from app.ai.schemas.ai import (
+    MAX_HISTORY_TURNS,
+    AIQueryError,
+    AIQueryRequest,
+    AIQueryResponse,
+)
 from app.ai.services.audit import write_ai_query_event
 from app.ai.services.pipeline import PipelineError, PipelineInput, run
 from app.ai.services.rate_limit import (
@@ -87,9 +92,18 @@ def ai_query(
             headers={"Retry-After": str(e.retry_after_seconds)},
         ) from e
 
+    # Trim history to the per-request cap. Client-side bound exists too,
+    # but the server is the source of truth — anything older gets
+    # dropped silently so a runaway client can't blow up the prompt.
+    trimmed_history = tuple(body.history[-MAX_HISTORY_TURNS:])
+
     try:
         response = run(
-            inp=PipelineInput(question=body.question, tenant_id=tenant_id),
+            inp=PipelineInput(
+                question=body.question,
+                tenant_id=tenant_id,
+                history=trimmed_history,
+            ),
             provider=get_provider(),
             settings=ai_settings(),
         )

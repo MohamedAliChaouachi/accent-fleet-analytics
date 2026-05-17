@@ -28,7 +28,7 @@ from app.ai.config import AISettings
 from app.ai.prompts.builder import build_sql_user_prompt
 from app.ai.prompts.system import SQL_SYSTEM_PROMPT
 from app.ai.providers.base import BaseLLMProvider, LLMProviderError
-from app.ai.schemas.ai import AIQueryResponse, ChartType
+from app.ai.schemas.ai import AIQueryResponse, ChartType, ChatTurn
 from app.ai.security.sql_guard import SqlGuardError, validate
 from app.ai.services.chart_suggester import suggest
 from app.ai.services.executor import ExecutorError, execute
@@ -51,6 +51,11 @@ class PipelineError(RuntimeError):
 class PipelineInput:
     question: str
     tenant_id: int
+    # Prior turns of the current chat session, oldest first. The router
+    # has already trimmed this to the per-request cap (MAX_HISTORY_TURNS
+    # in app/ai/schemas/ai.py), so the pipeline can pass it through
+    # without further bounds-checking.
+    history: tuple[ChatTurn, ...] = ()
 
 
 def run(
@@ -63,7 +68,11 @@ def run(
     t0 = time.perf_counter()
 
     # 1+2: prompt → LLM → SQL
-    user_prompt = build_sql_user_prompt(question=inp.question, tenant_id=inp.tenant_id)
+    user_prompt = build_sql_user_prompt(
+        question=inp.question,
+        tenant_id=inp.tenant_id,
+        history=inp.history,
+    )
     try:
         llm_resp = provider.generate_sql(SQL_SYSTEM_PROMPT, user_prompt)
     except LLMProviderError as e:

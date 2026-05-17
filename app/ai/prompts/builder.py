@@ -14,8 +14,9 @@ right table when given the descriptions.
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, Sequence
 
+from app.ai.schemas.ai import ChatTurn
 from app.ai.schemas.catalog import CATALOG, TableSpec
 
 
@@ -47,7 +48,28 @@ def _render_table(spec: TableSpec) -> str:
     return "\n".join(lines)
 
 
-def build_sql_user_prompt(question: str, tenant_id: int) -> str:
+def _render_history(history: Sequence[ChatTurn]) -> str:
+    """Render prior chat turns as a plain text block for the user message.
+
+    We deliberately keep this as text in the user message rather than
+    expanding it into multi-turn ``messages`` against the chat API:
+    a single user message keeps the providers interchangeable (the
+    Anthropic provider has slightly different multi-turn semantics)
+    and the system prompt stays the single source of truth for
+    SQL-generation rules.
+    """
+    lines = ["Previous conversation (oldest first):", ""]
+    for turn in history:
+        speaker = "User" if turn.role == "user" else "Assistant"
+        lines.append(f"{speaker}: {turn.content.strip()}")
+    return "\n".join(lines)
+
+
+def build_sql_user_prompt(
+    question: str,
+    tenant_id: int,
+    history: Sequence[ChatTurn] = (),
+) -> str:
     """Assemble the user message for the SQL-generation call.
 
     The tenant_id is included so the model has the value visible (useful
@@ -55,17 +77,26 @@ def build_sql_user_prompt(question: str, tenant_id: int) -> str:
     bind parameter `:tenant_id` — the server binds the *real* value at
     execute time. We restate that here as a backstop against the LLM
     inlining the integer.
+
+    When ``history`` is non-empty the conversation is rendered between
+    the catalog and the current question so the model can resolve
+    references like "and last week?" against earlier turns. Each call
+    still regenerates SQL from scratch — the guardrails apply
+    uniformly regardless of history.
     """
-    return "\n".join(
+    sections: list[str] = [render_catalog(), "---"]
+    if history:
+        sections.append(_render_history(history))
+        sections.append("---")
+    sections.extend(
         [
-            render_catalog(),
-            "---",
             f"Caller tenant_id: {tenant_id}  (do NOT inline; use `:tenant_id`)",
             "",
-            "User question:",
+            "Current user question:" if history else "User question:",
             question.strip(),
         ]
     )
+    return "\n".join(sections)
 
 
 def build_summary_user_prompt(

@@ -15,6 +15,25 @@ from pydantic import BaseModel, Field
 
 ChartType = Literal["line", "bar", "pie", "table"]
 
+# Hard cap on conversational context sent back to us. Picked at 6 to
+# keep prompt cost bounded (≈ 3 Q&A pairs) while giving the model
+# enough recent context to resolve follow-ups like "and last week?".
+# The router trims anything longer before it reaches the pipeline.
+MAX_HISTORY_TURNS = 6
+
+
+class ChatTurn(BaseModel):
+    """One previous exchange in the conversation.
+
+    ``content`` is the natural-language text only — for assistant turns
+    we send the one-line summary, not the SQL or rows, to keep prompts
+    small. The pipeline never re-uses prior SQL; it always regenerates
+    from the catalog so guardrails apply uniformly to every call.
+    """
+
+    role: Literal["user", "assistant"]
+    content: str = Field(..., min_length=1, max_length=4_000)
+
 
 class AIQueryRequest(BaseModel):
     """User's natural-language question.
@@ -22,6 +41,11 @@ class AIQueryRequest(BaseModel):
     ``tenant_id`` is OPTIONAL and only honored for superadmin principals.
     For all other roles the server uses the tenant from the JWT and
     rejects mismatched body values — see app/ai/routers/ai_query.py.
+
+    ``history`` is the prior turns of the current chat session, oldest
+    first. Optional — when empty the call behaves exactly like the v1
+    one-shot endpoint. Server trims to the last ``MAX_HISTORY_TURNS``
+    turns so a runaway client can't blow up the prompt budget.
     """
 
     question: str = Field(..., min_length=3, max_length=2_000)
@@ -31,6 +55,13 @@ class AIQueryRequest(BaseModel):
             "Superadmin-only override. Tenant users have their tenant "
             "derived from the JWT; this field is rejected if it doesn't "
             "match the caller's tenant_id."
+        ),
+    )
+    history: list[ChatTurn] = Field(
+        default_factory=list,
+        description=(
+            "Prior turns of this chat session, oldest first. Capped to "
+            f"the last {MAX_HISTORY_TURNS} turns server-side."
         ),
     )
 

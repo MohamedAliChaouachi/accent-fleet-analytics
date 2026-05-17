@@ -1,256 +1,881 @@
-// AI chat page — natural language → SQL → rows + summary + chart.
+// AI chat page — conversational Text2SQL with persistent history.
 //
-// Wire model: POST /v1/ai/query is the only call. The endpoint is
-// request/response (not streaming) in Phase 1, so this page is a pure
-// useMutation: ask one question, receive one answer. Phase 2 will swap
-// the mutation for an SSE stream behind the same UI.
+// Three things make this file longer than a typical page:
 //
-// Layout decisions:
-//   * Summary up top. That's the user's headline — render it big.
-//   * One chart underneath, rendered from the server-chosen `chart_type`.
-//     The chart-type heuristic is deterministic (see app/ai/services/
-//     chart_suggester.py), so the client never overrides it.
-//   * SQL + raw rows are tucked into a <details> so power users / auditors
-//     can verify what actually ran, without pushing it on casual users.
+//   1. Multi-conversation model. We persist N chats per user, not just
+//      the most-recent one. Storage shape is `{ v: 2, conversations:
+//      [{ id, title, messages, tenant, updatedAt }], activeId }` keyed
+//      by user email. Bumping the version invalidates the old v1
+//      single-chat layout silently — users had nothing important
+//      there anyway.
 //
-// Error model: server returns `{ stage, detail, sql? }`. We promote that
-// to a typed `AIQueryError` in `api/ai.ts`. UX rule (from docs/ai_query.md):
-//   sql_guard / tenant_filter → show inline, prompt user to rephrase.
-//   llm                       → 502; show a "try again" hint.
-//   execution / config        → generic failure; the operator gets paged
-//                               via the access log anyway.
+//   2. Server still sees only the active conversation's last 6 turns.
+//      Chosen conversations don't bleed into each other. Switching
+//      chats is purely a client-side state swap.
+//
+//   3. Errors are NOT persisted. They're transient UI ("rate limit hit,
+//      try again") and a stale error from yesterday isn't useful to
+//      bring back. We render the current attempt's error inline but
+//      drop it on save.
+//
+// Layout: message stream + composer on the left, 240px sidebar
+// (Recents list) on the right. Matches the requested placement —
+// the global app nav already occupies the left edge, so putting the
+// chat history on the right keeps the two from competing.
 
-import { useMutation } from "@tanstack/react-query";
-import { useRef, useState, type FormEvent } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+} from "react";
 
-import { askAI, AIQueryError, type AIQueryResponse } from "@/api/ai";
+import {
+  askAI,
+  AIQueryError,
+  MAX_HISTORY_TURNS,
+  type AIQueryResponse,
+  type ChatTurn,
+} from "@/api/ai";
+import { listTenants } from "@/api/admin";
 import { useAuth } from "@/auth/AuthContext";
-import { PageHeader } from "@/components/PageHeader";
-import { Panel } from "@/components/Panel";
 import { StateMessage } from "@/components/StateMessage";
-import { DataTable, type ColumnDef } from "@/components/DataTable";
 import { BarChart } from "@/components/charts/BarChart";
 import { LineChart } from "@/components/charts/LineChart";
 import { PieChart } from "@/components/charts/PieChart";
+
+// Bumping this string is the easiest way to tell, from the browser
+// console, whether a fresh build actually shipped. If you change the
+// page and don't see the new banner, your bundle is cached.
+const BUILD_TAG = "AIChat v3.8 — no All-tenants, New chat in top bar";
+if (typeof window !== "undefined") {
+  // eslint-disable-next-line no-console
+  console.info(`[${BUILD_TAG}] loaded`);
+}
 
 const EXAMPLE_QUESTIONS: ReadonlyArray<string> = [
   "Show monthly trip volume for the past 12 months.",
   "Top 5 vehicles by total cost last month.",
   "What's the distribution of risk categories across the fleet?",
-  "Compare overspeed events per 100 km between this month and last month.",
   "How many devices are in each behaviour cluster?",
 ];
 
-export function AIChat() {
-  const { user } = useAuth();
-  const [question, setQuestion] = useState("");
-  // Superadmins need to specify a tenant; we expose a small input only
-  // for them. Tenant users have their tenant fixed by the JWT.
-  const [tenantOverride, setTenantOverride] = useState<string>("");
-  // Hold on to the last successful answer so the form area can be
-  // re-used without losing the previous result on the screen.
-  const lastResponse = useRef<AIQueryResponse | null>(null);
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
-  const mutation = useMutation<AIQueryResponse, Error, void>({
-    mutationFn: async () => {
-      const tenantId =
-        user?.role === "superadmin" && tenantOverride.trim()
-          ? Number(tenantOverride.trim())
-          : undefined;
-      const resp = await askAI({ question, tenant_id: tenantId });
-      lastResponse.current = resp;
-      return resp;
-    },
-  });
+/** What lives on screen. Errors are in-memory only. */
+type DisplayMessage =
+  | { id: number; role: "user"; content: string }
+  | { id: number; role: "assistant"; response: AIQueryResponse };
 
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (!question.trim() || mutation.isPending) return;
-    mutation.mutate();
-  }
+/** What we persist — same as DisplayMessage today (errors are excluded). */
+type PersistedMessage = DisplayMessage;
 
-  const response = mutation.data ?? lastResponse.current;
-  const isSuperadmin = user?.role === "superadmin";
+interface Conversation {
+  id: string;
+  title: string;
+  messages: PersistedMessage[];
+  tenant: string;
+  updatedAt: number; // epoch ms — drives the Recents sort order
+  nextMsgId: number; // monotonic so React keys never collide
+}
 
-  return (
-    <section>
-      <PageHeader
-        title="Ask the data"
-        caption={
-          <>
-            Natural-language questions answered from the analytics marts. Every
-            query runs in a read-only transaction and is scoped to your tenant.
-          </>
-        }
-      />
-
-      <Panel title="Question">
-        <form onSubmit={onSubmit} className="space-y-3">
-          <textarea
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            rows={3}
-            placeholder="e.g. Show monthly trip volume for the past 12 months."
-            className="block w-full resize-y rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
-            disabled={mutation.isPending}
-          />
-
-          {isSuperadmin ? (
-            <label className="block">
-              <span className="mb-1 block text-xs uppercase tracking-wider text-slate-500">
-                Tenant id (required for superadmin)
-              </span>
-              <input
-                type="number"
-                inputMode="numeric"
-                value={tenantOverride}
-                onChange={(e) => setTenantOverride(e.target.value)}
-                className="block w-32 rounded-md border border-slate-300 bg-white px-2 py-1 text-sm"
-                disabled={mutation.isPending}
-              />
-            </label>
-          ) : null}
-
-          <div className="flex items-center gap-3">
-            <button
-              type="submit"
-              disabled={
-                mutation.isPending ||
-                !question.trim() ||
-                (isSuperadmin && !tenantOverride.trim())
-              }
-              className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-brand-dark disabled:cursor-not-allowed disabled:bg-slate-300"
-            >
-              {mutation.isPending ? "Thinking…" : "Ask"}
-            </button>
-            {mutation.isPending ? (
-              <span className="text-xs text-slate-500">
-                Running through the SQL guard and Postgres — typically 1–3s.
-              </span>
-            ) : null}
-          </div>
-
-          <div className="flex flex-wrap gap-2 pt-1">
-            {EXAMPLE_QUESTIONS.map((q) => (
-              <button
-                key={q}
-                type="button"
-                onClick={() => setQuestion(q)}
-                disabled={mutation.isPending}
-                className="rounded-full border border-slate-300 bg-slate-50 px-3 py-1 text-xs text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {q}
-              </button>
-            ))}
-          </div>
-        </form>
-      </Panel>
-
-      <div className="h-4" />
-
-      {mutation.isError ? <ErrorView error={mutation.error} /> : null}
-      {response ? <AnswerView response={response} /> : null}
-    </section>
-  );
+interface PersistedStateV2 {
+  v: 2;
+  conversations: Conversation[];
+  activeId: string | null;
 }
 
 // ---------------------------------------------------------------------------
-// Answer
+// Persistence (per-user, localStorage)
 // ---------------------------------------------------------------------------
 
-function AnswerView({ response }: { response: AIQueryResponse }) {
+const STORAGE_VERSION = 2;
+const STORAGE_PREFIX = "accent.ai.chats.v2";
+
+function storageKeyFor(email: string | undefined): string | null {
+  if (!email) return null;
+  return `${STORAGE_PREFIX}:${email.toLowerCase()}`;
+}
+
+function loadConvos(email: string | undefined): PersistedStateV2 | null {
+  const key = storageKeyFor(email);
+  if (!key) return null;
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as PersistedStateV2;
+    if (parsed.v !== STORAGE_VERSION) return null;
+    if (!Array.isArray(parsed.conversations)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function saveConvos(
+  email: string | undefined,
+  conversations: ReadonlyArray<Conversation>,
+  activeId: string | null,
+): void {
+  const key = storageKeyFor(email);
+  if (!key) return;
+  try {
+    const body: PersistedStateV2 = {
+      v: STORAGE_VERSION,
+      conversations: conversations as Conversation[],
+      activeId,
+    };
+    window.localStorage.setItem(key, JSON.stringify(body));
+  } catch {
+    // Quota exceeded — silently drop. The in-memory state remains
+    // correct for the current session. Realistic recovery would prune
+    // the oldest conversation; not worth the code for now.
+  }
+}
+
+function clearConvos(email: string | undefined): void {
+  const key = storageKeyFor(email);
+  if (!key) return;
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    /* ignore */
+  }
+}
+
+// Sidebar visibility is a per-browser preference, not per-user — same
+// person on the same machine wants the same layout regardless of which
+// account they sign in with. Hence a single global key rather than the
+// email-scoped one above.
+const SIDEBAR_PREF_KEY = "accent.ai.sidebar.v1";
+
+function loadSidebarOpen(): boolean {
+  try {
+    const raw = window.localStorage.getItem(SIDEBAR_PREF_KEY);
+    if (raw === null) return true; // default: visible
+    return raw === "1";
+  } catch {
+    return true;
+  }
+}
+
+function saveSidebarOpen(open: boolean): void {
+  try {
+    window.localStorage.setItem(SIDEBAR_PREF_KEY, open ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Small helpers
+// ---------------------------------------------------------------------------
+
+function newConvoId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `c_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function newConversation(tenant: string): Conversation {
+  return {
+    id: newConvoId(),
+    title: "New conversation",
+    messages: [],
+    tenant,
+    updatedAt: Date.now(),
+    nextMsgId: 1,
+  };
+}
+
+function deriveTitle(text: string): string {
+  const cleaned = text.trim().replace(/\s+/g, " ");
+  if (cleaned.length <= 50) return cleaned;
+  return cleaned.slice(0, 50).trimEnd() + "…";
+}
+
+function formatRelativeTime(ts: number): string {
+  const diff = Date.now() - ts;
+  const min = Math.floor(diff / 60_000);
+  if (min < 1) return "just now";
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const day = Math.floor(hr / 24);
+  if (day === 1) return "yesterday";
+  if (day < 7) return `${day}d ago`;
+  return new Date(ts).toLocaleDateString();
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
+export function AIChat() {
+  const { user } = useAuth();
+  const isSuperadmin = user?.role === "superadmin";
+
+  // Load tenants once per session; the list rarely changes during a
+  // single sitting. `enabled` gates the request on the role so a
+  // tenant_user never hits the superadmin-only endpoint and gets a 403
+  // in DevTools that they can't act on.
+  const tenantsQ = useQuery({
+    queryKey: ["tenants"],
+    queryFn: listTenants,
+    enabled: isSuperadmin,
+    staleTime: 5 * 60_000,
+  });
+
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [input, setInput] = useState("");
+  // Errors are kept out of the persisted conversation. They show under
+  // the message list for the current attempt and are cleared on
+  // conversation switch or next successful send.
+  const [transientError, setTransientError] = useState<Error | null>(null);
+  // Gate save on hydrate so first render doesn't overwrite stored data.
+  const [hydrated, setHydrated] = useState(false);
+
+  // Sidebar visibility (toggle button). Initial render uses the default
+  // so SSR/initial-paint matches; an effect below pulls the saved
+  // preference on mount.
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  useEffect(() => {
+    setSidebarOpen(loadSidebarOpen());
+  }, []);
+
+  function toggleSidebar() {
+    setSidebarOpen((v) => {
+      const next = !v;
+      saveSidebarOpen(next);
+      return next;
+    });
+  }
+
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+
+  // Derived active conversation + its visible fields.
+  const active = useMemo(
+    () => conversations.find((c) => c.id === activeId) ?? null,
+    [conversations, activeId],
+  );
+  const messages: ReadonlyArray<DisplayMessage> = active?.messages ?? [];
+  const tenant = active?.tenant ?? "";
+
+  // Hydrate from localStorage once the user identity is known.
+  useEffect(() => {
+    if (!user?.email) {
+      setConversations([]);
+      setActiveId(null);
+      setHydrated(true);
+      return;
+    }
+    const saved = loadConvos(user.email);
+    if (saved && saved.conversations.length > 0) {
+      // Sort by updatedAt desc so the Recents list reads top-to-bottom
+      // newest-first the moment we render.
+      const sorted = [...saved.conversations].sort(
+        (a, b) => b.updatedAt - a.updatedAt,
+      );
+      setConversations(sorted);
+      // Prefer the saved activeId if it still exists; otherwise pick
+      // the most recently updated convo.
+      const stillExists =
+        saved.activeId && sorted.some((c) => c.id === saved.activeId);
+      setActiveId(stillExists ? saved.activeId : sorted[0]!.id);
+    } else {
+      setConversations([]);
+      setActiveId(null);
+    }
+    setHydrated(true);
+  }, [user?.email]);
+
+  // Persist on every meaningful change after hydration. We refuse to
+  // write an empty conversation list — both as a defensive measure
+  // against the race between hydrate and this effect re-firing on
+  // user?.email change, and to keep an empty in-memory state from
+  // wiping a stored one. Explicit deletion is what calls clearConvos.
+  useEffect(() => {
+    if (!hydrated) return;
+    if (conversations.length === 0) return;
+    saveConvos(user?.email, conversations, activeId);
+  }, [hydrated, user?.email, conversations, activeId]);
+
+  // Auto-scroll the message stream when the active conversation grows.
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages.length, activeId]);
+
+  // -------------------------------------------------------------------------
+  // Mutations & actions
+  // -------------------------------------------------------------------------
+
+  const mutation = useMutation<
+    AIQueryResponse,
+    Error,
+    { convoId: string; question: string }
+  >({
+    mutationFn: async ({ question }) => {
+      const tenantId =
+        isSuperadmin && tenant.trim() ? Number(tenant.trim()) : undefined;
+      const history: ChatTurn[] = messages
+        .flatMap<ChatTurn>((m) => {
+          if (m.role === "user") return [{ role: "user", content: m.content }];
+          if (m.role === "assistant")
+            return [{ role: "assistant", content: m.response.summary }];
+          return [];
+        })
+        .slice(-MAX_HISTORY_TURNS);
+      return askAI({ question, tenant_id: tenantId, history });
+    },
+    onSuccess: (resp, vars) => {
+      // Append assistant reply to the same conversation that asked.
+      // Going through `vars.convoId` (captured at send time) instead
+      // of `activeId` avoids a race if the user switches chats while
+      // the request is in flight.
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id !== vars.convoId
+            ? c
+            : {
+                ...c,
+                messages: [
+                  ...c.messages,
+                  { id: c.nextMsgId, role: "assistant", response: resp },
+                ],
+                nextMsgId: c.nextMsgId + 1,
+                updatedAt: Date.now(),
+              },
+        ),
+      );
+      setTransientError(null);
+    },
+    onError: (err) => setTransientError(err),
+  });
+
+  function send() {
+    const q = input.trim();
+    if (!q || mutation.isPending) return;
+    // Tenant guard is SOFT — we don't disable the Send button on
+    // missing tenant (disabled styling washed out and read as "the
+    // button disappeared"). Instead, surface an inline error so the
+    // user gets immediate feedback and can fix it.
+    if (isSuperadmin && !tenant.trim()) {
+      setTransientError(
+        new Error("Pick a tenant from the dropdown before sending."),
+      );
+      return;
+    }
+
+    // Step 1: ensure we have an active conversation. If none, spin one
+    // up with the current tenant. We do this BEFORE appending the
+    // message so the convo id is stable.
+    let convoId = activeId;
+    setConversations((prev) => {
+      let working = prev;
+      if (!convoId || !working.some((c) => c.id === convoId)) {
+        const fresh = newConversation(isSuperadmin ? tenant : "");
+        convoId = fresh.id;
+        working = [fresh, ...working];
+      }
+      // Step 2: append the user message + maybe set the title.
+      return working.map((c) => {
+        if (c.id !== convoId) return c;
+        const isFirstUserMsg = c.messages.every((m) => m.role !== "user");
+        return {
+          ...c,
+          title: isFirstUserMsg ? deriveTitle(q) : c.title,
+          messages: [...c.messages, { id: c.nextMsgId, role: "user", content: q }],
+          nextMsgId: c.nextMsgId + 1,
+          updatedAt: Date.now(),
+        };
+      });
+    });
+    if (activeId !== convoId) setActiveId(convoId);
+    setInput("");
+    setTransientError(null);
+    // convoId is set above. The "!" reflects that.
+    mutation.mutate({ convoId: convoId!, question: q });
+  }
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    send();
+  }
+
+  function onKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      send();
+    }
+  }
+
+  function newChat() {
+    // Don't allocate a brand-new convo here — just deselect. Sending
+    // the first message will auto-create one. This avoids littering
+    // the sidebar with empty "New conversation" entries.
+    setActiveId(null);
+    setInput("");
+    setTransientError(null);
+    mutation.reset();
+  }
+
+  function switchTo(id: string) {
+    if (id === activeId) return;
+    setActiveId(id);
+    setInput("");
+    setTransientError(null);
+    mutation.reset();
+  }
+
+  function deleteConvo(id: string) {
+    setConversations((prev) => {
+      const remaining = prev.filter((c) => c.id !== id);
+      // If we just deleted the active one, jump to the next most
+      // recently updated convo (or to empty state if none left).
+      if (id === activeId) {
+        if (remaining.length === 0) {
+          setActiveId(null);
+          // The persist effect skips empty lists, so we explicitly
+          // wipe the saved data when the user empties their history.
+          clearConvos(user?.email);
+        } else {
+          const sorted = [...remaining].sort(
+            (a, b) => b.updatedAt - a.updatedAt,
+          );
+          setActiveId(sorted[0]!.id);
+        }
+      }
+      return remaining;
+    });
+  }
+
+  function updateTenant(value: string) {
+    if (!active) {
+      // No active convo yet — stash the tenant on a fresh one so
+      // `send()` finds it. Cheaper than juggling a parallel state.
+      const fresh = newConversation(value);
+      setConversations((prev) => [fresh, ...prev]);
+      setActiveId(fresh.id);
+      return;
+    }
+    setConversations((prev) =>
+      prev.map((c) => (c.id === active.id ? { ...c, tenant: value } : c)),
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Render
+  // -------------------------------------------------------------------------
+
+  const showEmpty = !active || (active.messages.length === 0 && !mutation.isPending);
+  const greeting = useMemo(() => buildGreeting(user?.email), [user?.email]);
+  const sortedConvos = useMemo(
+    () => [...conversations].sort((a, b) => b.updatedAt - a.updatedAt),
+    [conversations],
+  );
+  // Only disable on the two unambiguous cases: a request is in flight,
+  // or the textarea is empty. Tenant selection is checked in `send()`
+  // and surfaces as an inline message — that keeps the Send button
+  // visually constant so it never looks like it vanished.
+  const sendDisabled = mutation.isPending || !input.trim();
+
   return (
-    <div className="space-y-6">
-      <Panel title="Summary">
-        <blockquote className="border-l-4 border-brand pl-4 text-base text-slate-800">
-          {response.summary}
-        </blockquote>
-        <p className="mt-3 text-xs text-slate-500">
-          {response.row_count} {response.row_count === 1 ? "row" : "rows"} ·{" "}
-          {response.elapsed_ms} ms · {response.provider}/{response.model}
-        </p>
-      </Panel>
-
-      <Panel title="Chart" description={`Inferred chart type: ${response.chart_type}.`}>
-        <ChartFor response={response} />
-      </Panel>
-
-      <Panel
-        title="Details"
-        description="Generated SQL + raw rows. Useful for verifying what actually ran."
-      >
-        <details className="text-sm" open={false}>
-          <summary className="cursor-pointer text-slate-700">
-            Show generated SQL
-          </summary>
-          <pre className="mt-2 overflow-x-auto rounded-md bg-slate-900 p-3 text-xs text-slate-100">
-            <code>{response.sql}</code>
-          </pre>
-        </details>
-
-        <details className="mt-3 text-sm" open={false}>
-          <summary className="cursor-pointer text-slate-700">
-            Show raw rows ({response.row_count})
-          </summary>
-          <div className="mt-2">
-            <RowsTable response={response} />
+    <div className="flex h-[calc(100vh-7rem)] gap-3">
+      {/* --------- Main: chat ---------------------------------------------- */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Top bar: tenant input + small "New chat" for mobile (sidebar hidden). */}
+        <div className="flex items-center justify-between border-b border-slate-200 px-2 pb-3">
+          <div className="flex items-center gap-3">
+            {isSuperadmin ? (
+              <label className="flex items-center gap-2 text-xs text-slate-500">
+                <span className="uppercase tracking-wider">Tenant</span>
+                <select
+                  value={tenant}
+                  onChange={(e) => updateTenant(e.target.value)}
+                  className="min-w-[10rem] rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-800"
+                  disabled={tenantsQ.isLoading}
+                >
+                  {/* Disabled placeholder when nothing's picked yet.
+                      "All tenants" used to live here but ai_query
+                      requires a single tenant bind (see "Phase 2"
+                      comment in app/ai/routers/ai_query.py), so we
+                      force an explicit choice instead. */}
+                  <option value="" disabled>
+                    {tenantsQ.isLoading ? "Loading…" : "Select a tenant…"}
+                  </option>
+                  {(tenantsQ.data ?? []).map((t) => (
+                    <option key={t.tenant_id} value={String(t.tenant_id)}>
+                      {t.display_name} (#{t.tenant_id})
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
           </div>
-        </details>
-      </Panel>
+          <div className="flex items-center gap-2">
+            {/* Always-visible "+ New chat". Lives in the top bar (not
+                in the Recents sidebar) so it stays reachable even
+                when the sidebar is collapsed or hidden on mobile. */}
+            <button
+              type="button"
+              onClick={newChat}
+              className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+              title="Start a new chat"
+            >
+              <span aria-hidden="true">+</span>
+              <span>New chat</span>
+            </button>
+            {/* Desktop-only: collapse the Recents panel on the right. */}
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              className="hidden items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1 text-xs text-slate-600 hover:bg-slate-50 md:inline-flex"
+              title={sidebarOpen ? "Hide Recents" : "Show Recents"}
+              aria-pressed={sidebarOpen}
+            >
+              <span aria-hidden="true">{sidebarOpen ? "›|" : "|‹"}</span>
+              <span>{sidebarOpen ? "Hide Recents" : "Show Recents"}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Conversation stream */}
+        <div ref={scrollerRef} className="flex-1 overflow-y-auto px-2 py-6">
+          {showEmpty ? (
+            <EmptyState
+              greeting={greeting}
+              onPick={(q) => setInput(q)}
+              superadminMissingTenant={isSuperadmin && !tenant.trim()}
+            />
+          ) : (
+            <div className="mx-auto flex max-w-3xl flex-col gap-6">
+              {messages.map((m) => (
+                <MessageBubble key={m.id} message={m} />
+              ))}
+              {mutation.isPending ? <TypingIndicator /> : null}
+            </div>
+          )}
+          {/* Errors render OUTSIDE the showEmpty branch on purpose:
+              a click on Send with "All tenants" selected sets a
+              transient error but adds no message, so messages.length
+              stays 0 and showEmpty is true. If we left this inside the
+              else branch the error would never appear and the button
+              would look like it did nothing. */}
+          {transientError ? (
+            <div className="mx-auto mt-6 flex max-w-3xl">
+              <ErrorBubble error={transientError} />
+            </div>
+          ) : null}
+        </div>
+
+        {/* Composer */}
+        <form
+          onSubmit={onSubmit}
+          className="mx-auto w-full max-w-3xl px-2 pt-3"
+        >
+          <div className="flex items-end gap-2 rounded-2xl border border-slate-300 bg-white p-2 shadow-sm focus-within:border-brand">
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={onKeyDown}
+              rows={1}
+              placeholder="Ask anything about your fleet…"
+              className="block max-h-40 min-h-[2.5rem] flex-1 resize-none bg-transparent px-2 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none"
+              disabled={mutation.isPending}
+            />
+            <button
+              type="submit"
+              disabled={sendDisabled}
+              // Disabled palette pinned to slate-400 (medium grey) with
+              // white text + opacity-70 so contrast is unmistakable.
+              // `min-w-[5rem]` guarantees the button keeps its footprint
+              // no matter how long the textarea placeholder grows —
+              // earlier "Send disappears on 'All tenants'" reports
+              // looked like the disabled bg was washing out against
+              // the white composer. shrink-0 keeps flex from squashing
+              // it on narrow widths.
+              className="min-w-[5rem] shrink-0 rounded-xl bg-brand px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-brand-dark disabled:cursor-not-allowed disabled:bg-slate-400 disabled:text-white disabled:opacity-70 disabled:shadow-none"
+            >
+              {mutation.isPending ? "…" : "Send"}
+            </button>
+          </div>
+          <p className="mt-2 text-center text-[11px] text-slate-400">
+            Enter to send · Shift+Enter for a new line · scoped to your tenant
+          </p>
+        </form>
+      </div>
+
+      {/* --------- Sidebar: Recents (right side) --------------------------- */}
+      {/* `hidden ... md:flex` keeps the panel off mobile entirely; the
+          extra `sidebarOpen` gate lets desktop users collapse it too. */}
+      {sidebarOpen ? (
+      <aside className="hidden w-60 shrink-0 flex-col border-l border-slate-200 pl-3 md:flex">
+        <div className="flex items-center justify-between pb-2">
+          <span className="text-xs font-medium uppercase tracking-wider text-slate-500">
+            Recents
+          </span>
+          {/* "+ New chat" lives in the top bar now, not here. The only
+              control left in the sidebar header is the close button. */}
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            className="rounded-md px-1.5 py-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            title="Hide Recents"
+            aria-label="Hide Recents"
+          >
+            ×
+          </button>
+        </div>
+        {sortedConvos.length === 0 ? (
+          <p className="px-1 pt-2 text-xs text-slate-400">
+            Your past chats will show up here.
+          </p>
+        ) : (
+          <ul className="flex-1 space-y-1 overflow-y-auto">
+            {sortedConvos.map((c) => (
+              <li key={c.id}>
+                <ConvoItem
+                  convo={c}
+                  active={c.id === activeId}
+                  onClick={() => switchTo(c.id)}
+                  onDelete={() => deleteConvo(c.id)}
+                />
+              </li>
+            ))}
+          </ul>
+        )}
+      </aside>
+      ) : null}
     </div>
   );
 }
 
-function ChartFor({ response }: { response: AIQueryResponse }): JSX.Element {
-  const { chart_type, rows, columns } = response;
-  if (rows.length === 0) {
-    return <StateMessage>No rows to plot.</StateMessage>;
-  }
+// ---------------------------------------------------------------------------
+// Sidebar item
+// ---------------------------------------------------------------------------
 
-  // Drop the chart and fall back to the table if we don't have the
-  // shape the chart type wants. Defensive — the server-side suggester
-  // is supposed to send `"table"` in those cases.
-  if (chart_type === "table" || columns.length < 2) {
-    return <RowsTable response={response} />;
-  }
-
-  const [xKey, yKey] = columns;
-
-  if (chart_type === "line") {
-    return (
-      <LineChart
-        data={rows as Array<Record<string, unknown>>}
-        xKey={xKey}
-        series={[{ dataKey: yKey, label: yKey }]}
-      />
-    );
-  }
-
-  if (chart_type === "pie") {
-    const pieData = rows.map((r) => ({
-      name: String(r[xKey] ?? "—"),
-      value: Number(r[yKey] ?? 0),
-    }));
-    return <PieChart data={pieData} />;
-  }
-
-  // chart_type === "bar"
+function ConvoItem({
+  convo,
+  active,
+  onClick,
+  onDelete,
+}: {
+  convo: Conversation;
+  active: boolean;
+  onClick: () => void;
+  onDelete: () => void;
+}) {
   return (
-    <BarChart
-      data={rows as Array<Record<string, unknown>>}
-      xKey={xKey}
-      series={[{ dataKey: yKey, label: yKey }]}
-      layout={chooseBarLayout(rows.length, xKey, rows)}
-    />
+    <div
+      className={`group flex cursor-pointer items-center justify-between gap-1 rounded-md px-2 py-2 text-sm transition-colors ${
+        active
+          ? "bg-brand/10 text-brand-dark"
+          : "text-slate-700 hover:bg-slate-100"
+      }`}
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+    >
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[13px] leading-tight">{convo.title}</p>
+        <p className="mt-0.5 text-[10px] uppercase tracking-wider text-slate-400">
+          {formatRelativeTime(convo.updatedAt)}
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete();
+        }}
+        className="invisible rounded-md px-1 text-xs text-slate-400 hover:text-rose-500 group-hover:visible"
+        title="Delete this conversation"
+        aria-label="Delete conversation"
+      >
+        ×
+      </button>
+    </div>
   );
 }
 
-/**
- * Long category labels (matricules, device ids) are easier to read on
- * the vertical axis. Rule of thumb: more than 6 rows or any x-value
- * longer than 10 chars → switch to horizontal bars (i.e. layout="vertical"
- * in Recharts, which puts categories on the y-axis).
- */
+// ---------------------------------------------------------------------------
+// Empty / landing state
+// ---------------------------------------------------------------------------
+
+function EmptyState({
+  greeting,
+  onPick,
+  superadminMissingTenant,
+}: {
+  greeting: string;
+  onPick: (q: string) => void;
+  superadminMissingTenant: boolean;
+}) {
+  return (
+    <div className="mx-auto flex max-w-2xl flex-col items-center pt-16 text-center">
+      <h1 className="text-3xl font-semibold tracking-tight text-slate-800">
+        {greeting}
+      </h1>
+      <p className="mt-3 text-sm text-slate-500">
+        Ask a natural-language question about trips, vehicles, risk, or
+        maintenance.
+      </p>
+      {superadminMissingTenant ? (
+        <p className="mt-2 text-xs text-amber-600">
+          Pick a tenant in the top bar to start a conversation.
+        </p>
+      ) : null}
+      <div className="mt-8 flex w-full flex-wrap justify-center gap-2">
+        {EXAMPLE_QUESTIONS.map((q) => (
+          <button
+            key={q}
+            type="button"
+            onClick={() => onPick(q)}
+            className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-600 shadow-sm hover:bg-slate-50"
+          >
+            {q}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function buildGreeting(email: string | undefined): string {
+  const hour = new Date().getHours();
+  const timeOfDay =
+    hour < 5
+      ? "Late night"
+      : hour < 12
+        ? "Morning"
+        : hour < 18
+          ? "Afternoon"
+          : "Evening";
+  const name = email ? email.split("@")[0] : "there";
+  const pretty = name.charAt(0).toUpperCase() + name.slice(1);
+  return `${timeOfDay}, ${pretty}`;
+}
+
+// ---------------------------------------------------------------------------
+// Message bubbles
+// ---------------------------------------------------------------------------
+
+function MessageBubble({ message }: { message: DisplayMessage }) {
+  if (message.role === "user") {
+    return (
+      <div className="flex justify-end">
+        <div className="max-w-[80%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-brand px-4 py-2 text-sm text-white shadow-sm">
+          {message.content}
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="flex justify-start">
+      <div className="max-w-[92%] rounded-2xl rounded-bl-sm border border-slate-200 bg-white px-4 py-3 shadow-sm">
+        <p className="text-sm leading-relaxed text-slate-800">
+          {message.response.summary}
+        </p>
+        <AssistantChart response={message.response} />
+        <p className="mt-2 text-[11px] text-slate-400">
+          {message.response.row_count}{" "}
+          {message.response.row_count === 1 ? "row" : "rows"} ·{" "}
+          {message.response.elapsed_ms} ms · {message.response.provider}/
+          {message.response.model}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function TypingIndicator() {
+  return (
+    <div className="flex justify-start">
+      <div className="rounded-2xl rounded-bl-sm border border-slate-200 bg-white px-4 py-3 shadow-sm">
+        <span className="inline-flex items-center gap-1 text-sm text-slate-400">
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-slate-400" />
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-slate-400 [animation-delay:150ms]" />
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-slate-400 [animation-delay:300ms]" />
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function ErrorBubble({ error }: { error: Error }) {
+  return (
+    <div className="flex justify-start">
+      <div className="max-w-[92%] rounded-2xl rounded-bl-sm border border-rose-200 bg-rose-50 px-4 py-3 shadow-sm">
+        {error instanceof AIQueryError ? (
+          <StateMessage tone="error">
+            <strong className="block">{prettyStage(error.stage)}</strong>
+            <span className="mt-1 block whitespace-pre-wrap text-xs text-slate-700">
+              {error.message}
+            </span>
+            <span className="mt-2 block text-[11px] text-slate-500">
+              {stageHint(error.stage)}
+            </span>
+          </StateMessage>
+        ) : (
+          <StateMessage tone="error">{error.message}</StateMessage>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Chart rendering
+// ---------------------------------------------------------------------------
+
+function AssistantChart({ response }: { response: AIQueryResponse }) {
+  const { chart_type, rows, columns } = response;
+  if (rows.length === 0) return null;
+  if (chart_type === "table" || columns.length < 2) return null;
+
+  const [xKey, yKey] = columns;
+
+  return (
+    <div className="mt-3 rounded-md border border-slate-100 bg-slate-50/60 p-3">
+      {chart_type === "line" ? (
+        <LineChart
+          data={rows as Array<Record<string, unknown>>}
+          xKey={xKey}
+          series={[{ dataKey: yKey, label: yKey }]}
+        />
+      ) : chart_type === "pie" ? (
+        <PieChart
+          data={rows.map((r) => ({
+            name: String(r[xKey] ?? "—"),
+            value: Number(r[yKey] ?? 0),
+          }))}
+        />
+      ) : (
+        <BarChart
+          data={rows as Array<Record<string, unknown>>}
+          xKey={xKey}
+          series={[{ dataKey: yKey, label: yKey }]}
+          layout={chooseBarLayout(rows.length, xKey, rows)}
+        />
+      )}
+    </div>
+  );
+}
+
 function chooseBarLayout(
   n: number,
   xKey: string,
@@ -262,107 +887,36 @@ function chooseBarLayout(
 }
 
 // ---------------------------------------------------------------------------
-// Raw-rows table
+// Error copy
 // ---------------------------------------------------------------------------
-
-function RowsTable({ response }: { response: AIQueryResponse }) {
-  const columns: ColumnDef<Record<string, unknown>>[] = response.columns.map(
-    (col) => ({
-      key: col,
-      header: col,
-      accessor: (row) => formatCell(row[col]),
-      align: typeof response.rows[0]?.[col] === "number" ? "right" : "left",
-    }),
-  );
-  return (
-    <DataTable
-      rows={response.rows}
-      columns={columns}
-      rowKey={(_r, i) => i}
-      emptyMessage="No rows returned for this question."
-    />
-  );
-}
-
-function formatCell(v: unknown): string {
-  if (v === null || v === undefined) return "—";
-  if (typeof v === "number") {
-    // Tight default: integers as-is, floats with 2 decimals. Recharts
-    // formats its own axis values; this is only for the raw table.
-    return Number.isInteger(v) ? String(v) : v.toFixed(2);
-  }
-  if (typeof v === "object") return JSON.stringify(v);
-  return String(v);
-}
-
-// ---------------------------------------------------------------------------
-// Error rendering — stage-aware
-// ---------------------------------------------------------------------------
-
-function ErrorView({ error }: { error: Error }) {
-  if (error instanceof AIQueryError) {
-    return <TypedErrorView err={error} />;
-  }
-  return (
-    <Panel title="Error">
-      <StateMessage tone="error">{error.message}</StateMessage>
-    </Panel>
-  );
-}
-
-function TypedErrorView({ err }: { err: AIQueryError }) {
-  const hint = stageHint(err.stage);
-  return (
-    <Panel title="Couldn't answer that">
-      <StateMessage tone="error">
-        <strong className="block">{prettyStage(err.stage)}</strong>
-        <span className="mt-1 block whitespace-pre-wrap text-sm text-slate-700">
-          {err.message}
-        </span>
-        {hint ? <span className="mt-2 block text-xs text-slate-500">{hint}</span> : null}
-      </StateMessage>
-      {err.sql ? (
-        <details className="mt-3 text-sm" open={false}>
-          <summary className="cursor-pointer text-slate-700">
-            Offending SQL (rejected before execution)
-          </summary>
-          <pre className="mt-2 overflow-x-auto rounded-md bg-slate-900 p-3 text-xs text-slate-100">
-            <code>{err.sql}</code>
-          </pre>
-        </details>
-      ) : null}
-    </Panel>
-  );
-}
 
 function prettyStage(stage: AIQueryError["stage"]): string {
   switch (stage) {
     case "sql_guard":
-      return "SQL was unsafe and rejected.";
+      return "I couldn't form a safe query.";
     case "tenant_filter":
       return "Tenant check failed.";
     case "llm":
-      return "Upstream LLM provider failed.";
+      return "Upstream LLM provider is having trouble.";
     case "execution":
-      return "Database error while running the query.";
+      return "Database error.";
     case "summarization":
-      return "Could not summarise the result.";
+      return "Couldn't summarise the result.";
     case "config":
-      return "AI assistant is not configured.";
+      return "AI assistant isn't configured.";
   }
 }
 
-function stageHint(stage: AIQueryError["stage"]): string | null {
+function stageHint(stage: AIQueryError["stage"]): string {
   switch (stage) {
     case "sql_guard":
     case "tenant_filter":
-      return "Try rephrasing the question — name the metric and the time window explicitly.";
+      return "Try rephrasing — name the metric and the time window explicitly.";
     case "llm":
-      return "Transient upstream issue; try again in a moment.";
+      return "Transient — try again in a moment.";
     case "execution":
     case "summarization":
     case "config":
-      return null;
+      return "Operator has been notified.";
   }
 }
-

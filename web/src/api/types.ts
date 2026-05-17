@@ -22,6 +22,14 @@ export interface MeResponse {
   last_login_at: string | null;
 }
 
+// Returned by GET /v1/admin/tenants. `created_at` is ISO-8601.
+export interface TenantSummary {
+  tenant_id: number;
+  display_name: string;
+  is_active: boolean;
+  created_at: string;
+}
+
 // ---------- scoring ----------
 export interface FeatureVector {
   device_id?: number | null;
