@@ -68,3 +68,15 @@ PyJWT>=2.9.0
 # requires this validator. Without it pydantic raises ImportError at class
 # definition time, which would crash app startup.
 email-validator>=2.2.0
+
+# --- Text2SQL AI assistant (POST /v1/ai/query) ---
+# AST-based SQL validator — sql_guard parses LLM output under the
+# postgres dialect and walks the tree to reject anything that isn't a
+# read-only SELECT, with tenant predicate enforcement.
+sqlglot>=25.0.0
+# LLM provider SDKs. Both are listed; the runtime picks one via the
+# AI_PROVIDER env var. Marked as optional in spirit — if you only need
+# one provider, comment the other out (the factory lazy-imports so a
+# missing SDK doesn't break app boot, only /v1/ai/query for that vendor).
+openai>=1.40.0
+anthropic>=0.34.0

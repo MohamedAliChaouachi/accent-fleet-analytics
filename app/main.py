@@ -22,11 +22,12 @@ from accent_fleet.config import settings
 from accent_fleet.ml.inference import ClusterPredictor, get_risk_scorer
 from accent_fleet.observability import setup_logging
 from app import __version__
+from app.ai.routers.ai_query import router as ai_router
 from app.auth.admin_routes import router as auth_admin_router
 from app.auth.middleware import AuthMiddleware
 from app.auth.routes import router as auth_router
 from app.middleware import MetricsMiddleware
-from app.routes import admin, devices, health, metrics, score
+from app.routes import admin, dashboards, devices, health, metrics, score
 from app.versioning import LEGACY_SUNSET_HUMAN, include_versioned_router
 
 # Configure structured logging once at import time so anything that runs
@@ -88,7 +89,13 @@ app.include_router(metrics.router)
 # stamped on every response). See app/versioning.py for the policy.
 include_versioned_router(app, score.router)
 include_versioned_router(app, devices.router)
+include_versioned_router(app, dashboards.router)
 include_versioned_router(app, admin.router)
+
+# Text2SQL AI assistant — POST /v1/ai/query. JWT-protected like every
+# other business router; tenant scoping is enforced from the Principal
+# in app/ai/routers/ai_query.py rather than trusted from the body.
+include_versioned_router(app, ai_router)
 
 # Auth routers — same versioning policy. /v1/auth/* canonical, /auth/*
 # legacy (hidden, deprecation headers). The login and refresh paths are

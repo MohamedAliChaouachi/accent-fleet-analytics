@@ -60,6 +60,36 @@ def _generate_temp_password(length: int = 20) -> str:
 # ---------------------------------------------------------------------------
 # Tenants
 # ---------------------------------------------------------------------------
+@router.get(
+    "/tenants",
+    response_model=list[TenantResponse],
+    summary="List all tenants known to the auth layer (superadmin only).",
+)
+def list_tenants(
+    principal: Principal = RequireSuperadminDep,  # noqa: ARG001 — gate only
+    conn: Connection = DbDep,
+) -> list[TenantResponse]:
+    # Source of truth is auth.tenants (already a strict subset of
+    # warehouse.dim_tenant via FK). We sort by display_name so the
+    # React dropdown is alphabetical without client-side sorting.
+    rows = conn.execute(
+        text(
+            "SELECT tenant_id, display_name, is_active, created_at "
+            "FROM auth.tenants "
+            "ORDER BY display_name ASC"
+        )
+    ).all()
+    return [
+        TenantResponse(
+            tenant_id=r.tenant_id,
+            display_name=r.display_name,
+            is_active=r.is_active,
+            created_at=r.created_at,
+        )
+        for r in rows
+    ]
+
+
 @router.post(
     "/tenants",
     response_model=TenantResponse,
