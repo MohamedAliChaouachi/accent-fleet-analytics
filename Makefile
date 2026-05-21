@@ -36,6 +36,7 @@ build:
 
 .PHONY: up
 up:
+	$(COMPOSE) build base
 	$(COMPOSE) up -d mlflow api dashboard etl web
 
 # Run the React SPA against a locally running API (port 8000). Hot reload,
@@ -66,8 +67,8 @@ ps:
 # ---------------------------------------------------------------------------
 .PHONY: seed
 seed:
-	$(COMPOSE) run --rm etl python scripts/run_batch.py bootstrap
-	$(COMPOSE) run --rm etl python scripts/run_batch.py backfill --from 2024-01-01
+	$(COMPOSE) run --rm etl python scripts/run_batch.py --mode bootstrap
+	$(COMPOSE) run --rm etl python scripts/run_batch.py --mode backfill
 
 .PHONY: train
 train:

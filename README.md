@@ -266,6 +266,7 @@ listed below so the failure mode is predictable.
 | Variable | Required? | Failure if unset |
 |---|---|---|
 | `PG_HOST` / `PG_USER` / `PG_PASSWORD` / `PG_DATABASE` | **Yes** | API + dashboard + ETL all crash on startup with `connection refused` |
+| `ETL_PG_PASSWORD` | **Yes for `docker compose up`** | `etl` fails during Compose interpolation before the stack starts |
 | `PG_SSLMODE` | Yes (`require` on Azure, `prefer` locally) | TLS handshake fails on Azure Flexible Server |
 | `MLFLOW_TRACKING_URI` | Auto (compose sets `http://mlflow:5000`) | Cluster scoring falls back to local joblib |
 | `API_ADMIN_KEY` | Recommended | `POST /admin/*` returns 401 for *everyone* — admin endpoints disabled |
@@ -292,8 +293,10 @@ python -c "from accent_fleet.db.engine import get_engine; \
 ### 2. Build and start
 
 ```bash
-docker compose build base                          # one-time shared image
-docker compose up -d mlflow api dashboard etl      # the four long-running services
+make up                                             # builds base, then starts mlflow/api/dashboard/etl/web
+# or:
+docker compose build base                           # one-time shared image
+docker compose up -d mlflow api dashboard etl web    # after base exists locally
 ```
 
 The dashboard now lives at <http://localhost:8501>, the API at
