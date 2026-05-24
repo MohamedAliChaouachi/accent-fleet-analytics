@@ -298,43 +298,106 @@ feature_groups:
         column: total_fuel_used
 
 # =============================================================================
-# Risk Score Configuration
+# Risk Score Model Configuration  (Isolation Forest)
 # =============================================================================
-# Composite 0-100 risk score. Each factor is normalized to [0,1] then weighted.
-# See src/accent_fleet/features/risk_score.py for the reference implementation
-# and sql/21_v_device_risk_profile.sql for the in-database view.
+# The risk score is produced by an UNSUPERVISED anomaly-detection model, NOT a
+# hand-tuned weighted formula. We fit one Isolation Forest per tenant on the
+# 13 driver-behavior features below, take the per-row anomaly score
+#   raw = -decision_function(X)
+# rescale it to [0, 100] using each tenant's fit-time min/max, then bucket the
+# result into four risk categories using PER-TENANT quantile thresholds also
+# captured at fit time. New scoring requests reuse the stored min/max and
+# thresholds; values outside the fit-time range are clipped to [0, 100].
+#
+# All per-tenant artifacts (scaler, model, raw_min, raw_max, thresholds) are
+# bundled into a single MLflow Model Registry version under the name below, so
+# rollback is atomic across the whole tenant cohort.
+#
+# Reference training code: src/accent_fleet/ml/train_risk.py
+# Reference inference code: src/accent_fleet/ml/inference.py (RiskPredictor)
+# Compat SQL view:          sql/21_v_device_risk_profile.sql
+# Fact table:               marts.fact_device_risk_score
 # =============================================================================
 
-risk_score:
+risk_score_model:
+  algorithm: isolation_forest
+  mlflow_model_name: device-risk-score
+  mlflow_experiment_name: device-risk-score
+  mlflow_model_stage: Production
   scale: [0, 100]
-  factors:
-    - name: overspeed_rate
-      weight: 0.30
-      feature: overspeed_per_100km
-      normalize: { type: linear, max: 10.0 }
-    - name: severe_overspeed_share
-      weight: 0.20
-      formula: "(overspeed_severity_high + overspeed_severity_extreme) / NULLIF(overspeed_count, 0)"
-      normalize: { type: identity }       # already in [0, 1]
-    - name: high_speed_trip_ratio
-      weight: 0.15
-      feature: high_speed_trip_ratio
-      normalize: { type: linear, max: 0.3 }
-    - name: speed_alert_rate
-      weight: 0.15
-      feature: speed_alert_per_100km
-      normalize: { type: linear, max: 20.0 }
-    - name: night_driving
-      weight: 0.10
-      feature: night_trip_ratio
-      normalize: { type: linear, max: 0.3 }
-    - name: max_speed
-      weight: 0.10
-      feature: avg_max_speed_kmh       # using avg_max_speed as proxy
-      normalize: { type: linear, max: 200.0 }
+
+  # Hyperparameters — pinned to mirror notebooks/04_modeling/02_anomaly_risk_score.ipynb
+  hyperparameters:
+    n_estimators: 200
+    contamination: auto
+    random_state: 42
+    n_jobs: -1
+
+  # Minimum device-month rows per tenant to fit a model. Tenants below this
+  # threshold are skipped at training time and their devices return HTTP 503
+  # at inference (no fallback to a "global" model — per-tenant or nothing).
+  min_rows_per_tenant: 50
+
+  # Feature inputs — must match src/accent_fleet/ml/train_risk.py::FEATURES
+  # and the columns exposed by marts.v_ml_features_full.
+  features:
+    - overspeed_per_100km
+    - avg_speed_over_limit
+    - high_speed_trip_ratio
+    - speed_alert_per_100km
+    - harsh_brake_per_100km
+    - harsh_accel_per_100km
+    - harsh_corner_per_100km
+    - monthly_idle_ratio
+    - high_rpm_minutes_per_day
+    - night_trip_ratio
+    - rush_hour_trip_ratio
+    - stddev_trip_distance
+    - short_trip_ratio
+
+  # Rescale anomaly score → [0, 100].
+  #   score_0_1 = (raw - raw_min) / (raw_max - raw_min + eps)
+  #   score    = clip(score_0_1, 0, 1) * 100
+  # raw_min / raw_max are captured per tenant at fit time and stored alongside
+  # the model in the bundled artifact.
+  rescale:
+    strategy: per_tenant_minmax
+    epsilon: 1.0e-9
+    clip_to_scale: true
+
+  # Per-tenant quantile thresholds, captured at fit time. The four buckets are
+  #   low      = [0,   p50)
+  #   moderate = [p50, p80)
+  #   high     = [p80, p95)
+  #   critical = [p95, 100]
+  # Boundaries are inclusive on the lower side and exclusive on the upper side
+  # except the final bucket which is closed on both ends.
+  thresholds:
+    strategy: per_tenant_quantile
+    quantiles:
+      low_to_moderate: 0.50
+      moderate_to_high: 0.80
+      high_to_critical: 0.95
 
   categories:
-    - { name: low,      min: 0,  max: 19 }
-    - { name: moderate, min: 20, max: 44 }
-    - { name: high,     min: 45, max: 69 }
-    - { name: critical, min: 70, max: 100 }
+    - { name: low,      order: 0 }
+    - { name: moderate, order: 1 }
+    - { name: high,     order: 2 }
+    - { name: critical, order: 3 }
+
+  # Components returned in the API response are NOT weighted contributions
+  # anymore (the IF model has no per-feature weights). They are post-scaler
+  # z-scores: components[f] = (x[f] - mean[f]) / std[f]  per tenant.
+  # The dashboard's "explain why" chart consumes these to highlight which
+  # features are the most anomalous for a given device-month.
+  components:
+    type: standardized_z_scores
+    source: per_tenant_scaler
+
+  # Stability-based promotion gate. A new candidate version is promoted to
+  # Production only if BOTH category-mix shifts are within tolerance AND the
+  # score-distribution PSI stays under the drift alert threshold.
+  promotion_gate:
+    max_critical_share_shift_pp: 5.0
+    max_high_share_shift_pp: 5.0
+    max_score_psi: 0.25

@@ -2,9 +2,10 @@
 FastAPI application entrypoint.
 
 Boots the scoring service:
-  - Loads RiskScorer (pure-Python, YAML-driven) at import time.
-  - Lazily loads ClusterPredictor on first request (MLflow may not yet have
-    a Production model when the service starts on a fresh stack).
+  - Lazily loads RiskPredictor on first request (per-tenant Isolation Forest
+    artifact; MLflow may not yet have a Production model when the service
+    starts on a fresh stack).
+  - Lazily loads ClusterPredictor on first request (same reasoning).
   - Exposes /health, /score/risk, /score/cluster, /devices/* routes.
 
 Run locally:
@@ -19,7 +20,7 @@ import structlog
 from fastapi import FastAPI
 
 from accent_fleet.config import settings
-from accent_fleet.ml.inference import ClusterPredictor, get_risk_scorer
+from accent_fleet.ml.inference import ClusterPredictor, RiskPredictor
 from accent_fleet.observability import setup_logging
 from app import __version__
 from app.ai.routers.ai_query import router as ai_router
@@ -47,11 +48,11 @@ async def lifespan(app: FastAPI):
         mlflow=s.mlflow_tracking_uri,
     )
 
-    # RiskScorer is pure-Python — load eagerly so misconfiguration fails fast.
-    app.state.risk_scorer = get_risk_scorer()
-
-    # ClusterPredictor depends on MLflow being reachable AND a Production
-    # model existing. Both may not be true on a fresh stack — lazy-load.
+    # Both predictors depend on MLflow being reachable AND a Production
+    # model existing. Neither may be true on a fresh stack, so we
+    # construct them in the unloaded state and let the first request
+    # trigger ``ensure_loaded()``. /health stays green either way.
+    app.state.risk_predictor = RiskPredictor()
     app.state.cluster_predictor = ClusterPredictor()
     yield
     logger.info("api.shutting_down")

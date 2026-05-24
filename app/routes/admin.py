@@ -2,13 +2,17 @@
 Admin endpoints.
 
   POST /admin/reload-model
-        Force the cluster predictor to re-read the latest Production model
-        from MLflow (or local disk). Use after promoting a new version so the
-        running API picks it up without a container restart.
+        Force the cluster predictor to re-read the latest Production
+        clustering model from MLflow (or local disk).
 
-Authentication: every endpoint here requires an `X-API-Key` header matching
-settings.api_admin_key. When the key is not set the router fails closed —
-every request returns 401.
+  POST /admin/reload-risk-model
+        Same, for the per-tenant Isolation Forest risk model. Useful after
+        the monthly retrain promotes a new ``device-risk-score`` version
+        so the running API picks it up without a container restart.
+
+Authentication: every endpoint here requires an ``X-API-Key`` header
+matching settings.api_admin_key. When the key is not set the router fails
+closed — every request returns 401.
 """
 
 from __future__ import annotations
@@ -18,8 +22,8 @@ import logging
 from fastapi import APIRouter, Header, HTTPException, status
 
 from accent_fleet.config import settings
-from accent_fleet.ml.inference import ClusterPredictor
-from app.deps import ClusterPredictorDep
+from accent_fleet.ml.inference import ClusterPredictor, RiskPredictor
+from app.deps import ClusterPredictorDep, RiskPredictorDep
 
 logger = logging.getLogger("accent_fleet.api.admin")
 
@@ -53,9 +57,34 @@ def reload_model(
     _check_admin_key(x_api_key)
     logger.info("admin: reloading cluster model")
     info = predictor.reload()
-    logger.info("admin: reloaded model_version=%s source=%s", info["model_version"], info["source"])
+    logger.info(
+        "admin: reloaded cluster model_version=%s source=%s",
+        info["model_version"], info["source"],
+    )
     return {
         "status": "reloaded",
+        "model": "device-clustering",
+        "model_version": info["model_version"],
+        "source": info["source"],
+    }
+
+
+@router.post("/reload-risk-model")
+def reload_risk_model(
+    predictor: RiskPredictor = RiskPredictorDep,
+    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+) -> dict[str, str]:
+    """Force a fresh RiskPredictor load from MLflow."""
+    _check_admin_key(x_api_key)
+    logger.info("admin: reloading risk model")
+    info = predictor.reload()
+    logger.info(
+        "admin: reloaded risk model_version=%s source=%s",
+        info["model_version"], info["source"],
+    )
+    return {
+        "status": "reloaded",
+        "model": "device-risk-score",
         "model_version": info["model_version"],
         "source": info["source"],
     }

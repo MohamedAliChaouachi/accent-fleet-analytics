@@ -3,6 +3,12 @@ FastAPI dependency providers.
 
 These wrap the shared singletons stored on `app.state` so route handlers
 can take them as typed parameters instead of reaching into globals.
+
+Both predictors are lazy: the lifespan handler in app/main.py constructs
+them in the unloaded state. The first request that touches a route reads
+the singleton, calls ``ensure_loaded()`` on demand, and serves the
+prediction. This keeps the API able to boot on a fresh stack with no
+trained models yet.
 """
 
 from __future__ import annotations
@@ -13,8 +19,7 @@ from fastapi import Depends, Request
 from sqlalchemy.engine import Connection
 
 from accent_fleet.db.engine import get_engine
-from accent_fleet.features.risk_score import RiskScorer
-from accent_fleet.ml.inference import ClusterPredictor
+from accent_fleet.ml.inference import ClusterPredictor, RiskPredictor
 
 
 def get_db() -> Iterator[Connection]:
@@ -33,8 +38,8 @@ def get_db() -> Iterator[Connection]:
         yield conn
 
 
-def get_risk_scorer_dep(request: Request) -> RiskScorer:
-    return request.app.state.risk_scorer
+def get_risk_predictor_dep(request: Request) -> RiskPredictor:
+    return request.app.state.risk_predictor
 
 
 def get_cluster_predictor_dep(request: Request) -> ClusterPredictor:
@@ -43,5 +48,5 @@ def get_cluster_predictor_dep(request: Request) -> ClusterPredictor:
 
 # Re-exported for routes
 DbDep = Depends(get_db)
-RiskScorerDep = Depends(get_risk_scorer_dep)
+RiskPredictorDep = Depends(get_risk_predictor_dep)
 ClusterPredictorDep = Depends(get_cluster_predictor_dep)

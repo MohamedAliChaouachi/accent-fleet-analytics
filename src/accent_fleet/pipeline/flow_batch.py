@@ -277,6 +277,47 @@ def task_score_latest_partition(touched_months: list[str], run_id: int) -> int:
 
 
 @task(retries=1)
+def task_score_risk_latest_partition(touched_months: list[str], run_id: int) -> int:
+    """
+    Score the touched months with the per-tenant Isolation Forest risk
+    model and write fact_device_risk_score rows.
+
+    Must run BEFORE task_refresh_device_risk_profile because, since v0.6,
+    the v_device_risk_profile compat view sources risk_score/risk_category
+    from fact_device_risk_score. Skipping or failing this task leaves the
+    profile snapshot empty rather than stale — operationally preferable.
+
+    Never fails the flow:
+      - missing model       → skipped_reason on the result, warn + continue
+      - missing per-tenant artefact → counted in skipped_tenant_rows, warn
+
+    Lazy import for the same reason as task_score_latest_partition:
+    sklearn / mlflow stay off the bootstrap path.
+    """
+    if not touched_months:
+        log.info("risk_scoring.skip_no_touched_months")
+        return 0
+    from accent_fleet.ml.batch_scoring import score_risk_partitions
+
+    result = score_risk_partitions(touched_months, run_id)
+    if result.skipped_reason:
+        log.warning(
+            "risk_scoring.skipped",
+            reason=result.skipped_reason,
+            months=touched_months,
+        )
+    else:
+        log.info(
+            "risk_scoring.done",
+            rows=result.rows_scored,
+            months=touched_months,
+            model_version=result.model_version,
+            skipped_tenant_rows=result.skipped_tenant_rows or {},
+        )
+    return result.rows_scored
+
+
+@task(retries=1)
 def task_ensure_views() -> None:
     """(Re)create the marts views. Idempotent."""
     with transaction() as conn:
@@ -306,8 +347,9 @@ def task_ensure_mart_structure() -> None:
         for sql_file in (
             "20_mart_device_monthly_behavior.sql",
             "25_mart_device_monthly_telemetry.sql",
-            # ML output table (DDL only — populated by batch_scoring.py)
+            # ML output tables (DDL only — populated by batch_scoring.py)
             "27_fact_device_cluster_assignment.sql",
+            "28_fact_device_risk_score.sql",
             # BI marts (DDL only — recompute happens later)
             "30_mart_fleet_daily.sql",
             "31_mart_vehicle_monthly.sql",
@@ -468,6 +510,124 @@ def task_retrain_with_gate(month_from: str = "2025-01") -> dict:
     }
 
 
+@task(retries=0)
+def task_retrain_risk_with_gate(month_from: str = "2025-01") -> dict:
+    """
+    Run gated retraining of the per-tenant Isolation Forest risk model.
+
+    The risk gate is stability-based (|Δ%critical| ≤ 5pp AND |Δ%high| ≤ 5pp
+    AND PSI(score) < 0.25 by default), not silhouette-based — IF is
+    unsupervised and silhouette doesn't apply to the score distribution.
+
+    Updates the candidate / Production critical+high share gauges and the
+    score-PSI gauge so dashboards can see why a promotion was held without
+    digging through MLflow. Sets the last-promoted timestamp on success.
+
+    Never raises — retraining failures are reported in the return dict and
+    as warning logs, matching task_retrain_with_gate's contract so the
+    Prefect schedule keeps firing.
+
+    Imports are lazy because:
+      - promotion imports train_risk lazily (no cycle, but still)
+      - drift imports pandas/numpy/sqlalchemy
+      - observability is a tiny module but mlflow lives behind retrain
+    """
+    try:
+        from accent_fleet.ml.drift import compute_score_drift
+        from accent_fleet.ml.promotion import retrain_risk_with_gate
+        from accent_fleet.observability import (
+            ml_candidate_risk_critical_share,
+            ml_candidate_risk_high_share,
+            ml_last_risk_retrain_promoted_timestamp,
+            ml_production_risk_critical_share,
+            ml_production_risk_high_share,
+            ml_risk_score_psi,
+        )
+    except ImportError as exc:
+        log.warning("risk_retrain.skipped_import_error", error=str(exc))
+        return {"promoted": False, "reason": f"import_error: {exc}"}
+
+    # The provider receives the month_from string the flow was called with
+    # and returns the score-distribution PSI between the candidate's window
+    # and the prior reference window. Returns None on a fresh stack — the
+    # decision function treats that as "no signal" and lets the gate fall
+    # through to the share-shift checks alone.
+    def _score_psi_provider(mf: str) -> float | None:
+        # The candidate window spans ">= month_from"; we use a single-month
+        # anchor (`mf`) here as a representative "current" sample for the
+        # drift computation. compute_score_drift derives its own reference
+        # window from this anchor, so passing just `[mf]` is sufficient.
+        try:
+            return compute_score_drift([mf])
+        except Exception as exc:  # noqa: BLE001 — drift must not break retrain
+            log.warning("risk_retrain.score_psi_failed", error=str(exc))
+            return None
+
+    try:
+        result = retrain_risk_with_gate(
+            month_from=month_from,
+            score_psi_provider=_score_psi_provider,
+        )
+    except Exception as exc:  # noqa: BLE001 — never fail the flow
+        log.warning("risk_retrain.failed", error=str(exc), month_from=month_from)
+        return {"promoted": False, "reason": f"retrain_exception: {exc}"}
+
+    # Always publish the candidate shares so a "held" promotion is still
+    # observable on the dashboard.
+    cand = result.candidate_share or {}
+    ml_candidate_risk_critical_share.set(float(cand.get("critical", 0.0)))
+    ml_candidate_risk_high_share.set(float(cand.get("high", 0.0)))
+
+    # When the gate held, the live Production model didn't change. Keep
+    # the Production gauges pointed at the same numbers we just compared
+    # against so dashboards stay coherent.
+    if result.current_share is not None:
+        ml_production_risk_critical_share.set(
+            float(result.current_share.get("critical", 0.0))
+        )
+        ml_production_risk_high_share.set(
+            float(result.current_share.get("high", 0.0))
+        )
+
+    # PSI is informational — publish it whenever we have a value (the
+    # provider returns None on cold start; gauge stays at its previous
+    # reading rather than being clobbered with 0).
+    if result.score_psi is not None:
+        ml_risk_score_psi.set(float(result.score_psi))
+
+    if result.promoted:
+        # After a successful promotion, Production == candidate by definition.
+        ml_production_risk_critical_share.set(float(cand.get("critical", 0.0)))
+        ml_production_risk_high_share.set(float(cand.get("high", 0.0)))
+        ml_last_risk_retrain_promoted_timestamp.set_to_current_time()
+        log.info(
+            "risk_retrain.promoted",
+            version=result.candidate_version,
+            candidate_share=cand,
+            previous_share=result.current_share,
+            score_psi=result.score_psi,
+            reason=result.reason,
+        )
+    else:
+        log.warning(
+            "risk_retrain.held",
+            version=result.candidate_version,
+            candidate_share=cand,
+            current_share=result.current_share,
+            score_psi=result.score_psi,
+            reason=result.reason,
+        )
+
+    return {
+        "promoted": result.promoted,
+        "candidate_version": result.candidate_version,
+        "candidate_share": cand,
+        "current_share": result.current_share,
+        "score_psi": result.score_psi,
+        "reason": result.reason,
+    }
+
+
 # =============================================================================
 # Flow: bootstrap
 # =============================================================================
@@ -533,23 +693,30 @@ def incremental_flow(window_end: datetime | None = None) -> None:
         # tenant_summary rolls up the two BI marts above — must run last.
         task_recompute_tenant_summary(touched, run_id)
 
-        # 3b. Refresh the materialized risk-profile fact AFTER
-        #     mart_device_monthly_behavior — it reads from that mart through
-        #     v_device_risk_profile. Cheap (TRUNCATE + INSERT of a small,
-        #     gate-filtered snapshot) so we re-do it whenever any month moved.
+        # 4. Score touched partitions against BOTH ML models. Runs AFTER all
+        #    marts because both scorers read from marts.v_ml_features_full.
+        #    If no model is registered yet, each task is a no-op (logs and
+        #    continues — never fails the flow).
+        #
+        #    Clustering → fact_device_cluster_assignment.
+        #    Risk IF    → fact_device_risk_score.
+        task_score_latest_partition(touched, run_id)
+        task_score_risk_latest_partition(touched, run_id)
+
+        # 4b. Refresh the materialized risk-profile fact AFTER risk scoring.
+        #     Order matters: since v0.6, marts.v_device_risk_profile sources
+        #     risk_score / risk_category from fact_device_risk_score, so the
+        #     snapshot is only correct once the IF batch scorer has populated
+        #     that fact for the touched months. Cheap (TRUNCATE + INSERT of a
+        #     small, gate-filtered snapshot) so we re-do it whenever any month
+        #     moved.
         task_refresh_device_risk_profile(touched, run_id)
 
-        # 4. Score touched partitions against the clustering model and
-        #    persist cluster assignments. Runs AFTER all marts because the
-        #    scorer reads from marts.v_ml_features_full. If no model is
-        #    registered yet this is a no-op (logs and continues).
-        task_score_latest_partition(touched, run_id)
-
-        # 4b. Drift check — compares the just-scored months against a
-        #     6-month reference window. Informational only: a warning is
-        #     logged and a Prometheus gauge updated, but the flow continues
-        #     regardless of the result. Drift triggering retraining is a
-        #     human decision in v0.7.
+        # 4c. Drift check — compares the just-scored feature distribution
+        #     against a 6-month reference window. Informational only: a
+        #     warning is logged and a Prometheus gauge updated, but the flow
+        #     continues regardless of the result. Drift triggering retraining
+        #     is a human decision in v0.7.
         task_detect_drift(touched, run_id)
 
         # 5. Views are views — they don't need refreshing, but we keep
@@ -633,6 +800,38 @@ def retrain_flow(month_from: str = "2025-01") -> dict:
     run_id = begin_run(mode="retrain")
     try:
         result = task_retrain_with_gate(month_from=month_from)
+        end_run(run_id, status="success")
+        return result
+    except Exception as exc:
+        end_run(run_id, status="failed", error_message=str(exc))
+        raise
+
+
+# =============================================================================
+# Flow: monthly retrain (risk model — gated promotion)
+# =============================================================================
+
+@flow(name="accent-retrain-risk")
+def retrain_risk_flow(month_from: str = "2025-01") -> dict:
+    """
+    Train a candidate per-tenant Isolation Forest risk model and promote it
+    only if the stability gate passes (category-share shifts within tolerance
+    AND score-PSI below threshold). Designed to run on a monthly schedule
+    independent of both the incremental flow and the clustering retrain
+    flow — three different cadences, three separate flows, no coupling.
+
+    Returns the task_retrain_risk_with_gate result dict so a CLI caller can
+    surface the outcome in stdout and CI can assert on it.
+
+    Uses mode="retrain" for the etl_run_log entry. The mode is intentionally
+    shared with the clustering retrain — both are "ML retraining work" from
+    the operational perspective. If we ever need to distinguish them in
+    dashboards, the flow name (accent-retrain-risk vs accent-retrain) is
+    already a label on Prefect's side.
+    """
+    run_id = begin_run(mode="retrain")
+    try:
+        result = task_retrain_risk_with_gate(month_from=month_from)
         end_run(run_id, status="success")
         return result
     except Exception as exc:

@@ -22,8 +22,10 @@ GPS-instrumented vehicles (~600 devices, ~50M raw rows, multiple tenants)
 and turns them into two products:
 
 1. **A risk score per device, per month** — "how dangerously is device
-   `42` being driven *this* month?" Composite formula + KMeans clusters.
-   Consumed via a REST API (FastAPI) and a what-if scoring page.
+   `42` being driven *this* month?" Two unsupervised ML models:
+   a per-tenant Isolation Forest for the 0–100 anomaly score, and a
+   fleet-wide KMeans for behaviour personas. Consumed via a REST API
+   (FastAPI) and a what-if scoring page.
 2. **A fleet-BI dashboard** — executive KPIs, daily ops volume,
    maintenance cost leaderboards, harsh-event hotspots. Streamlit.
 
@@ -153,18 +155,20 @@ it's exactly what you'd debug when "the dashboard is stale":
    `mart_vehicle_monthly`, `mart_tenant_monthly_summary`. Only the
    months/dates touched by step 2 are rebuilt; everything else is
    left alone.
-4. `task_refresh_device_risk_profile` — write the current
-   `v_device_risk_profile` snapshot into a real table the API can
-   index.
-5. `task_score_latest_partition` — push KMeans assignments for the
+4. `task_score_latest_partition` — push KMeans assignments for the
    newest year_month into `marts.fact_device_cluster_assignment`.
+5. `task_score_risk_partitions` — run the per-tenant Isolation Forest
+   models over the newest year_month and write into
+   `marts.fact_device_risk_score`. `marts.v_device_risk_profile`
+   reads off this fact table as a compat view for legacy callers.
 6. `task_detect_drift` — PSI per ML feature against the rolling
-   reference window; updates `accent_ml_feature_drift_score{}` gauge.
+   reference window + score-PSI on the risk-score column; updates
+   `accent_ml_feature_drift_score{}` gauge.
 7. `task_run_validation` — run `sql/99_validation_suite.sql`. Counts,
    nulls, freshness.
 8. `task_apply_retention` — prune `etl_run_log`, `quarantine`,
-   `fact_device_cluster_assignment` beyond the retention horizon
-   (config `pipeline.yaml`).
+   `fact_device_cluster_assignment`, `fact_device_risk_score` beyond
+   the retention horizon (config `pipeline.yaml`).
 
 If the dashboard is showing stale data, that's the order to scan: a
 broken step N still lets steps 1..N-1 commit, so the downstream
@@ -184,10 +188,10 @@ profile flags.
 | Service | Role | What happens inside |
 |---|---|---|
 | `mlflow` | Model registry + artifact store | Tracking server v2.16.2. SQLite backend in a named volume. Models register under `device-behavior-clustering`. |
-| `api` | FastAPI scoring service, port 8000 | Loads RiskScorer at startup (pure-Python). Lazy-loads ClusterPredictor on first call. AuthMiddleware enforces JWT in `enforce` mode (M4). |
+| `api` | FastAPI scoring service, port 8000 | Lazy-loads `ClusterPredictor` (KMeans) and `RiskPredictor` (bundled per-tenant Isolation Forest) on first call to their respective routes. Unknown tenant on `/v1/score/risk` → 503 `tenant_model_missing`. AuthMiddleware enforces JWT in `enforce` mode (M4). |
 | `dashboard` | Streamlit UI, port 8501 | Pages `Home → Executive → Operations → Maintenance → Risk → What-If`. Reads Postgres directly (with a service Principal so RLS lets the rows through). What-If hits the API for ad-hoc scoring. |
 | `etl` | Prefect runtime | `while true: run incremental_flow; sleep`. Connects as `accent_etl` (BYPASSRLS) per M6. |
-| `retrain-scheduler` | `--profile scheduler` | supercronic that fires every Monday 04:00 UTC; the wrapper short-circuits unless today is the *first* Monday of the month. Triggers `train_clustering.py`. |
+| `retrain-scheduler` | `--profile scheduler` | supercronic that fires every Monday 04:00 UTC; the wrapper short-circuits unless today is the *first* Monday of the month. Triggers `retrain_monthly.py` (clustering, silhouette gate) and `retrain_risk_monthly.py` (per-tenant IF, stability gate). |
 | `nginx` | `--profile auth` | Reverse proxy with htpasswd at port 8080. v0.6.0 stopgap for "any auth at all"; the durable answer is the JWT model in §8. |
 | `redpanda` | `--profile streaming` | Kafka-compatible broker for the deferred streaming work. Nothing consumes from it yet. |
 | `postgres` | `--profile localdb` | Local Postgres 16 if you don't have an Azure DB to point at. |
@@ -215,17 +219,23 @@ once propagates dep upgrades to all four services.
 |---|---|
 | **Grain** | One row per `(tenant_id, device_id, year_month)` |
 | **Source mart** | `marts.mart_device_monthly_behavior` (+ telemetry mart) |
-| **Source view** | `marts.v_ml_features_full` — frozen training contract |
-| **Risk score** | Pure-Python formula in `src/accent_fleet/features/risk_score.py`. Driven by `config/feature_definitions.yaml` (weights are config, not code). |
-| **Clusters** | KMeans on the same features. Trained by `scripts/train_clustering.py`, registered in MLflow, promoted on silhouette gate. |
-| **API** | `POST /v1/score/risk` — pure-Python, no DB hit. `POST /v1/score/cluster` — uses the loaded MLflow model. |
-| **Dashboard** | "Risk and Behavior" page reads `marts.v_fleet_risk_dashboard` + `marts.v_device_risk_profile` + `marts.fact_device_cluster_assignment`. |
+| **Source view** | `marts.v_ml_features_full` — frozen training contract (same 13 features feed both models) |
+| **Risk score** | **Per-tenant Isolation Forest** in `src/accent_fleet/ml/train_risk.py`. One bundled artifact with `{tenant_id: {scaler, IF, raw_min/max, thresholds, score_share}}`. Trained by `scripts/train_risk_score.py`, gated retrains via `scripts/retrain_risk_monthly.py` (stability gate). |
+| **Clusters** | KMeans on the same 13 features. Trained by `scripts/train_clustering.py`, registered in MLflow, promoted on silhouette gate via `scripts/retrain_monthly.py`. |
+| **API** | `POST /v1/score/risk` — requires `tenant_id`, picks the per-tenant IF model, returns 503 `tenant_model_missing` if unknown. `POST /v1/score/cluster` — fleet-wide MLflow model. |
+| **Dashboard** | "Risk and Behavior" page reads `marts.v_fleet_risk_dashboard` + `marts.v_device_risk_profile` (compat view backed by `marts.fact_device_risk_score`) + `marts.fact_device_cluster_assignment`. |
 
-The risk formula has seven components (overspeed rate, severity high,
-severity extreme, high-speed-trip ratio, speed-alert rate, night-trip
-ratio, max-speed). The `POST /v1/score/risk` response splits the
-contribution per component so the What-If page can render the bar
-chart you saw.
+Both models are **unsupervised** — we have no labelled "this driver
+crashed" ground truth. Clustering segments the population; the risk
+model flags individual outliers within each tenant's own normal range.
+A tenant whose fleet routinely night-drives sees only its own
+night-drivers flagged as anomalous — not every night-driver across the
+country.
+
+The `POST /v1/score/risk` response returns the risk score, the band
+(low/moderate/high/critical), and a `components` dict of the per-feature
+**z-scores** the IF saw (not weight contributions — IF doesn't expose
+weights). The What-If page renders the z-scores as the bar chart.
 
 ### 6.2 Project 2 — Fleet BI dashboard
 
@@ -305,15 +315,21 @@ and `preprocess.joblib` ready for modelling.
 
 ### Phase 4 — Modeling (`notebooks/04_modeling/`)
 
-KMeans clustering on the device-month features. `scripts/train_clustering.py`
-is the production version of this notebook: load → fit → register in
-MLflow → optionally promote.
+Two production models, both unsupervised:
+- KMeans clustering on the 13 device-month features.
+  `scripts/train_clustering.py` is the production version of this
+  notebook: load → fit → register `device-behavior-clustering` →
+  optionally promote.
+- Per-tenant Isolation Forest. `scripts/train_risk_score.py` trains
+  one IF per tenant in the cohort, bundles them into a single artifact,
+  registers as `device-risk-score`.
 
 ### Phase 5 — Evaluation (`notebooks/05_evaluation/`)
 
 Cluster quality (silhouette per K), feature importance proxies,
 qualitative cluster narratives ("cluster 2 = night drivers with
-moderate overspeed"). Anomaly/risk score evaluation lives here too.
+moderate overspeed"). Per-tenant IF risk-score band sanity checks
+(quantile thresholds + score-share distribution) live here too.
 
 ### Phase 6 — Deployment (`notebooks/06_deployment/`)
 

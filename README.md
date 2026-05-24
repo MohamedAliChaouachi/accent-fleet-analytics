@@ -44,17 +44,20 @@ Stream mode (`scripts/run_streaming.py`, `pipeline/flow_stream.py`, `ingestion/s
   rep_activity_daily  │      dim_driver                │    mart_vehicle_monthly           (BI vehicle)
   notification        │      dim_date / dim_hour_band  │    mart_tenant_monthly_summary    (BI rollup)
   archive             │      bridge_device_driver      │
-  vehicule / device   ├──►   fact_trip                 │    Views — ML
-  driver / assignment │      fact_overspeed            │      v_device_risk_profile
-  maintenance         │      fact_stop                 │      v_ml_features
-  offense / sinistre  │      fact_speed_notification ──┤      v_ml_features_full
-  reparation          │      fact_daily_activity       │      v_fleet_risk_dashboard
-  document / fueling  │      fact_harsh_event          │
-                      │      fact_telemetry_daily      │    Views — BI
-                      │      fact_notification         │      v_executive_dashboard
-                      │      fact_maintenance          │      v_operational_dashboard
-                      │      fact_maintenance_line     │      v_maintenance_dashboard
-                      │      fact_fueling              │
+  vehicule / device   ├──►   fact_trip                 │    Facts — ML
+  driver / assignment │      fact_overspeed            │      fact_device_cluster_assignment
+  maintenance         │      fact_stop                 │      fact_device_risk_score
+  offense / sinistre  │      fact_speed_notification ──┤
+  reparation          │      fact_daily_activity       │    Views — ML
+  document / fueling  │      fact_harsh_event          │      v_device_risk_profile  (compat → fact_device_risk_score)
+                      │      fact_telemetry_daily      │      v_ml_features
+                      │      fact_notification         │      v_ml_features_full
+                      │      fact_maintenance          │      v_fleet_risk_dashboard
+                      │      fact_maintenance_line     │
+                      │      fact_fueling              │    Views — BI
+                      │                                │      v_executive_dashboard
+                      │                                │      v_operational_dashboard
+                      │                                │      v_maintenance_dashboard
                       └►     etl_watermark ◄────── drives incremental loads
                              etl_run_log
                              quarantine_rejected
@@ -88,12 +91,14 @@ accent-fleet-analytics/
 │   ├── 18_fact_maintenance_incr.sql               # NEW (BI: maintenance header)
 │   ├── 19_fact_maintenance_line_incr.sql          # NEW (BI: offense/sinistre/reparation)
 │   ├── 20_mart_device_monthly_behavior.sql
-│   ├── 21_v_device_risk_profile.sql
+│   ├── 21_v_device_risk_profile.sql               # compat view → fact_device_risk_score
 │   ├── 22_v_ml_features.sql
 │   ├── 23_v_fleet_risk_dashboard.sql
 │   ├── 24_fact_fueling_incr.sql                   # NEW (BI: fueling events)
 │   ├── 25_mart_device_monthly_telemetry.sql       # archive-side mart
 │   ├── 26_v_ml_features_full.sql                  # unified ML view
+│   ├── 27_fact_device_cluster_assignment.sql      # KMeans persisted output
+│   ├── 28_fact_device_risk_score.sql              # NEW (per-tenant IF persisted output)
 │   ├── 30_mart_fleet_daily.sql                    # NEW (BI mart: day-grain)
 │   ├── 31_mart_vehicle_monthly.sql                # NEW (BI mart: vehicle-month)
 │   ├── 32_mart_tenant_monthly_summary.sql         # NEW (BI mart: tenant-month)
@@ -109,7 +114,8 @@ accent-fleet-analytics/
 │   ├── transforms/        # Dim / fact / feature transforms
 │   ├── ingestion/         # Batch source (stream source in _deferred/)
 │   ├── pipeline/          # Prefect batch flow (stream flow in _deferred/)
-│   ├── features/          # Feature registry + risk score
+│   ├── features/          # Feature registry
+│   ├── ml/                # train_clustering, train_risk, inference, batch_scoring, drift, promotion
 │   └── monitoring/        # Row counts, freshness, null-rate checks
 ├── notebooks/             # CRISP-DM-aligned notebooks (see below)
 │   ├── 00_setup/                      # M0-M1: env check, DDL
@@ -175,25 +181,21 @@ python scripts/bench_api.py --no-db          # skip /devices/{id}/profile
 | `GET /devices/{id}/profile` | 1  | 200  | 340.4 ms  | 499.7 ms  | 748.0 ms  | 813.0 ms  | p95 ≤ 300 ms | **OVER** |
 | `GET /devices/{id}/profile` | 16 | 1000 | 1031.2 ms | 1692.7 ms | 3489.8 ms | 4659.1 ms | p95 ≤ 300 ms | **OVER** |
 
-**`/score/risk`** is pure-Python (no DB hit) and lands well under target —
-the 16× concurrency penalty is a real cost (single uvicorn worker + sync
-route runs in the anyio threadpool) but absolute numbers are still fine.
+**`/score/risk`** runs in-memory against the bundled per-tenant
+Isolation Forest artifact — no DB hit per request — and lands well
+under target. The 16× concurrency penalty is a real cost (single
+uvicorn worker + sync route runs in the anyio threadpool) but absolute
+numbers are still fine. Unknown tenants return HTTP 503
+`tenant_model_missing` rather than scoring against a neighbour's
+model.
 
-**`/devices/{id}/profile`** is over target even at single-request load. Two
-SQL hits per request: `marts.v_device_risk_profile` (a view doing a window
-rank over `mart_device_monthly_behavior` then a `WHERE device_id = ?`
-filter) and `marts.mart_device_monthly_behavior` (indexed). The view is
-the bottleneck — the window can't be pushed below the WHERE clause, so
-each request rescans the source table.
-
-**Follow-up to close the gap** — pick one:
-- Materialize `v_device_risk_profile` as a table refreshed by the
-  incremental flow (cheap; we already touch the source on every batch).
-- Or add a partial index `(device_id) WHERE ...` on
-  `mart_device_monthly_behavior` and rewrite the view to push the filter.
-
-Tracked as a Tier-1 follow-up; the bench script makes the regression
-test for it trivial.
+**`/devices/{id}/profile`** is over target even at single-request load.
+The historic bottleneck was `marts.v_device_risk_profile` running an
+on-the-fly window rank. In v0.6 this view became a compat-only thin
+wrapper over the precomputed `marts.fact_device_risk_score` table, so
+per-request cost is now dominated by the
+`marts.mart_device_monthly_behavior` join. Tracked as a Tier-1
+follow-up; the bench script makes the regression test for it trivial.
 
 ---
 

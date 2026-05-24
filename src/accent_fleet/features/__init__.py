@@ -1,6 +1,13 @@
-"""Feature registry and risk-score computation."""
+"""
+Feature registry.
+
+Until v0.6 this package also exported a deterministic RiskScorer that read
+a weighted-formula block from ``config/feature_definitions.yaml``. That
+scorer is now retired — the risk score is produced by the per-tenant
+Isolation Forest in ``accent_fleet.ml.inference.RiskPredictor`` and the
+relevant configuration lives under ``risk_score_model`` in the same YAML.
+"""
 
 from accent_fleet.features.registry import FeatureRegistry, load_feature_registry
-from accent_fleet.features.risk_score import RiskScorer, load_risk_scorer
 
-__all__ = ["FeatureRegistry", "RiskScorer", "load_feature_registry", "load_risk_scorer"]
+__all__ = ["FeatureRegistry", "load_feature_registry"]

@@ -1,15 +1,24 @@
 """
-Batch scoring: write cluster assignments for every (tenant, device, year_month)
-in a set of touched months into marts.fact_device_cluster_assignment.
+Batch scoring: write per-(tenant, device, year_month) model outputs into
+the marts fact tables for a set of touched months.
 
-Called from the Prefect incremental flow after marts are refreshed. The
-dashboard reads pre-computed cluster_ids from this fact table rather than
+Two parallel scoring paths share the same shape:
+
+  - ``score_partitions``        — KMeans cluster assignments
+                                  → marts.fact_device_cluster_assignment
+  - ``score_risk_partitions``   — Isolation Forest risk scores (per tenant)
+                                  → marts.fact_device_risk_score
+
+Both are called from the Prefect incremental flow after marts are refreshed.
+The dashboard reads pre-computed scores from the fact tables rather than
 calling the API per row — keeping page loads fast.
 
-Contract:
-  - score_partitions(touched_months, run_id) -> ScoreResult
+Contract for both:
   - Idempotent: rerunning on the same months replaces those rows.
-  - No-op (and logs the reason) if no clustering model is available.
+  - Atomic per-flow-run: delete-then-insert in one transaction so readers
+    never see a half-populated partition.
+  - No-op (and logs the reason) if no model is available — the flow
+    continues even when MLflow / disk artifacts are missing.
 """
 
 from __future__ import annotations
@@ -23,45 +32,73 @@ import pandas as pd
 from sqlalchemy import text
 
 from accent_fleet.db.engine import get_engine, transaction
-from accent_fleet.ml.inference import ClusterPredictor
+from accent_fleet.ml.inference import (
+    ClusterPredictor,
+    RiskPredictor,
+    TenantModelMissing,
+)
 
 logger = logging.getLogger("accent_fleet.ml.batch_scoring")
 
 
-# Singleton — we want to load the model once per process even if score_partitions
-# is called from multiple tasks. The ClusterPredictor itself is thread-safe.
-_PREDICTOR: ClusterPredictor | None = None
+# Singletons — we want to load each model once per process even if the
+# scoring entry points are called from multiple Prefect tasks. Both
+# predictors are thread-safe.
+_CLUSTER_PREDICTOR: ClusterPredictor | None = None
+_RISK_PREDICTOR: RiskPredictor | None = None
 
 
-def _get_predictor() -> ClusterPredictor:
-    global _PREDICTOR
-    if _PREDICTOR is None:
-        _PREDICTOR = ClusterPredictor()
-    return _PREDICTOR
+def _get_cluster_predictor() -> ClusterPredictor:
+    global _CLUSTER_PREDICTOR
+    if _CLUSTER_PREDICTOR is None:
+        _CLUSTER_PREDICTOR = ClusterPredictor()
+    return _CLUSTER_PREDICTOR
+
+
+def _get_risk_predictor() -> RiskPredictor:
+    global _RISK_PREDICTOR
+    if _RISK_PREDICTOR is None:
+        _RISK_PREDICTOR = RiskPredictor()
+    return _RISK_PREDICTOR
 
 
 @dataclass
 class ScoreResult:
+    """Outcome of a batch scoring pass — shared between cluster + risk."""
     rows_scored: int
     months: list[str]
     model_version: str
     model_source: str
     skipped_reason: str | None = None
+    # Risk-side only: which tenants we have no model for, mapped to the
+    # number of rows that were therefore skipped (NOT written to the fact).
+    skipped_tenant_rows: dict[int, int] | None = None
 
 
 # ---------------------------------------------------------------------------
-def _load_features(months: list[str], feature_order: list[str]) -> pd.DataFrame:
+# Shared feature-loader. The risk + cluster paths read the SAME view because
+# both train on it; keeping the loader in one place means a column rename
+# only needs to be reflected in one query.
+# ---------------------------------------------------------------------------
+def _load_features(
+    months: list[str],
+    feature_order: list[str],
+    *,
+    include_tenant: bool = False,
+) -> pd.DataFrame:
     """
     Pull rows from marts.v_ml_features_full for the given months.
 
     Only the columns we need (ids + features the model was trained on) are
     selected, which keeps the in-memory frame small even on a wide view.
+    ``include_tenant`` decides whether the resulting frame contains
+    tenant_id — the risk path groups by it; cluster path doesn't need it.
     """
+    base_cols = ["tenant_id", "device_id", "year_month", *feature_order]
     if not months:
-        return pd.DataFrame(columns=["tenant_id", "device_id", "year_month", *feature_order])
+        return pd.DataFrame(columns=base_cols)
 
-    cols = ["tenant_id", "device_id", "year_month", *feature_order]
-    select_list = ", ".join(cols)
+    select_list = ", ".join(base_cols)
     sql = text(
         f"""
         SELECT {select_list}
@@ -76,7 +113,9 @@ def _load_features(months: list[str], feature_order: list[str]) -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------------
-def _upsert_rows(rows: Iterable[dict], months: list[str], run_id: int) -> int:
+# Cluster-assignment fact upsert (unchanged from prior version).
+# ---------------------------------------------------------------------------
+def _upsert_cluster_rows(rows: Iterable[dict], months: list[str], run_id: int) -> int:
     """
     Replace-then-insert pattern: delete every row for the touched months,
     then insert the freshly-scored rows. Wrapped in a single transaction
@@ -141,7 +180,7 @@ def score_partitions(touched_months: list[str], run_id: int) -> ScoreResult:
             skipped_reason="no_touched_months",
         )
 
-    predictor = _get_predictor()
+    predictor = _get_cluster_predictor()
     try:
         predictor.ensure_loaded()
     except RuntimeError as exc:
@@ -158,7 +197,7 @@ def score_partitions(touched_months: list[str], run_id: int) -> ScoreResult:
     df = _load_features(touched_months, feature_order)
     if df.empty:
         # Still need to clear stale rows for these months — done in upsert.
-        _upsert_rows([], touched_months, run_id)
+        _upsert_cluster_rows([], touched_months, run_id)
         return ScoreResult(
             rows_scored=0,
             months=list(touched_months),
@@ -192,7 +231,7 @@ def score_partitions(touched_months: list[str], run_id: int) -> ScoreResult:
         }
         for i, r in enumerate(df.itertuples(index=False))
     ]
-    written = _upsert_rows(rows, touched_months, run_id)
+    written = _upsert_cluster_rows(rows, touched_months, run_id)
     logger.info(
         "scored %d device-months across %d partitions (model=%s)",
         written, len(touched_months), model_version,
@@ -202,4 +241,153 @@ def score_partitions(touched_months: list[str], run_id: int) -> ScoreResult:
         months=list(touched_months),
         model_version=model_version,
         model_source=model_source,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Risk-score fact upsert
+# ---------------------------------------------------------------------------
+def _upsert_risk_rows(rows: Iterable[dict], months: list[str], run_id: int) -> int:
+    """
+    Same replace-then-insert semantics as ``_upsert_cluster_rows`` but for
+    ``marts.fact_device_risk_score``. See that docstring for the rationale.
+
+    The risk variant also clears rows for tenants that the new model can't
+    score anymore (because the tenant fell below ``min_rows_per_tenant``
+    in this training window) — the row count returned reflects the
+    INSERT side only, not the delete.
+    """
+    rows = list(rows)
+    with transaction() as conn:
+        conn.execute(
+            text(
+                """
+                DELETE FROM marts.fact_device_risk_score
+                 WHERE year_month = ANY(CAST(:months AS text[]))
+                """
+            ),
+            {"months": months},
+        )
+        if not rows:
+            return 0
+        conn.execute(
+            text(
+                """
+                INSERT INTO marts.fact_device_risk_score (
+                  tenant_id, device_id, year_month,
+                  risk_score, risk_category,
+                  model_version, model_source, _etl_run_id
+                ) VALUES (
+                  :tenant_id, :device_id, :year_month,
+                  :risk_score, :risk_category,
+                  :model_version, :model_source, :etl_run_id
+                )
+                """
+            ),
+            rows,
+        )
+    return len(rows)
+
+
+# ---------------------------------------------------------------------------
+def score_risk_partitions(touched_months: list[str], run_id: int) -> ScoreResult:
+    """
+    Score every device-month in ``touched_months`` with the per-tenant
+    Isolation Forest and upsert into ``marts.fact_device_risk_score``.
+
+    Per-tenant model semantics: rows for a tenant that has no model in the
+    loaded artifact are dropped silently (counted in ``skipped_tenant_rows``)
+    rather than aborting the batch. The mart for that tenant simply won't
+    have current rows until the next retrain includes them — same posture
+    as the API's 503 behaviour.
+
+    Returns a ScoreResult describing what happened. Never raises on a
+    missing or unloadable risk artifact; the flow keeps moving and surfaces
+    the reason in logs / metrics.
+    """
+    if not touched_months:
+        return ScoreResult(
+            rows_scored=0,
+            months=[],
+            model_version="n/a",
+            model_source="n/a",
+            skipped_reason="no_touched_months",
+        )
+
+    predictor = _get_risk_predictor()
+    try:
+        predictor.ensure_loaded()
+    except RuntimeError as exc:
+        logger.warning("risk batch scoring skipped: %s", exc)
+        return ScoreResult(
+            rows_scored=0,
+            months=list(touched_months),
+            model_version="unloaded",
+            model_source="none",
+            skipped_reason=f"no_model: {exc}",
+        )
+
+    feature_order = predictor.feature_order
+    df = _load_features(touched_months, feature_order, include_tenant=True)
+    if df.empty:
+        _upsert_risk_rows([], touched_months, run_id)
+        return ScoreResult(
+            rows_scored=0,
+            months=list(touched_months),
+            model_version=predictor.model_version,
+            model_source=predictor.source,
+            skipped_reason="no_feature_rows",
+            skipped_tenant_rows={},
+        )
+
+    model_version = predictor.model_version
+    model_source = predictor.source
+
+    rows: list[dict] = []
+    skipped_tenant_rows: dict[int, int] = {}
+
+    # Group by tenant_id so each per-tenant Isolation Forest gets one
+    # vectorised forward pass. We process the groups in deterministic
+    # sorted order so logs / metrics are stable across runs.
+    for tenant_id, sub in df.groupby("tenant_id", sort=True):
+        tid = int(tenant_id)
+        try:
+            scores, labels = predictor.predict_batch(
+                tenant_id=tid,
+                features_df=sub[list(feature_order)],
+            )
+        except TenantModelMissing:
+            skipped_tenant_rows[tid] = len(sub)
+            logger.info(
+                "risk scoring: skipping tenant %d (%d rows) — no per-tenant model",
+                tid, len(sub),
+            )
+            continue
+
+        rows.extend(
+            {
+                "tenant_id": tid,
+                "device_id": int(r.device_id),
+                "year_month": str(r.year_month),
+                "risk_score": float(scores[i]),
+                "risk_category": str(labels[i]),
+                "model_version": model_version,
+                "model_source": model_source,
+                "etl_run_id": run_id,
+            }
+            for i, r in enumerate(sub.itertuples(index=False))
+        )
+
+    written = _upsert_risk_rows(rows, touched_months, run_id)
+    logger.info(
+        "risk scored %d device-months across %d partitions (model=%s, "
+        "skipped_tenants=%s)",
+        written, len(touched_months), model_version, skipped_tenant_rows,
+    )
+    return ScoreResult(
+        rows_scored=written,
+        months=list(touched_months),
+        model_version=model_version,
+        model_source=model_source,
+        skipped_tenant_rows=skipped_tenant_rows,
     )

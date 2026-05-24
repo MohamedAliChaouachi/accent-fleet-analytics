@@ -35,20 +35,28 @@ import httpx
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-# Synthetic payload that exercises every component of the RiskScorer.
-# Mid-range numbers so the score is non-zero and non-saturated — closer to
-# what real traffic looks like than an all-zero feature vector.
+# Synthetic payload that exercises the per-tenant RiskPredictor.
+# Mid-range numbers so the StandardScaler doesn't saturate at the tails —
+# closer to what real traffic looks like than an all-zero feature vector.
+# tenant_id is REQUIRED on /score/risk — defaults to 235, the first tenant
+# in the modeling cohort (see config/pipeline.yaml::modeling).
 RISK_PAYLOAD = {
+    "tenant_id": 235,
     "device_id": 1,
     "month": "2026-04",
     "overspeed_per_100km": 5.2,
-    "overspeed_count": 12,
-    "overspeed_severity_high": 4,
-    "overspeed_severity_extreme": 1,
+    "avg_speed_over_limit": 8.4,
     "high_speed_trip_ratio": 0.18,
     "speed_alert_per_100km": 8.7,
+    "harsh_brake_per_100km": 2.1,
+    "harsh_accel_per_100km": 1.4,
+    "harsh_corner_per_100km": 0.9,
+    "monthly_idle_ratio": 0.22,
+    "high_rpm_minutes_per_day": 7.3,
     "night_trip_ratio": 0.22,
-    "avg_max_speed_kmh": 112.0,
+    "rush_hour_trip_ratio": 0.35,
+    "stddev_trip_distance": 12.4,
+    "short_trip_ratio": 0.41,
 }
 
 

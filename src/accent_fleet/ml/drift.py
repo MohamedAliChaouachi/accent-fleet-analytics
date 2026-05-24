@@ -237,6 +237,66 @@ def compare_frames(
     return report
 
 
+def compute_score_drift(
+    current_months: list[str],
+    *,
+    reference_window_months: int = DEFAULT_REFERENCE_WINDOW_MONTHS,
+    n_bins: int = PSI_N_BINS,
+) -> float | None:
+    """
+    PSI of the IF risk-score distribution between two windows of
+    ``marts.fact_device_risk_score``.
+
+    Returns the score-level PSI as a single float, or None when either
+    side has no rows (a fresh stack, or current_months is empty). Used by
+    the risk-model promotion gate — see ``ml.promotion.retrain_risk_with_gate``.
+
+    Reference window = the N months immediately before the earliest current
+    month, same anchoring rule as ``detect_drift_for_months`` so a backfill
+    is measured against its own neighbourhood.
+    """
+    if not current_months:
+        return None
+
+    reference_months = derive_reference_window(current_months, reference_window_months)
+    if not reference_months:
+        return None
+
+    sql = text(
+        """
+        SELECT year_month, risk_score
+          FROM marts.fact_device_risk_score
+         WHERE year_month = ANY(CAST(:months AS text[]))
+        """
+    )
+    with get_engine().connect() as conn:
+        ref_df = pd.read_sql(sql, conn, params={"months": reference_months})
+        cur_df = pd.read_sql(sql, conn, params={"months": list(current_months)})
+
+    if ref_df.empty or cur_df.empty:
+        log.info(
+            "drift.score.empty_window",
+            reference_rows=len(ref_df),
+            current_rows=len(cur_df),
+        )
+        return None
+
+    psi = compute_psi(
+        ref_df["risk_score"].to_numpy(dtype=float, na_value=np.nan),
+        cur_df["risk_score"].to_numpy(dtype=float, na_value=np.nan),
+        n_bins=n_bins,
+    )
+    log.info(
+        "drift.score.computed",
+        psi=psi,
+        n_reference_rows=len(ref_df),
+        n_current_rows=len(cur_df),
+        reference_months=reference_months,
+        current_months=list(current_months),
+    )
+    return float(psi)
+
+
 def detect_drift_for_months(
     current_months: list[str],
     *,

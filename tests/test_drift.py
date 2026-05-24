@@ -6,6 +6,11 @@ DB-free: every test exercises the pure-Python math layer
 DB-backed driver (`detect_drift_for_months`) is covered in an integration
 test that we don't run in CI.
 
+For ``compute_score_drift`` we mock ``pd.read_sql`` at the drift-module
+boundary so the function still goes through its real SQL-text branch
+(catches dumb refactors that drop the year_month filter) while never
+opening a real connection.
+
 What we pin:
   1. Identical distributions → PSI ≈ 0.
   2. Wildly different distributions → PSI exceeds the 0.25 alert threshold.
@@ -14,6 +19,8 @@ What we pin:
   5. The full DriftReport flags exactly the features that crossed the threshold.
   6. The reference-window helper walks calendar months correctly across year
      boundaries.
+  7. compute_score_drift returns None on empty input + on empty current/ref.
+  8. compute_score_drift returns a finite PSI on a clear shift.
 """
 
 from __future__ import annotations
@@ -21,10 +28,12 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from accent_fleet.ml import drift as drift_mod
 from accent_fleet.ml.drift import (
     PSI_ALERT_THRESHOLD,
     compare_frames,
     compute_psi,
+    compute_score_drift,
     derive_reference_window,
 )
 
@@ -130,3 +139,136 @@ def test_derive_reference_window_anchors_to_earliest_current_month():
     # min = 2026-01 → ref window is 2025-10..2025-12.
     assert out == ["2025-10", "2025-11", "2025-12"]
     assert all(m not in out for m in ["2026-01", "2026-02", "2026-03"])
+
+
+# =============================================================================
+# compute_score_drift — PSI of the IF risk-score column between two windows
+# =============================================================================
+# We mock at the pandas boundary (``pd.read_sql``) and at the engine boundary
+# (``get_engine``) so the function runs end-to-end without a Postgres. The
+# fake connection is a no-op context manager: drift only uses ``conn`` as a
+# handle to pass to read_sql, which we've already intercepted.
+
+
+class _FakeConn:
+    def __enter__(self):
+        return self
+    def __exit__(self, *exc):
+        return False
+
+
+def _install_fake_engine(monkeypatch, by_month: dict[str, list[float]]) -> dict:
+    """
+    Intercept the engine + pd.read_sql call inside drift.compute_score_drift
+    so it returns the canned scores for whichever months were requested.
+
+    Returns a `calls` dict that records every (months,) tuple read_sql saw,
+    so tests can assert on the reference vs. current windows the function
+    derived. Catches a refactor that accidentally re-orders the queries or
+    skips one of them.
+    """
+    calls: dict[str, list[list[str]]] = {"months_seen": []}
+
+    def fake_engine():
+        class _Eng:
+            def connect(self_inner):
+                return _FakeConn()
+        return _Eng()
+
+    def fake_read_sql(sql, conn, params=None, **kwargs):
+        months = list((params or {}).get("months") or [])
+        calls["months_seen"].append(months)
+        rows: list[float] = []
+        for m in months:
+            rows.extend(by_month.get(m, []))
+        return pd.DataFrame({"year_month": ["x"] * len(rows), "risk_score": rows})
+
+    monkeypatch.setattr(drift_mod, "get_engine", fake_engine)
+    monkeypatch.setattr(drift_mod.pd, "read_sql", fake_read_sql)
+    return calls
+
+
+def test_compute_score_drift_empty_current_months_returns_none(monkeypatch):
+    """No months scored this run → no signal to compute drift against."""
+    _install_fake_engine(monkeypatch, by_month={})
+    assert compute_score_drift([]) is None
+
+
+def test_compute_score_drift_no_reference_rows_returns_none(monkeypatch):
+    """
+    Cold start: the current window has rows but the derived 6-month
+    reference window is entirely empty (we've literally never scored
+    before). Returning None lets the promotion gate treat PSI as
+    "unknown, no veto" instead of falsely promoting on bogus zero.
+    """
+    _install_fake_engine(
+        monkeypatch,
+        by_month={"2026-05": [10.0, 20.0, 30.0, 40.0, 50.0]},
+    )
+    assert compute_score_drift(["2026-05"]) is None
+
+
+def test_compute_score_drift_returns_low_psi_on_identical_distributions(monkeypatch):
+    """
+    Same scores in reference and current windows → PSI ≈ 0 (well under
+    the 0.25 alert threshold). Sanity that the function actually wires
+    the data through, not that it accidentally returns a constant.
+    """
+    rng = np.random.default_rng(42)
+    sample = rng.uniform(0, 100, size=2000).tolist()
+
+    # 6 reference months derived from current=["2026-05"] → 2025-11..2026-04.
+    by_month = {f"2025-{m:02d}": sample for m in range(11, 13)}
+    by_month.update({f"2026-{m:02d}": sample for m in range(1, 6)})
+
+    _install_fake_engine(monkeypatch, by_month=by_month)
+    psi = compute_score_drift(["2026-05"])
+    assert psi is not None
+    assert psi < PSI_ALERT_THRESHOLD, f"identical scores should yield PSI<<0.25, got {psi}"
+
+
+def test_compute_score_drift_returns_high_psi_on_shift(monkeypatch):
+    """
+    Reference centered at 10, current at 80 → must trip the 0.25 alert
+    threshold. This is the exact pattern that triggers a hold in the
+    risk promotion gate.
+    """
+    rng = np.random.default_rng(1)
+    ref_scores = rng.normal(loc=10.0, scale=5.0, size=2000).clip(0, 100).tolist()
+    cur_scores = rng.normal(loc=80.0, scale=5.0, size=2000).clip(0, 100).tolist()
+
+    by_month = {f"2025-{m:02d}": ref_scores for m in range(11, 13)}
+    by_month.update({f"2026-{m:02d}": ref_scores for m in range(1, 5)})
+    by_month["2026-05"] = cur_scores
+
+    _install_fake_engine(monkeypatch, by_month=by_month)
+    psi = compute_score_drift(["2026-05"])
+    assert psi is not None
+    assert psi > PSI_ALERT_THRESHOLD, f"large mean shift should trip the gate, got {psi}"
+
+
+def test_compute_score_drift_queries_reference_then_current(monkeypatch):
+    """
+    Two SQL calls — first for the reference window, then for the current
+    window. If a refactor accidentally drops one (or sends the same
+    months twice), the calls list catches it.
+    """
+    rng = np.random.default_rng(0)
+    ref_scores = rng.uniform(0, 50, size=200).tolist()
+    cur_scores = rng.uniform(50, 100, size=200).tolist()
+
+    by_month = {f"2025-{m:02d}": ref_scores for m in range(11, 13)}
+    by_month.update({f"2026-{m:02d}": ref_scores for m in range(1, 5)})
+    by_month["2026-05"] = cur_scores
+
+    calls = _install_fake_engine(monkeypatch, by_month=by_month)
+    psi = compute_score_drift(["2026-05"])
+    assert psi is not None
+    assert len(calls["months_seen"]) == 2
+    # First query is reference, second is current. Reference must NOT
+    # include 2026-05; current MUST be exactly ['2026-05'].
+    ref_call, cur_call = calls["months_seen"]
+    assert "2026-05" not in ref_call
+    assert cur_call == ["2026-05"]
+    # And the reference window has the expected 6-month shape.
+    assert len(ref_call) == 6

@@ -128,6 +128,58 @@ ml_last_retrain_promoted_timestamp = Gauge(
     registry=REGISTRY,
 )
 
+# Risk-model (Isolation Forest) retraining metrics. The risk gate is
+# stability-based — silhouette doesn't apply — so we expose the two
+# tail shares ('critical', 'high') for candidate and Production, plus
+# the score PSI we measured at promotion time. Dashboards can plot
+# candidate-vs-production on the same axis to spot a held promotion at
+# a glance.
+ml_candidate_risk_critical_share = Gauge(
+    "accent_ml_candidate_risk_critical_share",
+    "Share of devices in the 'critical' risk category in the latest "
+    "candidate run (gated, may or may not have been promoted).",
+    registry=REGISTRY,
+)
+
+ml_candidate_risk_high_share = Gauge(
+    "accent_ml_candidate_risk_high_share",
+    "Share of devices in the 'high' risk category in the latest "
+    "candidate run (gated, may or may not have been promoted).",
+    registry=REGISTRY,
+)
+
+ml_production_risk_critical_share = Gauge(
+    "accent_ml_production_risk_critical_share",
+    "Share of devices in the 'critical' risk category in the current "
+    "Production-stage risk model. None when no Production version exists "
+    "(cold-start) — gauge is simply not set in that case.",
+    registry=REGISTRY,
+)
+
+ml_production_risk_high_share = Gauge(
+    "accent_ml_production_risk_high_share",
+    "Share of devices in the 'high' risk category in the current "
+    "Production-stage risk model.",
+    registry=REGISTRY,
+)
+
+ml_risk_score_psi = Gauge(
+    "accent_ml_risk_score_psi",
+    "PSI between the candidate's risk-score distribution and the current "
+    "Production one, measured at retrain time. Promotion gate trips when "
+    "this crosses the configured threshold (default 0.25).",
+    registry=REGISTRY,
+)
+
+ml_last_risk_retrain_promoted_timestamp = Gauge(
+    "accent_ml_last_risk_retrain_promoted_timestamp_seconds",
+    "Unix timestamp of the most recent successful risk-model promotion to "
+    "Production. Mirrors `ml_last_retrain_promoted_timestamp` but tracks "
+    "the risk model separately so the two retrain cadences are observable "
+    "without ambiguity.",
+    registry=REGISTRY,
+)
+
 
 def render_metrics() -> tuple[bytes, str]:
     """Return (body, content_type) for the /metrics HTTP response."""
