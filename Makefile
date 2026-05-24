@@ -19,6 +19,7 @@ help:
 	@echo "  ps              show container status"
 	@echo "  seed            run ETL bootstrap + small backfill against the configured DB"
 	@echo "  train           train + register the clustering model in MLflow"
+	@echo "  train-risk      train + register the per-tenant risk model in MLflow"
 	@echo "  test            run pytest (skips integration unless PG is reachable)"
 	@echo "  lint            run ruff"
 	@echo ""
@@ -73,6 +74,10 @@ seed:
 .PHONY: train
 train:
 	$(COMPOSE) run --rm etl python scripts/train_clustering.py
+
+.PHONY: train-risk
+train-risk:
+	$(COMPOSE) run --rm etl python scripts/train_risk_score.py
 
 # ---------------------------------------------------------------------------
 # Quality

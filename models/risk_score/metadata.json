@@ -1,0 +1,142 @@
+{
+  "version": "v1",
+  "model_name": "device-risk-score",
+  "trained_at": "2026-05-24T16:11:10.363063+00:00",
+  "feature_order": [
+    "overspeed_per_100km",
+    "avg_speed_over_limit",
+    "high_speed_trip_ratio",
+    "speed_alert_per_100km",
+    "harsh_brake_per_100km",
+    "harsh_accel_per_100km",
+    "harsh_corner_per_100km",
+    "monthly_idle_ratio",
+    "high_rpm_minutes_per_day",
+    "night_trip_ratio",
+    "rush_hour_trip_ratio",
+    "stddev_trip_distance",
+    "short_trip_ratio"
+  ],
+  "tenants": [
+    235,
+    238,
+    264,
+    1787,
+    7486
+  ],
+  "rows_by_tenant": {
+    "235": 613,
+    "238": 339,
+    "264": 354,
+    "1787": 417,
+    "7486": 434
+  },
+  "skipped_tenants": {},
+  "tenant_stats": {
+    "235": {
+      "n_rows": 613,
+      "raw_min": -0.16418439998341983,
+      "raw_max": 0.12853648251996852,
+      "thresholds": {
+        "moderate": 16.690985840361062,
+        "high": 36.51179008107727,
+        "critical": 62.128104439497
+      },
+      "score_share": {
+        "low": 0.499184339314845,
+        "moderate": 0.300163132137031,
+        "high": 0.1500815660685155,
+        "critical": 0.05057096247960848
+      }
+    },
+    "238": {
+      "n_rows": 339,
+      "raw_min": -0.16903939316808414,
+      "raw_max": 0.12642832662269088,
+      "thresholds": {
+        "moderate": 15.786983061899255,
+        "high": 36.42592485005659,
+        "critical": 55.257029779624936
+      },
+      "score_share": {
+        "low": 0.49852507374631266,
+        "moderate": 0.3008849557522124,
+        "high": 0.1504424778761062,
+        "critical": 0.05014749262536873
+      }
+    },
+    "264": {
+      "n_rows": 354,
+      "raw_min": -0.1556796318421062,
+      "raw_max": 0.10505919111385276,
+      "thresholds": {
+        "moderate": 20.134468465519248,
+        "high": 42.59119777065539,
+        "critical": 72.90218198929568
+      },
+      "score_share": {
+        "low": 0.5,
+        "moderate": 0.2994350282485876,
+        "high": 0.1497175141242938,
+        "critical": 0.05084745762711865
+      }
+    },
+    "1787": {
+      "n_rows": 417,
+      "raw_min": -0.16443574882740725,
+      "raw_max": 0.12032719388418978,
+      "thresholds": {
+        "moderate": 19.651155996416385,
+        "high": 40.938844512223234,
+        "critical": 58.93765971074667
+      },
+      "score_share": {
+        "low": 0.4988009592326139,
+        "moderate": 0.2997601918465228,
+        "high": 0.1510791366906475,
+        "critical": 0.050359712230215826
+      }
+    },
+    "7486": {
+      "n_rows": 434,
+      "raw_min": -0.15449926799162927,
+      "raw_max": 0.12677319710595591,
+      "thresholds": {
+        "moderate": 17.020088447716326,
+        "high": 35.767069085426606,
+        "critical": 63.90993653729796
+      },
+      "score_share": {
+        "low": 0.5,
+        "moderate": 0.2995391705069124,
+        "high": 0.1497695852534562,
+        "critical": 0.05069124423963134
+      }
+    }
+  },
+  "overall_share": {
+    "low": 0.4993045897079277,
+    "moderate": 0.2999536393138618,
+    "high": 0.1502086230876217,
+    "critical": 0.050533147890588784
+  },
+  "n_rows": 2157,
+  "random_state": 42,
+  "training_window": ">= 2025-01",
+  "config": {
+    "algorithm": "isolation_forest",
+    "hyperparameters": {
+      "n_estimators": 200,
+      "contamination": "auto",
+      "random_state": 42,
+      "n_jobs": -1
+    },
+    "quantiles": {
+      "low_to_moderate": 0.5,
+      "moderate_to_high": 0.8,
+      "high_to_critical": 0.95
+    },
+    "rescale_epsilon": 1e-09,
+    "min_rows_per_tenant": 50
+  }
+}
