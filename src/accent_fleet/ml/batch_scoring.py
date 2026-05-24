@@ -35,7 +35,7 @@ from accent_fleet.db.engine import get_engine, transaction
 from accent_fleet.ml.inference import (
     ClusterPredictor,
     RiskPredictor,
-    TenantModelMissing,
+    TenantModelMissingError,
 )
 
 logger = logging.getLogger("accent_fleet.ml.batch_scoring")
@@ -356,7 +356,7 @@ def score_risk_partitions(touched_months: list[str], run_id: int) -> ScoreResult
                 tenant_id=tid,
                 features_df=sub[list(feature_order)],
             )
-        except TenantModelMissing:
+        except TenantModelMissingError:
             skipped_tenant_rows[tid] = len(sub)
             logger.info(
                 "risk scoring: skipping tenant %d (%d rows) — no per-tenant model",

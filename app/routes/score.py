@@ -22,7 +22,7 @@ from accent_fleet.config import config_hash
 from accent_fleet.ml.inference import (
     ClusterPredictor,
     RiskPredictor,
-    TenantModelMissing,
+    TenantModelMissingError,
 )
 from app.deps import ClusterPredictorDep, RiskPredictorDep
 from app.schemas.score import (
@@ -54,7 +54,7 @@ def score_risk(
             tenant_id=int(payload.tenant_id),
             features=payload.as_dict(),
         )
-    except TenantModelMissing as exc:
+    except TenantModelMissingError as exc:
         # We have a model loaded, just not one for this tenant. 503 because
         # this is a "feature unavailable for this dimension" condition that
         # will resolve once a retrain includes this tenant.

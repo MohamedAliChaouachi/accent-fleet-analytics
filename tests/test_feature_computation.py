@@ -199,7 +199,7 @@ def test_risk_predictor_matches_persisted_fact(db_available):
     if not db_available:
         pytest.skip("postgres not reachable")
     from accent_fleet.db.engine import get_engine
-    from accent_fleet.ml.inference import RiskPredictor, TenantModelMissing
+    from accent_fleet.ml.inference import RiskPredictor, TenantModelMissingError
 
     predictor = RiskPredictor()
     try:
@@ -272,7 +272,7 @@ def test_risk_predictor_matches_persisted_fact(db_available):
             continue
         try:
             pred = predictor.predict(int(r.tenant_id), dict(feats))
-        except TenantModelMissing:
+        except TenantModelMissingError:
             # The bundle in memory doesn't contain this tenant. Can happen
             # if the production version was trained without it but the
             # fact still has older rows. Count once and move on.

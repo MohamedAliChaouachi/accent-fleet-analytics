@@ -78,7 +78,7 @@ class RiskPredictor:
     Per-tenant semantics:
       Every tenant in the cohort has its own (scaler, IsolationForest,
       raw_min, raw_max, thresholds). A request for an unknown tenant is
-      raised as ``TenantModelMissing`` — the API translates that to a 503
+      raised as ``TenantModelMissingError`` — the API translates that to a 503
       because the feature itself is unavailable, not malformed.
     """
 
@@ -228,12 +228,12 @@ class RiskPredictor:
 
     # ------------------------------------------------------------------
     def _tenant_entry(self, tenant_id: int) -> dict[str, Any]:
-        """Return the per-tenant artifact entry or raise TenantModelMissing."""
+        """Return the per-tenant artifact entry or raise TenantModelMissingError."""
         self.ensure_loaded()
         tenants = (self._artifact or {}).get("tenants", {})
         entry = tenants.get(int(tenant_id))
         if entry is None:
-            raise TenantModelMissing(
+            raise TenantModelMissingError(
                 f"no risk-score model for tenant_id={tenant_id}. "
                 f"Trained tenants: {sorted(int(t) for t in tenants)}."
             )
@@ -285,7 +285,7 @@ class RiskPredictor:
     def predict_batch(
         self,
         tenant_id: int,
-        features_df: "Any",  # pandas.DataFrame; typed as Any to keep import light
+        features_df: Any,  # pandas.DataFrame; typed as Any to keep import light
     ) -> tuple[np.ndarray, np.ndarray]:
         """
         Vectorised batch predict for the offline scoring path
@@ -307,7 +307,7 @@ class RiskPredictor:
         return scores, labels
 
 
-class TenantModelMissing(LookupError):
+class TenantModelMissingError(LookupError):
     """Raised by RiskPredictor when no per-tenant model is fitted for tenant_id."""
 
 

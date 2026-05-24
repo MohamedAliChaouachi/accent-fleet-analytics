@@ -10,7 +10,7 @@ These are unit tests — no live Postgres required. We:
      so we can verify both upsert paths:
         - cluster:  delete-then-insert, idempotency on rerun, no-model branch.
         - risk:     same shape, plus the per-tenant skip path where a
-                    TenantModelMissing exception turns into a counted row
+                    TenantModelMissingError exception turns into a counted row
                     drop instead of an aborted batch.
 
 The v0.6 IF rewrite renamed the per-process singletons and the upsert
@@ -30,7 +30,7 @@ import pytest
 
 from accent_fleet.config import SQL_DIR
 from accent_fleet.ml import batch_scoring
-from accent_fleet.ml.inference import TenantModelMissing
+from accent_fleet.ml.inference import TenantModelMissingError
 
 
 # ---------------------------------------------------------------------------
@@ -171,7 +171,7 @@ class FakeRiskPredictor:
 
     Tenants in ``known_tenants`` predict deterministically (score = first
     feature, category = "low"); any other tenant_id raises
-    TenantModelMissing — the trigger the batch loop turns into a counted
+    TenantModelMissingError — the trigger the batch loop turns into a counted
     skip rather than an error.
     """
 
@@ -186,7 +186,7 @@ class FakeRiskPredictor:
 
     def predict_batch(self, *, tenant_id: int, features_df: pd.DataFrame):
         if tenant_id not in self.known_tenants:
-            raise TenantModelMissing(f"no model for tenant {tenant_id}")
+            raise TenantModelMissingError(f"no model for tenant {tenant_id}")
         # Deterministic: score is the first feature value; category fixed.
         scores = features_df.iloc[:, 0].to_numpy(dtype=float)
         labels = np.array(["low"] * len(features_df), dtype=object)

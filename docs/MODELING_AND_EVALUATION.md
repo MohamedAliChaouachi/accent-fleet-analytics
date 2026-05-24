@@ -359,7 +359,7 @@ is what the API uses at runtime. Loading strategy mirrors `ClusterPredictor`:
 Single-row predict:
 
 ```python
-entry         = artifact["tenants"][tenant_id]       # raises TenantModelMissing if absent
+entry         = artifact["tenants"][tenant_id]       # raises TenantModelMissingError if absent
 vec           = np.asarray([[float(features.get(name) or 0.0)
                               for name in feature_order]], dtype=float)
 scaled        = entry["scaler"].transform(vec)

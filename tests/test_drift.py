@@ -171,7 +171,7 @@ def _install_fake_engine(monkeypatch, by_month: dict[str, list[float]]) -> dict:
 
     def fake_engine():
         class _Eng:
-            def connect(self_inner):
+            def connect(self):
                 return _FakeConn()
         return _Eng()
 

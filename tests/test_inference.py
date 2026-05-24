@@ -27,7 +27,7 @@ from accent_fleet.ml.inference import (
     RISK_MODEL_DIR,
     ClusterPredictor,
     RiskPredictor,
-    TenantModelMissing,
+    TenantModelMissingError,
     _categorize_array,
     _categorize_one,
     _rescale_array,
@@ -199,7 +199,7 @@ def test_risk_predictor_predict_returns_well_formed_prediction():
 
     # Sum of [0, 0, 0] = 0; raw = -0 = 0 → midway between raw_min(0) and
     # raw_max(10) is below moderate(25) → category low, score 0.
-    pred = p.predict(tenant_id=235, features={f: 0.0 for f in features})
+    pred = p.predict(tenant_id=235, features=dict.fromkeys(features, 0.0))
     assert pred.score == pytest.approx(0.0)
     assert pred.category == "low"
     assert pred.model_version == "synthetic-1"
@@ -229,7 +229,7 @@ def test_risk_predictor_raises_tenant_model_missing_for_unknown_tenant():
     features = ["a", "b"]
     _inject_artifact(p, _build_synthetic_artifact(features, tenants=[235, 238]))
 
-    with pytest.raises(TenantModelMissing) as excinfo:
+    with pytest.raises(TenantModelMissingError) as excinfo:
         p.predict(tenant_id=999, features={"a": 1.0, "b": 1.0})
     assert "999" in str(excinfo.value)
     # The exception should list the trained tenants so the operator

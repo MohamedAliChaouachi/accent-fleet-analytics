@@ -51,5 +51,7 @@ select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4", "SIM"]
 
 # sklearn's training API uses uppercase `X` (feature matrix) and lowercase
 # `y` (target vector) by convention. Renaming would obscure what the code
-# does for anyone coming from a ML background.
+# does for anyone coming from a ML background. Same applies to test code
+# that exercises the sklearn-shaped artifacts.
 "src/accent_fleet/ml/*.py" = ["N806"]
+"tests/test_train_risk.py" = ["N806"]

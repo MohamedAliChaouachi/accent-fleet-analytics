@@ -381,8 +381,14 @@ def decide_risk_promotion(
 
     # Shares are in [0, 1]; multiply by 100 to express the tolerance in
     # percentage points, which is how the YAML / config talks about them.
-    delta_crit_pp = abs(candidate_share.get("critical", 0.0) - current_share.get("critical", 0.0)) * 100
-    delta_high_pp = abs(candidate_share.get("high", 0.0) - current_share.get("high", 0.0)) * 100
+    delta_crit_pp = (
+        abs(candidate_share.get("critical", 0.0) - current_share.get("critical", 0.0))
+        * 100
+    )
+    delta_high_pp = (
+        abs(candidate_share.get("high", 0.0) - current_share.get("high", 0.0))
+        * 100
+    )
 
     reasons: list[str] = []
     if delta_crit_pp > cap_crit:
@@ -495,7 +501,7 @@ def retrain_risk_with_gate(
     max_critical_shift_pp: float | None = None,
     max_high_shift_pp: float | None = None,
     max_score_psi: float | None = None,
-    score_psi_provider: "Any" = None,
+    score_psi_provider: Any = None,
 ) -> RiskRetrainResult:
     """
     Train a candidate risk model, register it (no immediate promotion),
@@ -510,25 +516,23 @@ def retrain_risk_with_gate(
     Kept as a parameter to avoid a cycle: drift imports promotion's
     decision dataclass for the report, not the other way around.
     """
-    # Local imports to avoid an import cycle: train_risk imports nothing
-    # from this module, but the other way around requires lazy lookup
-    # so unit tests can monkeypatch train_risk.run.
-    from accent_fleet.ml.train_risk import (
-        fit_risk_model,
-        load_training_frame,
-        log_to_mlflow as risk_log_to_mlflow,
-        save_local as risk_save_local,
-    )
+    # Local module import to avoid an import cycle and keep test
+    # monkeypatching live (attribute lookup, not name-bound at import).
+    # ``train_clustering`` and ``train_risk`` both export ``save_local`` /
+    # ``log_to_mlflow`` / ``load_training_frame`` — using the module
+    # qualifier here avoids name shadowing with the clustering imports
+    # at the top of this file.
+    from accent_fleet.ml import train_risk
 
-    df = load_training_frame(month_from=month_from)
-    artifact, train = fit_risk_model(df)
+    df = train_risk.load_training_frame(month_from=month_from)
+    artifact, train = train_risk.fit_risk_model(df)
     train.training_window = f">= {month_from}"
 
     # Local artifacts first — cheapest insurance against MLflow being down.
-    risk_save_local(artifact, train)
+    train_risk.save_local(artifact, train)
 
     # Register without auto-promoting so the gate can run first.
-    version = risk_log_to_mlflow(artifact, train, promote=False)
+    version = train_risk.log_to_mlflow(artifact, train, promote=False)
 
     current_share = get_current_production_risk_share()
     score_psi: float | None = None

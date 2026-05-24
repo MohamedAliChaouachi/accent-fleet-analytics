@@ -7,7 +7,7 @@ environment neither source exists, so we override the predictor dependency
 with a small stub that exercises the route's contract surface:
 
   - structurally valid request without tenant_id  → 422
-  - request for a tenant the stub doesn't know     → 503 (TenantModelMissing)
+  - request for a tenant the stub doesn't know     → 503 (TenantModelMissingError)
   - happy-path request                             → 200 with expected shape
   - dependency raising RuntimeError ("no model")   → 503
 
@@ -20,7 +20,7 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from accent_fleet.ml.inference import RiskPrediction, TenantModelMissing
+from accent_fleet.ml.inference import RiskPrediction, TenantModelMissingError
 from app.deps import get_risk_predictor_dep
 from app.main import app
 
@@ -77,7 +77,7 @@ class _StubRiskPredictor:
     def predict(self, tenant_id: int, features: dict) -> RiskPrediction:
         known = {235, 238}
         if tenant_id not in known:
-            raise TenantModelMissing(
+            raise TenantModelMissingError(
                 f"no model fitted for tenant {tenant_id}; known: {sorted(known)}"
             )
         # Deterministic toy score so the happy-path test can assert shape
@@ -143,7 +143,7 @@ def test_score_risk_missing_tenant_id_returns_422(stub_predictor):
 
 def test_score_risk_unknown_tenant_returns_503(stub_predictor):
     """
-    The stub raises TenantModelMissing for tenant_id=999. The route translates
+    The stub raises TenantModelMissingError for tenant_id=999. The route translates
     that to 503 because the API itself is healthy; the model just hasn't been
     retrained to include this tenant yet. Dashboards can show a "feature not
     ready for this tenant" message instead of a 5xx alarm.
