@@ -290,6 +290,271 @@ export interface DeviceProfileResponse {
   history: DeviceMonthRow[];
 }
 
+// ---------- dashboards: fleet efficiency ----------
+export interface FleetEfficiencyRow {
+  tenant_id: number | null;
+  year_month: string;
+  active_devices: number | null;
+  active_vehicles: number | null;
+  total_trips: number | null;
+  total_distance_km: number | null;
+  total_driving_hours: number | null;
+  total_operating_cost: number | null;
+  total_fuel_cost: number | null;
+  total_maintenance_cost: number | null;
+  cost_per_km: number | null;
+  cost_per_trip: number | null;
+  fuel_cost_per_100km: number | null;
+  maintenance_cost_per_km: number | null;
+  total_fuel_litres: number | null;
+  fuel_litres_per_100km: number | null;
+  avg_cost_per_litre: number | null;
+  utilization_rate_pct: number | null;
+  idle_time_pct: number | null;
+  trips_per_device_per_day: number | null;
+  avg_trip_duration_min: number | null;
+  avg_distance_per_device: number | null;
+  distance_trend_mom_pct: number | null;
+  cost_trend_mom_pct: number | null;
+}
+
+export interface FleetEfficiencyMonthly {
+  year_month: string;
+  active_devices: number | null;
+  active_vehicles: number | null;
+  total_trips: number | null;
+  total_distance_km: number | null;
+  total_driving_hours: number | null;
+  total_operating_cost: number | null;
+  total_fuel_cost: number | null;
+  total_maintenance_cost: number | null;
+  total_fuel_litres: number | null;
+  cost_per_km: number | null;
+  cost_per_trip: number | null;
+  fuel_litres_per_100km: number | null;
+  fuel_cost_per_100km: number | null;
+  utilization_rate_pct: number | null;
+  idle_time_pct: number | null;
+}
+
+export interface FleetEfficiencyKpi {
+  year_month: string;
+  cost_per_km: number | null;
+  cost_per_km_delta_pct: number | null;
+  utilization_rate_pct: number | null;
+  utilization_rate_delta_pct: number | null;
+  fuel_litres_per_100km: number | null;
+  fuel_litres_per_100km_delta_pct: number | null;
+  idle_time_pct: number | null;
+  idle_time_pct_delta_pct: number | null;
+  active_devices: number | null;
+  total_trips: number | null;
+}
+
+export interface FleetEfficiencyDashboardResponse {
+  rows: FleetEfficiencyRow[];
+  monthly: FleetEfficiencyMonthly[];
+  kpi: FleetEfficiencyKpi | null;
+  best_worst_latest: FleetEfficiencyRow[];
+}
+
+// ---------- dashboards: safety scorecard ----------
+export interface SafetyScorecardRow {
+  tenant_id: number | null;
+  year_month: string;
+  active_devices: number | null;
+  total_distance_km: number | null;
+  total_trips: number | null;
+  total_overspeed: number | null;
+  total_harsh_events: number | null;
+  overspeed_rate_per_1000km: number | null;
+  overspeed_severity_score: number | null;
+  overspeed_trend_mom_pct: number | null;
+  harsh_events_per_1000km: number | null;
+  harsh_brake_count: number | null;
+  harsh_accel_count: number | null;
+  harsh_corner_count: number | null;
+  harsh_brake_rate: number | null;
+  harsh_accel_rate: number | null;
+  harsh_corner_rate: number | null;
+  rush_hour_trip_pct: number | null;
+  night_trip_pct: number | null;
+  weekend_harsh_pct: number | null;
+  avg_risk_score: number | null;
+  scored_devices: number | null;
+  high_risk_devices: number | null;
+  critical_risk_devices: number | null;
+  high_or_critical_devices: number | null;
+  high_risk_device_pct: number | null;
+  safety_score: number | null;
+  safety_score_trend: number | null;
+}
+
+export interface SafetyScorecardMonthly {
+  year_month: string;
+  active_devices: number | null;
+  total_distance_km: number | null;
+  total_overspeed: number | null;
+  total_harsh_events: number | null;
+  harsh_brake_count: number | null;
+  harsh_accel_count: number | null;
+  harsh_corner_count: number | null;
+  scored_devices: number | null;
+  high_risk_devices: number | null;
+  critical_risk_devices: number | null;
+  high_or_critical_devices: number | null;
+  overspeed_rate_per_1000km: number | null;
+  harsh_events_per_1000km: number | null;
+  safety_score: number | null;
+  high_risk_device_pct: number | null;
+}
+
+export interface SafetyScorecardKpi {
+  year_month: string;
+  overspeed_rate_per_1000km: number | null;
+  overspeed_rate_delta: number | null;
+  harsh_events_per_1000km: number | null;
+  harsh_events_delta: number | null;
+  high_or_critical_devices: number | null;
+  high_or_critical_delta: number | null;
+  safety_score: number | null;
+  safety_score_delta: number | null;
+  active_devices: number | null;
+  total_distance_km: number | null;
+}
+
+export interface SafetyScorecardDashboardResponse {
+  rows: SafetyScorecardRow[];
+  monthly: SafetyScorecardMonthly[];
+  kpi: SafetyScorecardKpi | null;
+}
+
+// ---------- dashboards: predictive alerts ----------
+export interface PredictiveAlertRow {
+  alert_id: string;
+  tenant_id: number | null;
+  device_id: number | null;
+  alert_type: string;
+  severity: string;
+  detected_at: string; // ISO-8601
+  alert_message: string | null;
+  alert_value: number | null;
+  assigned_to: string | null;
+  status: string | null;
+  resolution_time_hours: number | null;
+}
+
+export interface LiveAlertRow {
+  alert_id: string;
+  tenant_id: number | null;
+  device_id: number | null;
+  alert_category: string;
+  severity: string;
+  detected_at: string;
+  alert_message: string | null;
+  alert_value: number | null;
+  latest_trip_time: string | null;
+  distance_km_24h: number | null;
+  device_risk_score: number | null;
+  device_risk_category: string | null;
+  device_cluster: number | null;
+  priority_score: number | null;
+}
+
+export interface AlertCount {
+  key: string;
+  count: number;
+}
+
+export interface PredictiveAlertsSummary {
+  total: number;
+  high_or_critical: number;
+  last_24h: number;
+  unique_devices: number;
+  by_severity: AlertCount[];
+  by_type: AlertCount[];
+}
+
+export interface LiveAlertsSummary {
+  total: number;
+  high_or_critical: number;
+  avg_priority: number;
+  unique_devices: number;
+  by_category: AlertCount[];
+}
+
+export interface PredictiveAlertsDashboardResponse {
+  alerts: PredictiveAlertRow[];
+  stream: LiveAlertRow[];
+  alerts_summary: PredictiveAlertsSummary;
+  stream_summary: LiveAlertsSummary;
+}
+
+// ---------- dashboards: tenant billing ----------
+export interface TenantBillingRow {
+  tenant_id: number | null;
+  tenant_name: string | null;
+  year_month: string;
+  active_devices: number | null;
+  active_vehicles: number | null;
+  total_devices_registered: number | null;
+  active_devices_registered: number | null;
+  total_trips_processed: number | null;
+  total_distance_km: number | null;
+  total_alerts_generated: number | null;
+  total_harsh_events: number | null;
+  total_overspeed_events: number | null;
+  total_events: number | null;
+  data_volume_gb: number | null;
+  db_storage_mb: number | null;
+  avg_daily_events: number | null;
+  events_per_device: number | null;
+  alerts_per_trip: number | null;
+  data_per_device_mb: number | null;
+  pricing_tier: number | null;
+  price_per_device: number | null;
+  estimated_revenue: number | null;
+  estimated_infra_cost: number | null;
+  devices_mom_growth_pct: number | null;
+  trips_mom_growth_pct: number | null;
+  alerts_mom_growth_pct: number | null;
+}
+
+export interface TenantBillingMonthly {
+  year_month: string;
+  active_devices: number | null;
+  total_trips_processed: number | null;
+  data_volume_gb: number | null;
+  estimated_revenue: number | null;
+}
+
+export interface TenantBillingKpi {
+  year_month: string;
+  total_tenants: number;
+  total_tenants_delta: number | null;
+  total_devices: number;
+  total_devices_delta: number | null;
+  total_revenue: number;
+  total_revenue_delta_pct: number | null;
+  total_storage_gb: number;
+  total_storage_delta_pct: number | null;
+}
+
+export interface TenantBillingTier {
+  pricing_tier: number;
+  tenants: number;
+  devices: number;
+  revenue: number;
+}
+
+export interface TenantBillingDashboardResponse {
+  rows: TenantBillingRow[];
+  monthly: TenantBillingMonthly[];
+  kpi: TenantBillingKpi | null;
+  tier_breakdown: TenantBillingTier[];
+  latest_month: string | null;
+}
+
 // ---------- shared filter payload ----------
 export interface DashboardFilters {
   start: string; // YYYY-MM-DD

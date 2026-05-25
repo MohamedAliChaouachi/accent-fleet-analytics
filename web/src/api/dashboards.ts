@@ -2,9 +2,13 @@ import { request } from "./client";
 import type {
   DashboardFilters,
   ExecutiveDashboardResponse,
+  FleetEfficiencyDashboardResponse,
   MaintenanceDashboardResponse,
   OperationsDashboardResponse,
+  PredictiveAlertsDashboardResponse,
   RiskDashboardResponse,
+  SafetyScorecardDashboardResponse,
+  TenantBillingDashboardResponse,
 } from "./types";
 
 function asQuery(f: DashboardFilters) {
@@ -38,6 +42,34 @@ export function fetchMaintenance(f: DashboardFilters, signal?: AbortSignal) {
 
 export function fetchRisk(f: DashboardFilters, signal?: AbortSignal) {
   return request<RiskDashboardResponse>("/dashboards/risk", {
+    query: asQuery(f),
+    signal,
+  });
+}
+
+export function fetchFleetEfficiency(f: DashboardFilters, signal?: AbortSignal) {
+  return request<FleetEfficiencyDashboardResponse>("/dashboards/fleet-efficiency", {
+    query: asQuery(f),
+    signal,
+  });
+}
+
+export function fetchSafetyScorecard(f: DashboardFilters, signal?: AbortSignal) {
+  return request<SafetyScorecardDashboardResponse>("/dashboards/safety-scorecard", {
+    query: asQuery(f),
+    signal,
+  });
+}
+
+export function fetchPredictiveAlerts(f: DashboardFilters, signal?: AbortSignal) {
+  return request<PredictiveAlertsDashboardResponse>("/dashboards/predictive-alerts", {
+    query: asQuery(f),
+    signal,
+  });
+}
+
+export function fetchTenantBilling(f: DashboardFilters, signal?: AbortSignal) {
+  return request<TenantBillingDashboardResponse>("/dashboards/tenant-billing", {
     query: asQuery(f),
     signal,
   });

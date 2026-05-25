@@ -9,6 +9,10 @@ import { ExecutiveOverview } from "@/pages/ExecutiveOverview";
 import { Operations } from "@/pages/Operations";
 import { Maintenance } from "@/pages/Maintenance";
 import { RiskAndBehavior } from "@/pages/RiskAndBehavior";
+import { FleetEfficiency } from "@/pages/FleetEfficiency";
+import { SafetyScorecard } from "@/pages/SafetyScorecard";
+import { PredictiveAlerts } from "@/pages/PredictiveAlerts";
+import { TenantBilling } from "@/pages/TenantBilling";
 import { WhatIf } from "@/pages/WhatIf";
 import { AIChat } from "@/pages/AIChat";
 
@@ -39,6 +43,10 @@ export function App() {
                   <Route path="/operations" element={<Operations />} />
                   <Route path="/maintenance" element={<Maintenance />} />
                   <Route path="/risk" element={<RiskAndBehavior />} />
+                  <Route path="/fleet-efficiency" element={<FleetEfficiency />} />
+                  <Route path="/safety" element={<SafetyScorecard />} />
+                  <Route path="/alerts" element={<PredictiveAlerts />} />
+                  <Route path="/billing" element={<TenantBilling />} />
                   <Route path="/what-if" element={<WhatIf />} />
                   <Route path="/ai" element={<AIChat />} />
                 </Route>

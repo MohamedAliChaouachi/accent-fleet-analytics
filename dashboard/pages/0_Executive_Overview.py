@@ -1,4 +1,9 @@
-"""Executive overview — reads marts.v_executive_dashboard."""
+"""Executive overview — reads marts.v_executive_dashboard.
+
+v2.0 addition: a 5-metric "fleet health" strip at the top sourced from
+several views (efficiency, safety, alerts) so a director can read the
+business pulse without scrolling.
+"""
 
 from __future__ import annotations
 
@@ -13,6 +18,145 @@ filters = render_sidebar_filters()
 
 st.title("Executive overview")
 st.caption("Fleet-wide KPIs sourced from `marts.v_executive_dashboard`.")
+
+# =============================================================================
+# v2.0 KPI strip — top-of-page health pulse
+# =============================================================================
+# Each metric is read from the most appropriate view rather than recomputed
+# locally; this keeps the page resilient to schema drift and means the
+# Executive page is the canonical "fleet health" surface.
+#
+# Each lookup is wrapped in a try so a missing view (e.g. the safety mart
+# hasn't been deployed yet) silently degrades to "—" instead of breaking
+# the whole page.
+
+st.markdown(
+    "<style>div[data-testid='stMetricValue'] {font-size: 32px;}</style>",
+    unsafe_allow_html=True,
+)
+
+
+def _safe_read(query: str, params: dict | None = None):
+    try:
+        return read_sql(query, params=params or {})
+    except Exception:  # noqa: BLE001
+        return None
+
+
+k1, k2, k3, k4, k5 = st.columns(5)
+
+# --- Fleet Health: latest safety_score from v_safety_scorecard_dashboard ----
+health = _safe_read(
+    f"""
+    SELECT year_month, AVG(safety_score) AS safety_score
+      FROM marts.v_safety_scorecard_dashboard
+     WHERE 1=1
+       {filters.tenant_clause()}
+       {filters.month_clause('year_month')}
+     GROUP BY year_month
+     ORDER BY year_month DESC
+     LIMIT 2
+    """,
+    params=filters.params(),
+)
+if health is not None and not health.empty:
+    latest_h = float(health.iloc[0]["safety_score"] or 0)
+    prior_h = float(health.iloc[1]["safety_score"] or 0) if len(health) > 1 else None
+    delta = f"{latest_h - prior_h:+.1f}" if prior_h is not None else None
+    k1.metric("Fleet health", f"{latest_h:.0f}%", delta=delta)
+else:
+    k1.metric("Fleet health", "—")
+
+# --- Avg Risk Score: latest avg_risk_score across tenants -------------------
+risk = _safe_read(
+    f"""
+    SELECT year_month, AVG(avg_risk_score) AS avg_risk
+      FROM marts.v_safety_scorecard_dashboard
+     WHERE 1=1
+       {filters.tenant_clause()}
+       {filters.month_clause('year_month')}
+     GROUP BY year_month
+     ORDER BY year_month DESC
+     LIMIT 2
+    """,
+    params=filters.params(),
+)
+if risk is not None and not risk.empty:
+    latest_r = float(risk.iloc[0]["avg_risk"] or 0)
+    prior_r = float(risk.iloc[1]["avg_risk"] or 0) if len(risk) > 1 else None
+    delta = f"{latest_r - prior_r:+.1f}" if prior_r is not None else None
+    # Lower risk score = better → inverse colouring.
+    k2.metric("Avg risk score", f"{latest_r:.0f}", delta=delta, delta_color="inverse")
+else:
+    k2.metric("Avg risk score", "—")
+
+# --- Active Devices, Cost/KM — derived from the existing exec dashboard ----
+# We re-query here (cached) so the strip is cheap and resilient even when
+# the main df below is empty (e.g. on a fresh DB).
+exec_summary = _safe_read(
+    f"""
+    SELECT year_month,
+           SUM(active_devices)              AS active_devices,
+           SUM(total_distance_km)           AS total_distance_km,
+           SUM(total_operating_cost)        AS total_operating_cost,
+           SUM(total_alerts)                AS total_alerts
+      FROM marts.v_executive_dashboard
+     WHERE 1=1
+       {filters.tenant_clause()}
+       {filters.month_clause('year_month')}
+     GROUP BY year_month
+     ORDER BY year_month DESC
+     LIMIT 2
+    """,
+    params=filters.params(),
+)
+if exec_summary is not None and not exec_summary.empty:
+    cur = exec_summary.iloc[0]
+    prv = exec_summary.iloc[1] if len(exec_summary) > 1 else None
+
+    # Active devices
+    cur_d = int(cur["active_devices"] or 0)
+    prv_d = int(prv["active_devices"]) if prv is not None else None
+    k3.metric(
+        "Active devices",
+        f"{cur_d:,}",
+        delta=f"{cur_d - prv_d:+d}" if prv_d is not None else None,
+    )
+
+    # Cost / km
+    cur_cost = float(cur["total_operating_cost"] or 0)
+    cur_dist = float(cur["total_distance_km"] or 0)
+    cur_cpk = cur_cost / cur_dist if cur_dist > 0 else 0
+    if prv is not None:
+        prv_cost = float(prv["total_operating_cost"] or 0)
+        prv_dist = float(prv["total_distance_km"] or 0)
+        prv_cpk = prv_cost / prv_dist if prv_dist > 0 else 0
+        cpk_delta = f"{(cur_cpk - prv_cpk) / prv_cpk * 100:+.1f}%" if prv_cpk > 0 else None
+    else:
+        cpk_delta = None
+    k4.metric("Cost / km (DA)", f"{cur_cpk:.2f}", delta=cpk_delta, delta_color="inverse")
+else:
+    k3.metric("Active devices", "—")
+    k4.metric("Cost / km (DA)", "—")
+
+# --- Active alerts (from predictive alerts view; current snapshot) ----------
+alerts = _safe_read(
+    f"""
+    SELECT COUNT(*) AS n
+      FROM marts.v_predictive_alerts_dashboard
+     WHERE 1=1
+       {filters.tenant_clause()}
+    """,
+    params=filters.params(),
+)
+if alerts is not None and not alerts.empty:
+    n_alerts = int(alerts.iloc[0]["n"] or 0)
+    # Inverse colour — more alerts is worse for the business.
+    k5.metric("Active alerts", f"{n_alerts:,}", delta_color="inverse")
+else:
+    k5.metric("Active alerts", "—")
+
+st.divider()
 
 # Filtered SELECT. The view itself is small (≤12 months × tenants) so a
 # WHERE clause is cheap; we still scope to the chosen window for tidiness.

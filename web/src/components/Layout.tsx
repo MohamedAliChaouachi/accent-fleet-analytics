@@ -8,6 +8,10 @@ const NAV_ITEMS: ReadonlyArray<{ to: string; label: string }> = [
   { to: "/operations", label: "Operations" },
   { to: "/maintenance", label: "Maintenance" },
   { to: "/risk", label: "Risk & behavior" },
+  { to: "/fleet-efficiency", label: "Fleet efficiency" },
+  { to: "/safety", label: "Safety scorecard" },
+  { to: "/alerts", label: "Predictive alerts" },
+  { to: "/billing", label: "Tenant billing" },
   { to: "/what-if", label: "What-if" },
   { to: "/ai", label: "Ask the data" },
 ];

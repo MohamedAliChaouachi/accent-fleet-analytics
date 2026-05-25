@@ -54,7 +54,18 @@
       "Bash(.venv/Scripts/python -m ruff check tests/test_api_versioning.py)",
       "Bash(.venv/Scripts/python -m pytest tests/test_api_versioning.py -v)",
       "Bash(.venv/Scripts/python -m pytest -ra --maxfail=5 -m \"not integration\")",
-      "Bash(AUTH_ENFORCEMENT=advisory .venv/Scripts/python -m pytest -ra --maxfail=5 -m \"not integration\")"
+      "Bash(AUTH_ENFORCEMENT=advisory .venv/Scripts/python -m pytest -ra --maxfail=5 -m \"not integration\")",
+      "Bash(make help *)",
+      "Bash(python -m py_compile dashboard/pages/5_Fleet_Efficiency.py dashboard/pages/6_Safety_Scorecard.py dashboard/pages/7_Predictive_Alerts.py dashboard/pages/8_Tenant_Billing.py dashboard/pages/0_Executive_Overview.py)",
+      "Bash(.venv/Scripts/python -m ruff check dashboard/pages/5_Fleet_Efficiency.py dashboard/pages/6_Safety_Scorecard.py dashboard/pages/7_Predictive_Alerts.py dashboard/pages/8_Tenant_Billing.py dashboard/pages/0_Executive_Overview.py)",
+      "Bash(.venv/Scripts/python -m ruff check dashboard/pages/)",
+      "Bash(.venv/Scripts/python -m ruff check dashboard/pages/0_Executive_Overview.py dashboard/pages/1_Operations.py dashboard/pages/2_Maintenance.py dashboard/pages/3_Risk_and_Behavior.py dashboard/pages/4_What_If.py)",
+      "Bash(.venv/Scripts/python -m ruff check --fix --unsafe-fixes dashboard/pages/5_Fleet_Efficiency.py dashboard/pages/6_Safety_Scorecard.py dashboard/pages/7_Predictive_Alerts.py dashboard/pages/8_Tenant_Billing.py)",
+      "Bash(.venv/Scripts/python -m py_compile dashboard/pages/5_Fleet_Efficiency.py dashboard/pages/6_Safety_Scorecard.py dashboard/pages/7_Predictive_Alerts.py dashboard/pages/8_Tenant_Billing.py dashboard/pages/0_Executive_Overview.py)",
+      "Bash(.venv/Scripts/python -c ' *)",
+      "Bash(python -c \"from app.routes import dashboards; print\\('OK', [r.path for r in dashboards.router.routes]\\)\")",
+      "Bash(npx --no-install tsc --noEmit)",
+      "Bash(echo \"EXIT=$?\")"
     ]
   }
 }

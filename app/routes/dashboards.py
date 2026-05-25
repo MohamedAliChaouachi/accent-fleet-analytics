@@ -30,15 +30,23 @@ from sqlalchemy.engine import Connection
 from app.deps import DbDep
 from app.schemas.dashboards import (
     ExecutiveDashboardResponse,
+    FleetEfficiencyDashboardResponse,
     MaintenanceDashboardResponse,
     OperationsDashboardResponse,
+    PredictiveAlertsDashboardResponse,
     RiskDashboardResponse,
+    SafetyScorecardDashboardResponse,
+    TenantBillingDashboardResponse,
 )
 from app.services.dashboards import (
     fetch_executive,
+    fetch_fleet_efficiency,
     fetch_maintenance,
     fetch_operations,
+    fetch_predictive_alerts,
     fetch_risk,
+    fetch_safety_scorecard,
+    fetch_tenant_billing,
     parse_filters,
 )
 
@@ -111,3 +119,47 @@ def risk_overview(
 ) -> RiskDashboardResponse:
     f = parse_filters(start, end, _tenant_ids(tenant_ids))
     return fetch_risk(conn, f)
+
+
+@router.get("/fleet-efficiency", response_model=FleetEfficiencyDashboardResponse)
+def fleet_efficiency_overview(
+    start: StartParam = None,
+    end: EndParam = None,
+    tenant_ids: TenantIdsParam = None,
+    conn: Connection = DbDep,
+) -> FleetEfficiencyDashboardResponse:
+    f = parse_filters(start, end, _tenant_ids(tenant_ids))
+    return fetch_fleet_efficiency(conn, f)
+
+
+@router.get("/safety-scorecard", response_model=SafetyScorecardDashboardResponse)
+def safety_scorecard_overview(
+    start: StartParam = None,
+    end: EndParam = None,
+    tenant_ids: TenantIdsParam = None,
+    conn: Connection = DbDep,
+) -> SafetyScorecardDashboardResponse:
+    f = parse_filters(start, end, _tenant_ids(tenant_ids))
+    return fetch_safety_scorecard(conn, f)
+
+
+@router.get("/predictive-alerts", response_model=PredictiveAlertsDashboardResponse)
+def predictive_alerts_overview(
+    start: StartParam = None,
+    end: EndParam = None,
+    tenant_ids: TenantIdsParam = None,
+    conn: Connection = DbDep,
+) -> PredictiveAlertsDashboardResponse:
+    f = parse_filters(start, end, _tenant_ids(tenant_ids))
+    return fetch_predictive_alerts(conn, f)
+
+
+@router.get("/tenant-billing", response_model=TenantBillingDashboardResponse)
+def tenant_billing_overview(
+    start: StartParam = None,
+    end: EndParam = None,
+    tenant_ids: TenantIdsParam = None,
+    conn: Connection = DbDep,
+) -> TenantBillingDashboardResponse:
+    f = parse_filters(start, end, _tenant_ids(tenant_ids))
+    return fetch_tenant_billing(conn, f)
