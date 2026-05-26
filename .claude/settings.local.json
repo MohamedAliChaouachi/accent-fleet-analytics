@@ -101,7 +101,25 @@
       "PowerShell(docker compose logs api --since 30s 2>&1)",
       "PowerShell(findstr -i \"ai\\\\.\")",
       "PowerShell(docker compose logs api --since 60s 2>&1)",
-      "PowerShell(findstr -i \"audit\\\\|ai\\\\.audit\")"
+      "PowerShell(findstr -i \"audit\\\\|ai\\\\.audit\")",
+      "PowerShell(docker compose logs api --tail 60 2>&1)",
+      "PowerShell(findstr -i \"ai\\\\.\\\\|/v1/ai\\\\|error\\\\|500\\\\|502\")",
+      "PowerShell(curl.exe -sI http://localhost:3000/)",
+      "PowerShell(findstr -i \"cache\\\\|etag\\\\|last-modified\\\\|content-length\")",
+      "PowerShell(curl.exe -sI http://localhost:3000/ 2>&1)",
+      "PowerShell(docker compose logs api --tail 30 2>&1)",
+      "PowerShell(findstr -i \"/v1/ai\\\\|/v1/auth\")",
+      "PowerShell(docker compose logs web --tail 30 2>&1)",
+      "PowerShell(findstr -i \"/v1/ai\\\\|/v1/auth\\\\|/ai\")",
+      "PowerShell(docker compose logs api --tail 50 2>&1)",
+      "PowerShell(docker compose cp scripts/_smoke_ai_risk.py api:/app/scripts/_smoke_ai_risk.py)",
+      "PowerShell(docker compose exec -T api python /app/scripts/_smoke_ai_risk.py)",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "mcp__Claude_in_Chrome__navigate",
+      "mcp__Claude_in_Chrome__browser_batch",
+      "Bash(curl -s http://localhost:3000/ -o /dev/null -w \"status=%{http_code}\\\\n\")",
+      "Bash(curl -s http://localhost:3000/)",
+      "Bash(python scripts/_smoke_ai_risk.py)"
     ]
   }
 }
