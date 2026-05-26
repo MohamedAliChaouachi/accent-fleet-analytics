@@ -2,8 +2,9 @@
 #
 # Two jobs:
 #
-#   lint   — ruff over src/, app/, dashboard/, tests/, scripts/. Pure-Python
-#            so it stays under a minute.
+#   lint   — ruff over src/, app/, tests/, scripts/. Pure-Python so it stays
+#            under a minute. (dashboard/ was retired in v2.0 when the
+#            Streamlit UI was replaced by the React SPA under web/.)
 #
 #   test   — installs the package + dev deps and runs pytest. The DB-bound
 #            integration tests (tests/test_api_devices.py, the SQL parity
@@ -47,7 +48,7 @@ jobs:
         run: pip install "ruff>=0.5,<1.0"
 
       - name: Run ruff
-        run: ruff check src app dashboard tests scripts
+        run: ruff check src app tests scripts
 
   test:
     name: test (pytest)
