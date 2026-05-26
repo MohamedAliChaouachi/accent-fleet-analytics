@@ -50,7 +50,7 @@ import { PieChart } from "@/components/charts/PieChart";
 // Bumping this string is the easiest way to tell, from the browser
 // console, whether a fresh build actually shipped. If you change the
 // page and don't see the new banner, your bundle is cached.
-const BUILD_TAG = "AIChat v3.9 — render tabular results inline";
+const BUILD_TAG = "AIChat v4.0 — fix send() convoId race";
 if (typeof window !== "undefined") {
   // eslint-disable-next-line no-console
   console.info(`[${BUILD_TAG}] loaded`);
@@ -374,18 +374,43 @@ export function AIChat() {
       return;
     }
 
-    // Step 1: ensure we have an active conversation. If none, spin one
-    // up with the current tenant. We do this BEFORE appending the
-    // message so the convo id is stable.
-    let convoId = activeId;
+    // Resolve / allocate the target conversation BEFORE touching React
+    // state. Two reasons this can't live inside the setConversations
+    // updater:
+    //
+    //   * React batches setState calls in event handlers — the updater
+    //     function runs during the NEXT render, not synchronously. So
+    //     if we mutated an outer `convoId` from inside the updater, the
+    //     `mutation.mutate({ convoId })` call below would fire with the
+    //     stale pre-call value (typically null for a fresh chat), and
+    //     onSuccess would do `prev.map(c => c.id !== null ? c : …)` —
+    //     no row matches, the assistant reply is silently dropped, and
+    //     the UI shows the user bubble with nothing after it. That was
+    //     the v3.x bug.
+    //
+    //   * State updaters must be pure. StrictMode invokes them twice
+    //     in dev to detect impurity; a `convoId = fresh.id` side effect
+    //     inside the updater would generate two different UUIDs across
+    //     the two invocations and leak orphan conversations.
+    //
+    // Compute everything synchronously here, then pass the resolved
+    // id into both the state update and the mutation.
+    const existing = activeId
+      ? conversations.find((c) => c.id === activeId) ?? null
+      : null;
+    const conversation = existing ?? newConversation(isSuperadmin ? tenant : "");
+    const convoId = conversation.id;
+    const isNew = existing === null;
+
     setConversations((prev) => {
-      let working = prev;
-      if (!convoId || !working.some((c) => c.id === convoId)) {
-        const fresh = newConversation(isSuperadmin ? tenant : "");
-        convoId = fresh.id;
-        working = [fresh, ...working];
-      }
-      // Step 2: append the user message + maybe set the title.
+      // Re-check inside the updater in case StrictMode replays it with
+      // a state that already contains the conversation we just created
+      // (defensive: `prev` should equal the snapshot we read above,
+      // but cheap to verify and keeps the updater idempotent).
+      const working =
+        isNew && !prev.some((c) => c.id === convoId)
+          ? [conversation, ...prev]
+          : prev;
       return working.map((c) => {
         if (c.id !== convoId) return c;
         const isFirstUserMsg = c.messages.every((m) => m.role !== "user");
@@ -401,8 +426,7 @@ export function AIChat() {
     if (activeId !== convoId) setActiveId(convoId);
     setInput("");
     setTransientError(null);
-    // convoId is set above. The "!" reflects that.
-    mutation.mutate({ convoId: convoId!, question: q });
+    mutation.mutate({ convoId, question: q });
   }
 
   function onSubmit(e: FormEvent) {
