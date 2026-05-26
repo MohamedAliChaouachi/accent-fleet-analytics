@@ -319,17 +319,51 @@ def task_score_risk_latest_partition(touched_months: list[str], run_id: int) -> 
 
 @task(retries=1)
 def task_ensure_views() -> None:
-    """(Re)create the marts views. Idempotent."""
+    """(Re)create the marts views. Idempotent.
+
+    We DROP each view before re-creating it so column-type drift between
+    versions (e.g. v0.6 changed fact_device_risk_score.year_month from an
+    unsized `char` to `char(7)`, which makes CREATE OR REPLACE error with
+    "cannot change data type of view column") does not block bootstrap.
+    CASCADE handles dependent views; we re-create them in the same pass.
+    """
+    files = (
+        "21_v_device_risk_profile.sql",
+        "22_v_ml_features.sql",
+        "23_v_fleet_risk_dashboard.sql",
+        "26_v_ml_features_full.sql",
+        # BI dashboard views
+        "33_v_executive_dashboard.sql",
+        "34_v_operational_dashboard.sql",
+        "35_v_maintenance_dashboard.sql",
+        # v2.0 business KPI views
+        "36_v_fleet_efficiency_dashboard.sql",
+        "37_v_safety_scorecard_dashboard.sql",
+        "38_v_predictive_alerts_dashboard.sql",
+        "39_v_tenant_billing_dashboard.sql",
+        "42_v_real_time_alerts_stream.sql",
+    )
     with transaction() as conn:
-        for f in ("21_v_device_risk_profile.sql",
-                  "22_v_ml_features.sql",
-                  "23_v_fleet_risk_dashboard.sql",
-                  "26_v_ml_features_full.sql",
-                  # BI dashboard views
-                  "33_v_executive_dashboard.sql",
-                  "34_v_operational_dashboard.sql",
-                  "35_v_maintenance_dashboard.sql"):
+        # Drop everything first (CASCADE), then recreate in dependency
+        # order. Dropping inline would force us to topologically sort the
+        # files; a separate pre-pass keeps the create order untouched.
+        for f in files:
+            view = _view_name_from_sql_filename(f)
+            if view is not None:
+                conn.execute(text(f"DROP VIEW IF EXISTS marts.{view} CASCADE"))
+        for f in files:
             run_sql_file(conn, f)
+
+
+def _view_name_from_sql_filename(filename: str) -> str | None:
+    """Derive `v_<name>` from `NN_v_<name>.sql`. Returns None if mismatched."""
+    base = filename.rsplit(".", 1)[0]
+    # Strip the leading "NN_" prefix.
+    parts = base.split("_", 1)
+    if len(parts) != 2:
+        return None
+    name = parts[1]
+    return name if name.startswith("v_") else None
 
 
 @task(retries=1)

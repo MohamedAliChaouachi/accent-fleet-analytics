@@ -48,9 +48,20 @@ export function LoginPage() {
 
         <label className="mb-3 block">
           <span className="mb-1 block text-sm font-medium text-slate-700">Email</span>
+          {/*
+            type="text" + inputMode="email" rather than type="email" on
+            purpose: seeded system identities use `.local` with underscored
+            subdomains (e.g. admin@tenant_235.local) which the browser's
+            built-in email validator rejects per RFC 1035, even though the
+            API accepts them via the loose pattern in app/schemas/auth.py.
+            inputMode keeps the mobile @-key hint without the strict check.
+          */}
           <input
-            type="email"
+            type="text"
+            inputMode="email"
             autoComplete="username"
+            spellCheck={false}
+            autoCapitalize="off"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}

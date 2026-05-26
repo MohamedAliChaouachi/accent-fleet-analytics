@@ -2,8 +2,12 @@ import { useState, type ChangeEvent } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "@/auth/AuthContext";
 import { useFilters } from "@/filters/FiltersContext";
+import type { UserRole } from "@/api/types";
 
-const NAV_ITEMS: ReadonlyArray<{ to: string; label: string }> = [
+// `superadminOnly: true` hides the entry for tenant_admin and tenant_user.
+// /billing is the only one today — it's a cross-tenant revenue/usage view
+// that doesn't make sense for a user who only sees their own tenant.
+const NAV_ITEMS: ReadonlyArray<{ to: string; label: string; superadminOnly?: boolean }> = [
   { to: "/executive", label: "Executive overview" },
   { to: "/operations", label: "Operations" },
   { to: "/maintenance", label: "Maintenance" },
@@ -11,10 +15,14 @@ const NAV_ITEMS: ReadonlyArray<{ to: string; label: string }> = [
   { to: "/fleet-efficiency", label: "Fleet efficiency" },
   { to: "/safety", label: "Safety scorecard" },
   { to: "/alerts", label: "Predictive alerts" },
-  { to: "/billing", label: "Tenant billing" },
-  { to: "/what-if", label: "What-if" },
+  { to: "/billing", label: "Tenant billing", superadminOnly: true },
   { to: "/ai", label: "Ask the data" },
 ];
+
+function visibleNavItems(role: UserRole | undefined) {
+  if (role === "superadmin") return NAV_ITEMS;
+  return NAV_ITEMS.filter((i) => !i.superadminOnly);
+}
 
 function navClass({ isActive }: { isActive: boolean }) {
   return [
@@ -28,6 +36,12 @@ function navClass({ isActive }: { isActive: boolean }) {
 export function Layout() {
   const { user, logout } = useAuth();
   const { filters, setRange, setTenantIds } = useFilters();
+
+  // Superadmin can scope to a comma-separated list of tenant ids;
+  // tenant_admin and tenant_user are pinned to their own tenant by the
+  // API (see app/routes/dashboards.py::_effective_tenant_ids), so we
+  // hide the input for them.
+  const isSuperadmin = user?.role === "superadmin";
 
   // Local state for the tenants text input so users can type a comma
   // mid-value without us thrashing the URL on every keystroke. Commit
@@ -59,7 +73,7 @@ export function Layout() {
         </div>
 
         <nav className="mb-8 space-y-1">
-          {NAV_ITEMS.map((item) => (
+          {visibleNavItems(user?.role).map((item) => (
             <NavLink key={item.to} to={item.to} className={navClass}>
               {item.label}
             </NavLink>
@@ -88,30 +102,46 @@ export function Layout() {
               className="block w-full rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-sm text-white"
             />
           </label>
-          <label className="block">
-            <span className="mb-1 block text-xs text-slate-400">
-              Tenant ids (comma-separated, blank = all)
-            </span>
-            <input
-              type="text"
-              value={tenantsText}
-              onChange={(e) => setTenantsText(e.target.value)}
-              onBlur={commitTenants}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  commitTenants();
-                }
-              }}
-              placeholder="e.g. 1, 2"
-              className="block w-full rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-sm text-white placeholder:text-slate-500"
-            />
-          </label>
-          <p className="text-xs text-slate-500">
-            {filters.tenant_ids.length
-              ? `Scope: ${filters.tenant_ids.length} tenant(s)`
-              : "Scope: all tenants"}
-          </p>
+          {isSuperadmin ? (
+            <>
+              <label className="block">
+                <span className="mb-1 block text-xs text-slate-400">
+                  Tenant ids (comma-separated, blank = all)
+                </span>
+                <input
+                  type="text"
+                  value={tenantsText}
+                  onChange={(e) => setTenantsText(e.target.value)}
+                  onBlur={commitTenants}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      commitTenants();
+                    }
+                  }}
+                  placeholder="e.g. 1, 2"
+                  className="block w-full rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-sm text-white placeholder:text-slate-500"
+                />
+              </label>
+              <p className="text-xs text-slate-500">
+                {filters.tenant_ids.length
+                  ? `Scope: ${filters.tenant_ids.length} tenant(s)`
+                  : "Scope: all tenants"}
+              </p>
+            </>
+          ) : (
+            // Non-superadmin: tenant scope is pinned by the API to the JWT
+            // claim, so showing an editable input would be a lie. Render a
+            // static badge so the user knows what they're looking at.
+            <div className="rounded-md border border-slate-700 bg-slate-800 px-3 py-2">
+              <p className="text-[10px] uppercase tracking-wider text-slate-400">
+                Scope (locked by your role)
+              </p>
+              <p className="mt-1 text-sm text-white">
+                {user?.tenant_name ?? `Tenant #${user?.tenant_id ?? "—"}`}
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="mt-10 border-t border-slate-700 pt-4 text-xs text-slate-400">

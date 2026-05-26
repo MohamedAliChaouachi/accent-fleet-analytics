@@ -60,7 +60,7 @@ export function RiskAndBehavior() {
         caption="Fleet-level + per-device 3-month rolling risk with cluster overlay."
       />
 
-      {isPending ? <StateMessage>Loading risk dashboard\u2026</StateMessage> : null}
+      {isPending ? <StateMessage>Loading risk dashboard…</StateMessage> : null}
       {isError ? (
         <StateMessage tone="error">
           Failed to load risk dashboard: {(error as Error).message}
@@ -115,7 +115,7 @@ function Content({ data }: { data: RiskDashboardResponse }) {
     return (
       <StateMessage tone="warning">
         No risk data for the current filters. Widen the date range or remove the tenant
-        filter \u2014 the view derives from a 3-month rolling window, so the earliest data
+        filter — the view derives from a 3-month rolling window, so the earliest data
         must be at least 1 month old.
       </StateMessage>
     );
@@ -201,7 +201,7 @@ function Content({ data }: { data: RiskDashboardResponse }) {
 
       {crosstab.length ? (
         <Panel
-          title="Cluster \u00d7 risk-category crosstab"
+          title="Cluster × risk-category crosstab"
           description="Stacked: do behaviour groups track risk categories?"
           accent="#9b59b6"
         >
@@ -273,7 +273,7 @@ function ClusterPersonaGrid({
                   {persona.name}
                 </p>
                 <p className="text-[11px] uppercase tracking-wider text-slate-500">
-                  Cluster #{c.cluster_id} \u00b7 {fmtInt(c.devices)} devices ({pct.toFixed(0)}%)
+                  Cluster #{c.cluster_id} · {fmtInt(c.devices)} devices ({pct.toFixed(0)}%)
                 </p>
               </div>
             </div>
@@ -379,7 +379,7 @@ function RiskScoreCell({
   category: DeviceRiskRow["risk_category"];
 }) {
   if (score === null || score === undefined)
-    return <span className="text-slate-400">\u2014</span>;
+    return <span className="text-slate-400">—</span>;
   const pct = Math.max(0, Math.min(100, score));
   const color = RISK_COLORS[category ?? "low"] ?? "#94a3b8";
   return (
@@ -481,7 +481,7 @@ function DeviceDrillDown({
               <span className="sr-only">Search devices</span>
               <input
                 type="search"
-                placeholder="Search device id, risk, persona\u2026"
+                placeholder="Search device id, risk, persona…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm placeholder:text-slate-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
@@ -514,7 +514,7 @@ function DeviceDrillDown({
                           #{d.device_id}
                         </p>
                         <p className="truncate text-[11px] text-slate-500">
-                          {d.latest_month ?? "\u2014"} \u00b7 score {fmtDec(d.risk_score)}
+                          {d.latest_month ?? "—"} · score {fmtDec(d.risk_score)}
                         </p>
                       </div>
                       <div className="flex flex-shrink-0 items-center gap-1">
@@ -541,7 +541,7 @@ function DeviceDrillDown({
                 latestHistory={data?.history.at(-1) ?? null}
               />
               {isPending ? (
-                <StateMessage>Loading device profile\u2026</StateMessage>
+                <StateMessage>Loading device profile…</StateMessage>
               ) : isError ? (
                 <StateMessage tone="error">
                   Failed to load device: {(error as Error).message}

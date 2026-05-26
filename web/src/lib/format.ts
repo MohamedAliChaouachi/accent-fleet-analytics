@@ -1,6 +1,5 @@
-// Tiny number/date formatters used across pages. Mirrors the Streamlit
-// "{:,.0f}" / "{:,.2f}" defaults so the two dashboards present the same
-// values during cutover.
+// Tiny number/date formatters used across pages. Defaults match the
+// {:,.0f} / {:,.2f} style we use everywhere else.
 
 const intFmt = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 const decFmt = new Intl.NumberFormat("en-US", {

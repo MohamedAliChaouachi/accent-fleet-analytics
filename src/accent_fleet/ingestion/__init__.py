@@ -1,7 +1,4 @@
-"""Ingestion sources — same interface, batch or stream.
-
-Stream implementation is deferred. See ``_deferred/stream_source.py``.
-"""
+"""Ingestion sources — currently batch-only (staging-table polling)."""
 
 from accent_fleet.ingestion.batch_source import BatchStagingSource
 from accent_fleet.ingestion.source import Source

@@ -2,10 +2,9 @@
 Response schemas for the per-page dashboard endpoints (/v1/dashboards/*).
 
 Shapes are designed so the React client can render directly from the JSON
-without re-aggregating: the service layer pre-computes the same monthly
-roll-ups, KPI strips, and crosstabs the Streamlit pages currently build
-in-page with pandas. Raw view rows are returned alongside so the React
-"Detail" tables match the Streamlit "Raw table" sections 1:1.
+without re-aggregating: the service layer pre-computes the monthly
+roll-ups, KPI strips, and crosstabs. Raw view rows are returned alongside
+to back the per-page "Detail" tables.
 """
 
 from __future__ import annotations
@@ -62,7 +61,7 @@ class ExecutiveMonthlyAggregate(BaseModel):
 
 
 class ExecutiveKpi(BaseModel):
-    """KPI strip for the latest month in scope (matches Streamlit page header)."""
+    """KPI strip for the latest month in scope."""
 
     year_month: str
     tenants_in_latest_month: int = Field(..., ge=0)

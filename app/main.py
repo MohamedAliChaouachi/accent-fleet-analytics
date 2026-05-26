@@ -63,7 +63,7 @@ app = FastAPI(
     version=__version__,
     description=(
         "Risk + clustering scoring service for fleet device-month features. "
-        "Pairs with the Streamlit dashboard and the Prefect batch pipeline."
+        "Pairs with the React web app and the Prefect batch pipeline."
     ),
     lifespan=lifespan,
 )

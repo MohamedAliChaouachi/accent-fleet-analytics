@@ -8,8 +8,7 @@ import {
 import { useSearchParams } from "react-router-dom";
 import type { DashboardFilters } from "@/api/types";
 
-// Default window matches the Streamlit sidebar (last 90 days) so the two
-// dashboards agree on what "today's data" looks like during cutover.
+// Default window: last 90 days.
 const DEFAULT_WINDOW_DAYS = 90;
 
 function isoDate(d: Date): string {

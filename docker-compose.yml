@@ -1,6 +1,6 @@
 # Accent Fleet Analytics — local/Azure-VM compose stack.
 #
-# Default services (always start):  base, mlflow, api, dashboard, etl
+# Default services (always start):  base, mlflow, api, web, etl
 # Optional profiles:
 #   --profile localdb   -> spins up a Postgres 16 container for purely local dev.
 #                          Skip this on Azure where the DB is hosted externally
@@ -14,7 +14,7 @@
 #
 # Typical Azure-VM usage:
 #   docker compose build base
-#   docker compose up -d mlflow api dashboard etl
+#   docker compose up -d mlflow api web etl
 #   (.env has PG_HOST=<your-server>.postgres.database.azure.com and PG_SSLMODE=require)
 
 services:
@@ -119,37 +119,8 @@ services:
     networks: [fleet-net]
 
   # ---------------------------------------------------------------------------
-  # Streamlit dashboard.
-  # ---------------------------------------------------------------------------
-  dashboard:
-    image: accent-fleet-dashboard:latest
-    build:
-      context: .
-      dockerfile: docker/dashboard.Dockerfile
-    container_name: accent_dashboard
-    restart: unless-stopped
-    env_file: .env
-    environment:
-      API_BASE_URL: http://api:8000
-      # The What-If page (and any future page that hits /v1/score/*, /devices/*,
-      # /admin/*) needs a bearer token. Dashboard logs in as DASHBOARD_API_EMAIL
-      # on first call and caches the JWT; see dashboard/lib/api.py. EMAIL has a
-      # sensible default that matches scripts/seed_auth.py; PASSWORD is the
-      # plaintext printed by seed_auth.py stdout and must come from .env.
-      DASHBOARD_API_EMAIL: ${DASHBOARD_API_EMAIL:-superadmin@accent.local}
-      DASHBOARD_API_PASSWORD: ${DASHBOARD_API_PASSWORD:-}
-    ports:
-      - "${DASHBOARD_PORT:-8501}:8501"
-    depends_on:
-      api:
-        condition: service_healthy
-    networks: [fleet-net]
-
-  # ---------------------------------------------------------------------------
   # React SPA. Served by nginx; reverse-proxies /v1/* to the api service so the
-  # browser sees a single origin. Coexists with the Streamlit dashboard during
-  # cutover — delete this comment + the `dashboard` service once parity is
-  # signed off (see plans/now-i-want-to-cozy-fairy.md "Out of scope").
+  # browser sees a single origin.
   # ---------------------------------------------------------------------------
   web:
     image: accent-fleet-web:latest
@@ -232,7 +203,7 @@ services:
     networks: [fleet-net]
 
   # ---------------------------------------------------------------------------
-  # nginx reverse proxy with HTTP Basic Auth in front of dashboard / mlflow / api.
+  # nginx reverse proxy with HTTP Basic Auth in front of web / mlflow / api.
   # Opt-in via `--profile auth`. Required when the host is reachable outside
   # localhost. See docker/nginx/nginx.conf + README §Auth-protected stack for
   # how to create the htpasswd file before starting this service.
@@ -248,7 +219,7 @@ services:
       - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./docker/nginx/htpasswd:/etc/nginx/htpasswd:ro
     depends_on:
-      - dashboard
+      - web
       - mlflow
       - api
     networks: [fleet-net]

@@ -27,7 +27,7 @@ and turns them into two products:
    fleet-wide KMeans for behaviour personas. Consumed via a REST API
    (FastAPI) and a what-if scoring page.
 2. **A fleet-BI dashboard** — executive KPIs, daily ops volume,
-   maintenance cost leaderboards, harsh-event hotspots. Streamlit.
+   maintenance cost leaderboards, harsh-event hotspots. React SPA.
 
 The repo is structured around the **CRISP-DM** methodology
 (Cross-Industry Standard Process for Data Mining): six phases from
@@ -76,17 +76,17 @@ notebook folder so the work is traceable.
                     │               v_maintenance_dashboard │
                     │               v_fleet_risk_dashboard  │
                     └────┬───────────────────────────┬──────┘
-                         │ role: accent_app          │ role: accent_app
-                         │ (NOBYPASSRLS — RLS clamps)│ (with superadmin
-                         │                           │  Principal at
-                  ┌──────▼──────┐             ┌──────▼──────┐ page init)
-                  │   API       │             │  Dashboard  │
-                  │  (FastAPI)  │             │ (Streamlit) │
-                  │  port 8000  │             │  port 8501  │
+                         │ role: accent_app          │
+                         │ (NOBYPASSRLS — RLS clamps)│
+                         │                           │
+                  ┌──────▼──────┐             ┌──────▼──────┐
+                  │   API       │◄────────────│   Web app   │
+                  │  (FastAPI)  │  /v1/* via  │   (React)   │
+                  │  port 8000  │   nginx     │  nginx :80  │
                   │             │             │             │
-                  │ JWT auth    │◄────────────│  hits API   │
-                  │ /v1/score/* │   What-If   │  for ad-hoc │
-                  │ /v1/devices │   page only │   scoring   │
+                  │ JWT auth    │             │  JWT login  │
+                  │ /v1/score/* │             │   per user  │
+                  │ /v1/devices │             │             │
                   │ /v1/admin/* │             │             │
                   └─────────────┘             └─────────────┘
                          │
@@ -189,7 +189,7 @@ profile flags.
 |---|---|---|
 | `mlflow` | Model registry + artifact store | Tracking server v2.16.2. SQLite backend in a named volume. Models register under `device-behavior-clustering`. |
 | `api` | FastAPI scoring service, port 8000 | Lazy-loads `ClusterPredictor` (KMeans) and `RiskPredictor` (bundled per-tenant Isolation Forest) on first call to their respective routes. Unknown tenant on `/v1/score/risk` → 503 `tenant_model_missing`. AuthMiddleware enforces JWT in `enforce` mode (M4). |
-| `dashboard` | Streamlit UI, port 8501 | Pages `Home → Executive → Operations → Maintenance → Risk → What-If`. Reads Postgres directly (with a service Principal so RLS lets the rows through). What-If hits the API for ad-hoc scoring. |
+| `web` | React SPA served by nginx, port 3000 | TanStack-Query-backed dashboards: Executive Overview, Operations, Maintenance, Risk & Behavior, Fleet Efficiency, Safety Scorecard, Predictive Alerts, Tenant Billing, Ask the Data. All pages talk to the FastAPI over the bundled nginx (reverse-proxies `/v1/*` so the browser sees a single origin). Real per-user JWT login. |
 | `etl` | Prefect runtime | `while true: run incremental_flow; sleep`. Connects as `accent_etl` (BYPASSRLS) per M6. |
 | `retrain-scheduler` | `--profile scheduler` | supercronic that fires every Monday 04:00 UTC; the wrapper short-circuits unless today is the *first* Monday of the month. Triggers `retrain_monthly.py` (clustering, silhouette gate) and `retrain_risk_monthly.py` (per-tenant IF, stability gate). |
 | `nginx` | `--profile auth` | Reverse proxy with htpasswd at port 8080. v0.6.0 stopgap for "any auth at all"; the durable answer is the JWT model in §8. |
@@ -243,8 +243,8 @@ weights). The What-If page renders the z-scores as the bar chart.
 |---|---|
 | **Grain** | Three: day (`mart_fleet_daily`), vehicle-month (`mart_vehicle_monthly`), tenant-month (`mart_tenant_monthly_summary`) |
 | **Views** | `v_executive_dashboard` (tenant-month, exec KPIs + MoM deltas + 3mo rolling), `v_operational_dashboard` (fleet-day, ops volume), `v_maintenance_dashboard` (tenant-month, cost + work order counts) |
-| **Pages** | `dashboard/pages/0_Executive_Overview.py`, `1_Operations.py`, `2_Maintenance.py` |
-| **Aggregation gotcha** | The views are per-(tenant, period). When the sidebar leaves "all tenants" empty, dashboard pages MUST aggregate across tenants before computing KPIs — otherwise a single-row pick picks one arbitrary tenant's slice. See the fix in `0_Executive_Overview.py` (groupby year_month + sum additive cols, recompute ratios from totals). |
+| **Pages** | `web/src/pages/ExecutiveOverview.tsx`, `Operations.tsx`, `Maintenance.tsx`, `FleetEfficiency.tsx`, `SafetyScorecard.tsx`, `PredictiveAlerts.tsx`, `TenantBilling.tsx` |
+| **Aggregation gotcha** | The views are per-(tenant, period). The `/v1/dashboards/*` service layer (in `app/services/dashboards.py`) aggregates across tenants before computing KPIs when the filter is empty — otherwise a single-row pick picks one arbitrary tenant's slice. |
 
 ---
 
@@ -387,14 +387,13 @@ The flow on every API request:
    exemption — even the table owner sees zero rows unless they
    elevate.
 
-**The dashboard's twist:** there is no per-user login. So
-`dashboard/lib/theme.py:_ensure_dashboard_principal` stamps a service
-"superadmin" Principal into the ContextVar at page init, the engine
-listener emits `SET LOCAL ROLE accent_superadmin`, and queries see
-all tenants for the duration of one transaction. The What-If page is
-the exception — it hits the API and needs a real JWT
-(`dashboard/lib/api.py:post_json` handles the login + bearer
-injection).
+**The web app's twist:** every request carries a JWT issued by
+`POST /v1/auth/login`. The API's `AuthMiddleware` derives the
+Principal (`user_id`, `tenant_id`, `role`), which the engine listener
+turns into `SET LOCAL ROLE accent_app` + `SET LOCAL app.current_tenant
+= <tenant_id>` for the duration of the request, and RLS does the rest.
+Superadmins (no `tenant_id`) get `SET LOCAL ROLE accent_superadmin` and
+see all tenants — same engine listener, different role.
 
 > **Operator recovery — lost seed password.** `seed_auth.py` prints
 > generated passwords once and stores only the argon2id hash. If you
@@ -412,10 +411,10 @@ injection).
 ### 9.1 Bring up a fresh stack
 
 ```bash
-cp .env.example .env                                # fill DB creds + DASHBOARD_API_PASSWORD
+cp .env.example .env                                # fill DB creds
 docker compose build base                           # one-time shared image
-make build                                          # api + dashboard + etl
-make up                                             # mlflow + api + dashboard + etl
+make build                                          # api + etl + web
+make up                                             # mlflow + api + etl + web
 make seed                                           # bootstrap + small backfill
 
 # Seed auth (M2). CAPTURE THE OUTPUT — passwords are printed once.
@@ -423,7 +422,7 @@ docker compose exec api python scripts/seed_auth.py
 ```
 
 Then visit:
-- Dashboard: <http://localhost:8501>
+- Web app:   <http://localhost:3000>
 - API docs:  <http://localhost:8000/docs>
 - MLflow:    <http://localhost:5000>
 
@@ -483,7 +482,7 @@ medamine_dev_elevated     : N    (escape hatch via accent_superadmin)
 | Concern | File |
 |---|---|
 | Add a new fact table | `sql/1X_fact_*_incremental.sql` + a notebook in `notebooks/02_data_preparation/facts/` + register in the flow's task list |
-| Add a new dashboard page | `dashboard/pages/N_<name>.py` — copy a sibling and adapt. Don't forget `apply_layout()` + `render_sidebar_filters()` |
+| Add a new dashboard page | `web/src/pages/<Name>.tsx` (+ route in `web/src/App.tsx`, nav link in `web/src/components/Layout.tsx`). Add the API endpoint in `app/routes/dashboards.py` + a service function in `app/services/dashboards.py`, and a fetcher in `web/src/api/dashboards.ts`. |
 | Add a new API endpoint | `app/routes/<file>.py` — add to `app/main.py` via `include_versioned_router` so it gets `/v1` + legacy paths |
 | Add a new cleaning rule | `config/cleaning_rules.yaml` + `src/accent_fleet/cleaning/` + a unit test in `tests/test_cleaning_rules.py` |
 | Change a risk weight | `config/feature_definitions.yaml` — no code change needed |
@@ -497,41 +496,7 @@ medamine_dev_elevated     : N    (escape hatch via accent_superadmin)
 A few real failure modes you (or future-you) will hit again, with the
 exact symptom and the exact fix.
 
-### 10.1 Dashboard shows "No data for the current filters" on every page
-
-**Symptom.** Every dashboard page is empty even though `psql` as
-`postgres` shows the marts are populated.
-
-**Cause.** Post-B7 + FORCE RLS the dashboard's queries land as
-`accent_app` (NOBYPASSRLS) with no `app.current_tenant` GUC set, so
-the policies in `sql/51_rls_policies.sql` evaluate to NULL ⇒ zero
-rows.
-
-**Fix.** Ensure `dashboard/lib/theme.py:_ensure_dashboard_principal`
-stamps a superadmin Principal **before** any `read_sql()` call. The
-engine listener then emits `SET LOCAL ROLE accent_superadmin` per
-transaction. Requires `app/` in the dashboard image AND the
-post-M5 `src/accent_fleet/db/engine.py` (so the listener's superadmin
-branch is present). Both are now baked in
-`docker/dashboard.Dockerfile` via `COPY app ./app` + `COPY src ./src`.
-
-### 10.2 What-If page: "401 Unauthorized" on Score
-
-**Symptom.** Score button → "Risk API call failed: Client error
-'401 Unauthorized'".
-
-**Cause.** Post-M3 the API enforces JWT bearer auth on every
-non-exempt path. The What-If page was hitting `/score/risk` with no
-`Authorization` header.
-
-**Fix.** Use `dashboard/lib/api.post_json("/v1/score/risk", payload)`.
-The helper lazy-logs-in, caches the access token across Streamlit
-reruns (`@st.cache_resource`), refreshes 30s before expiry, and
-retries once on a server-returned 401. Credentials come from
-`DASHBOARD_API_EMAIL` / `DASHBOARD_API_PASSWORD` in the dashboard
-container env.
-
-### 10.3 KPI says "all tenants = 46 devices, tenant 235 alone = 126"
+### 10.1 KPI says "all tenants = 46 devices, tenant 235 alone = 126"
 
 **Symptom.** Aggregate filter shows a smaller number than a single
 tenant in the same filter.

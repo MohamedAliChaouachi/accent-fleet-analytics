@@ -50,7 +50,7 @@ import { PieChart } from "@/components/charts/PieChart";
 // Bumping this string is the easiest way to tell, from the browser
 // console, whether a fresh build actually shipped. If you change the
 // page and don't see the new banner, your bundle is cached.
-const BUILD_TAG = "AIChat v3.8 — no All-tenants, New chat in top bar";
+const BUILD_TAG = "AIChat v3.9 — render tabular results inline";
 if (typeof window !== "undefined") {
   // eslint-disable-next-line no-console
   console.info(`[${BUILD_TAG}] loaded`);
@@ -845,7 +845,20 @@ function ErrorBubble({ error }: { error: Error }) {
 function AssistantChart({ response }: { response: AIQueryResponse }) {
   const { chart_type, rows, columns } = response;
   if (rows.length === 0) return null;
-  if (chart_type === "table" || columns.length < 2) return null;
+
+  // chart_type="table" or single-column results: render the rows
+  // themselves. Without this the bubble shows just the summary sentence
+  // and the row-count footer — which reads as "the bot didn't show me
+  // anything" for questions like "top 5 vehicles by cost". The same
+  // visual treatment doubles as the empty-state for low-cardinality
+  // results that the chart suggester refused to plot.
+  if (chart_type === "table" || columns.length < 2) {
+    return (
+      <div className="mt-3 overflow-x-auto rounded-md border border-slate-100 bg-slate-50/60 p-3">
+        <ResultTable rows={rows} columns={columns} />
+      </div>
+    );
+  }
 
   const [xKey, yKey] = columns;
 
@@ -874,6 +887,73 @@ function AssistantChart({ response }: { response: AIQueryResponse }) {
       )}
     </div>
   );
+}
+
+// Plain HTML table for chart_type="table" responses. Cap at 50 rows so
+// a runaway query that the server permitted (the SQL guard already caps
+// at LIMIT 1000) doesn't blow up the chat panel — show the rest only on
+// demand. Columns come from the server in declared order, which is the
+// order the LLM put them in, so we trust that ordering.
+function ResultTable({
+  rows,
+  columns,
+}: {
+  rows: ReadonlyArray<Record<string, unknown>>;
+  columns: ReadonlyArray<string>;
+}) {
+  const VISIBLE_LIMIT = 50;
+  const truncated = rows.length > VISIBLE_LIMIT;
+  const shown = truncated ? rows.slice(0, VISIBLE_LIMIT) : rows;
+  // Defensive: if columns is empty for some reason (older server build),
+  // derive them from the first row so we still render something.
+  const cols = columns.length > 0 ? columns : Object.keys(shown[0] ?? {});
+
+  return (
+    <div>
+      <table className="w-full min-w-[20rem] border-collapse text-xs">
+        <thead>
+          <tr className="text-left text-slate-500">
+            {cols.map((c) => (
+              <th
+                key={c}
+                className="border-b border-slate-200 px-2 py-1.5 font-medium uppercase tracking-wider"
+              >
+                {c}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {shown.map((r, i) => (
+            <tr key={i} className="odd:bg-white even:bg-slate-50">
+              {cols.map((c) => (
+                <td key={c} className="border-b border-slate-100 px-2 py-1.5 text-slate-800">
+                  {formatCell(r[c])}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {truncated ? (
+        <p className="mt-2 text-[11px] text-slate-400">
+          Showing first {VISIBLE_LIMIT} of {rows.length} rows.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function formatCell(v: unknown): string {
+  if (v === null || v === undefined) return "—";
+  if (typeof v === "number") {
+    // Compact thousands separator for readability. Integers get no decimals;
+    // floats keep up to 4 sig figs so a 0.732 doesn't read as "1".
+    if (Number.isInteger(v)) return v.toLocaleString();
+    return v.toLocaleString(undefined, { maximumFractionDigits: 4 });
+  }
+  if (typeof v === "boolean") return v ? "yes" : "no";
+  return String(v);
 }
 
 function chooseBarLayout(

@@ -1,8 +1,8 @@
 import type { Config } from "tailwindcss";
 
-// Risk-tier palette mirrors RISK_COLORS in dashboard/lib/theme.py so
-// the React app and the Streamlit page render the same colors during
-// the side-by-side migration window.
+// Risk-tier palette — shared across KPI cards, chart legends, and the
+// device-level risk badge so every surface labels the same row the same
+// color.
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {

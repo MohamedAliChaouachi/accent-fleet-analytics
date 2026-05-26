@@ -86,9 +86,6 @@ class Settings(BaseSettings):
     # When unset, the admin router refuses every request — fail closed.
     api_admin_key: str = Field("", alias="API_ADMIN_KEY")
 
-    dashboard_port: int = Field(8501, alias="DASHBOARD_PORT")
-    dashboard_base_url: str = Field("http://localhost:8501", alias="DASHBOARD_BASE_URL")
-
     # --- v0.9.0 auth (docs/auth_design.md) ---
     # Enforcement mode for the JWT middleware.
     #   off       — middleware does nothing (back-compat fallback).

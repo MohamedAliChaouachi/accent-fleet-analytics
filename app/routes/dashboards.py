@@ -14,9 +14,15 @@ context. The SQL composition and per-month aggregation live in
 :mod:`app.services.dashboards`; the routes are thin wrappers that own
 parameter parsing and response serialization.
 
-Tenant scoping is still a query parameter for v1 to match the current
-Streamlit behaviour. A follow-up will fold it into the JWT principal
-once the React app is the only consumer.
+Tenant scoping is split between role types:
+  * superadmin  — trusts the client's ``tenant_ids`` filter as-is (or
+                  treats omission as "all tenants"). They can drill into
+                  any subset.
+  * tenant_admin / tenant_user — the JWT's ``tenant_id`` is the source
+                  of truth; whatever the client sends is ignored. RLS is
+                  the final clamp, but pinning at the API layer means a
+                  tenant-scoped user sees their data on first load
+                  without having to know and type their own tenant_id.
 """
 
 from __future__ import annotations
@@ -27,6 +33,7 @@ from typing import Annotated
 from fastapi import APIRouter, Query
 from sqlalchemy.engine import Connection
 
+from app.auth.principal import current_principal
 from app.deps import DbDep
 from app.schemas.dashboards import (
     ExecutiveDashboardResponse,
@@ -71,10 +78,33 @@ TenantIdsParam = Annotated[
 ]
 
 
-def _tenant_ids(raw: list[int] | None) -> list[int]:
-    """FastAPI passes [] when the param is omitted entirely with default=None
-    on a list-typed Query; normalise to a plain list either way."""
-    return list(raw) if raw else []
+def _effective_tenant_ids(raw: list[int] | None) -> list[int]:
+    """
+    Resolve which tenant_ids the query is allowed to filter on.
+
+    FastAPI passes ``[]`` when the param is omitted on a list-typed Query;
+    we normalise that to a plain list either way. On top of that, we
+    enforce the role contract from the module docstring:
+
+      * No principal in scope (auth_enforcement=off, or advisory mode
+        with no token) → trust the client. Dev-only path; production
+        always has a principal.
+      * superadmin → trust the client. They may scope to any subset of
+        tenants, or omit to mean "all tenants".
+      * tenant_admin / tenant_user → ignore the client. Force the scope
+        to ``[principal.tenant_id]`` so the page hydrates with the
+        user's data immediately. A user spoofing a different tenant_id
+        in the URL is still safe because RLS clamps every query to the
+        same GUC.
+    """
+    p = current_principal()
+    if p is None or p.is_superadmin:
+        return list(raw) if raw else []
+    # Non-superadmin: Principal.__post_init__ guarantees tenant_id is not None
+    # whenever role != 'superadmin', so this assertion is a safety net for
+    # future refactors rather than a real branch.
+    assert p.tenant_id is not None
+    return [p.tenant_id]
 
 
 @router.get("/executive", response_model=ExecutiveDashboardResponse)
@@ -84,7 +114,7 @@ def executive_overview(
     tenant_ids: TenantIdsParam = None,
     conn: Connection = DbDep,
 ) -> ExecutiveDashboardResponse:
-    f = parse_filters(start, end, _tenant_ids(tenant_ids))
+    f = parse_filters(start, end, _effective_tenant_ids(tenant_ids))
     return fetch_executive(conn, f)
 
 
@@ -95,7 +125,7 @@ def operations_overview(
     tenant_ids: TenantIdsParam = None,
     conn: Connection = DbDep,
 ) -> OperationsDashboardResponse:
-    f = parse_filters(start, end, _tenant_ids(tenant_ids))
+    f = parse_filters(start, end, _effective_tenant_ids(tenant_ids))
     return fetch_operations(conn, f)
 
 
@@ -106,7 +136,7 @@ def maintenance_overview(
     tenant_ids: TenantIdsParam = None,
     conn: Connection = DbDep,
 ) -> MaintenanceDashboardResponse:
-    f = parse_filters(start, end, _tenant_ids(tenant_ids))
+    f = parse_filters(start, end, _effective_tenant_ids(tenant_ids))
     return fetch_maintenance(conn, f)
 
 
@@ -117,7 +147,7 @@ def risk_overview(
     tenant_ids: TenantIdsParam = None,
     conn: Connection = DbDep,
 ) -> RiskDashboardResponse:
-    f = parse_filters(start, end, _tenant_ids(tenant_ids))
+    f = parse_filters(start, end, _effective_tenant_ids(tenant_ids))
     return fetch_risk(conn, f)
 
 
@@ -128,7 +158,7 @@ def fleet_efficiency_overview(
     tenant_ids: TenantIdsParam = None,
     conn: Connection = DbDep,
 ) -> FleetEfficiencyDashboardResponse:
-    f = parse_filters(start, end, _tenant_ids(tenant_ids))
+    f = parse_filters(start, end, _effective_tenant_ids(tenant_ids))
     return fetch_fleet_efficiency(conn, f)
 
 
@@ -139,7 +169,7 @@ def safety_scorecard_overview(
     tenant_ids: TenantIdsParam = None,
     conn: Connection = DbDep,
 ) -> SafetyScorecardDashboardResponse:
-    f = parse_filters(start, end, _tenant_ids(tenant_ids))
+    f = parse_filters(start, end, _effective_tenant_ids(tenant_ids))
     return fetch_safety_scorecard(conn, f)
 
 
@@ -150,7 +180,7 @@ def predictive_alerts_overview(
     tenant_ids: TenantIdsParam = None,
     conn: Connection = DbDep,
 ) -> PredictiveAlertsDashboardResponse:
-    f = parse_filters(start, end, _tenant_ids(tenant_ids))
+    f = parse_filters(start, end, _effective_tenant_ids(tenant_ids))
     return fetch_predictive_alerts(conn, f)
 
 
@@ -161,5 +191,5 @@ def tenant_billing_overview(
     tenant_ids: TenantIdsParam = None,
     conn: Connection = DbDep,
 ) -> TenantBillingDashboardResponse:
-    f = parse_filters(start, end, _tenant_ids(tenant_ids))
+    f = parse_filters(start, end, _effective_tenant_ids(tenant_ids))
     return fetch_tenant_billing(conn, f)

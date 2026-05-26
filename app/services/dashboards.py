@@ -1,18 +1,15 @@
 """
 Service layer for the /v1/dashboards/* endpoints.
 
-Holds the SQL the Streamlit pages currently embed (against
-``marts.v_executive_dashboard``, ``v_operational_dashboard``,
-``v_maintenance_dashboard``, ``v_fleet_risk_dashboard``,
-``v_device_risk_profile``, ``fact_device_cluster_assignment``) and the
-per-month / per-category aggregations the pages compute client-side with
-pandas. Pulling both into one place means the React client gets one
-chart-ready JSON per page and never has to talk to the DB.
+Wraps the marts views (``marts.v_executive_dashboard``,
+``v_operational_dashboard``, ``v_maintenance_dashboard``,
+``v_fleet_risk_dashboard``, ``v_device_risk_profile``,
+``fact_device_cluster_assignment``) and the per-month / per-category
+aggregations the React pages render. The client gets one chart-ready JSON
+per page and never has to talk to the DB.
 
-The dashboard's ``Filters`` class in ``dashboard/lib/theme.py`` still
-exists; we duplicate its SQL-fragment helpers here as
-:class:`DashboardFilters` rather than reaching across packages, so the
-Streamlit container keeps working unchanged during the migration window.
+:class:`DashboardFilters` owns the SQL-fragment helpers (start/end window,
+tenant scoping) so every endpoint applies the filters identically.
 """
 
 from __future__ import annotations
@@ -73,10 +70,9 @@ DEFAULT_WINDOW_DAYS = 90
 
 @dataclass(frozen=True)
 class DashboardFilters:
-    """Resolved query filters shared by all four dashboard endpoints.
+    """Resolved query filters shared by every dashboard endpoint.
 
-    Mirrors :class:`dashboard.lib.theme.Filters` exactly so SQL fragments
-    can be lifted unchanged. Empty ``tenant_ids`` means "all tenants".
+    Empty ``tenant_ids`` means "all tenants".
     """
 
     start: date
@@ -131,7 +127,7 @@ def parse_filters(
     end: date | None,
     tenant_ids: list[int] | None,
 ) -> DashboardFilters:
-    """Apply Streamlit defaults: last 90 days, all tenants."""
+    """Apply defaults: last 90 days, all tenants."""
     today = date.today()
     if start is None:
         start = today - timedelta(days=DEFAULT_WINDOW_DAYS)
@@ -323,7 +319,7 @@ def fetch_risk(conn: Connection, f: DashboardFilters) -> RiskDashboardResponse:
     devices = [DeviceRiskRow(**dict(r)) for r in device_rows]
 
     # Risk category distribution (preserves insertion order; React can
-    # color-map). Skip None categories to match the Streamlit page.
+    # color-map). Skip None categories.
     counts: dict[str, int] = defaultdict(int)
     for d in devices:
         if d.risk_category:

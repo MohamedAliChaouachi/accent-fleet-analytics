@@ -12,8 +12,8 @@ COMPOSE := docker compose
 .PHONY: help
 help:
 	@echo "Common targets:"
-	@echo "  build           build all docker images (base + api + dashboard + etl + web)"
-	@echo "  up              start the application stack (api, dashboard, web, mlflow, etl)"
+	@echo "  build           build all docker images (base + api + etl + web)"
+	@echo "  up              start the application stack (api, web, mlflow, etl)"
 	@echo "  down            stop the stack"
 	@echo "  logs            tail logs"
 	@echo "  ps              show container status"
@@ -33,12 +33,12 @@ help:
 .PHONY: build
 build:
 	$(COMPOSE) build base
-	$(COMPOSE) build api dashboard etl web
+	$(COMPOSE) build api etl web
 
 .PHONY: up
 up:
 	$(COMPOSE) build base
-	$(COMPOSE) up -d mlflow api dashboard etl web
+	$(COMPOSE) up -d mlflow api etl web
 
 # Run the React SPA against a locally running API (port 8000). Hot reload,
 # proxies /v1/* to localhost:8000 by default (override with VITE_API_TARGET).
@@ -88,7 +88,7 @@ test:
 
 .PHONY: lint
 lint:
-	ruff check src app dashboard tests scripts
+	ruff check src app tests scripts
 
 # ---------------------------------------------------------------------------
 # Optional local Postgres
@@ -96,7 +96,7 @@ lint:
 .PHONY: up-localdb
 up-localdb:
 	$(COMPOSE) --profile localdb up -d postgres
-	$(COMPOSE) up -d mlflow api dashboard etl web
+	$(COMPOSE) up -d mlflow api etl web
 
 .PHONY: down-localdb
 down-localdb:

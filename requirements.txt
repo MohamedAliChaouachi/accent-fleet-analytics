@@ -52,9 +52,6 @@ httpx>=0.27.0                 # API client used by tests and dashboard What-If
 mlflow>=2.16.0,<3.0.0
 joblib>=1.4.0
 
-# Dashboard
-streamlit>=1.38.0
-
 # --- v0.9.0 auth + multi-tenancy ---
 # Argon2id is the PHC password-hashing winner and OWASP-recommended primitive
 # (see docs/auth_design.md §1.2 threat #6). argon2-cffi ships the canonical

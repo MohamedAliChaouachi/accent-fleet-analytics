@@ -13,7 +13,7 @@ Project layout (top-level)
 - `app/` — FastAPI service (routes, auth, middleware).
 - `scripts/` — ETL & training utilities (`run_batch.py`, `train_clustering.py`).
 - `sql/` — Idempotent SQL transforms, views, marts.
-- `dashboard/` — Streamlit dashboard (legacy, slated for replacement).
+- `web/` — React SPA (Vite + TypeScript) — the production frontend.
 - `config/` — YAML feature & pipeline configs.
 - `notebooks/` — CRISP-DM notebooks (00–06).
 - `tests/` — pytest suites (unit & integration).

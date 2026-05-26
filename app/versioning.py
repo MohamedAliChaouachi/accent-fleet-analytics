@@ -10,13 +10,12 @@ compatibility, but every response on them carries:
     Sunset:      <human-readable date>
     Link:        </v1/...>; rel="successor-version"
 
-…so existing clients (the Streamlit dashboard, the bench script, anything
-external someone may have wired up) keep working without code changes,
-but operators see the headers in `curl -I` and CI logs and know when to
-migrate.
+…so existing clients (the bench script, anything external someone may
+have wired up) keep working without code changes, but operators see the
+headers in `curl -I` and CI logs and know when to migrate.
 
 Why not break legacy on the v0.7.0 release:
-  - The dashboard ships in the same repo and could be updated atomically,
+  - The web app ships in the same repo and could be updated atomically,
     but we don't control external scrape probes, ad-hoc Postman calls, or
     notebooks people copy-pasted from #data-science. A sunset window is
     cheaper than a Slack thread per consumer.

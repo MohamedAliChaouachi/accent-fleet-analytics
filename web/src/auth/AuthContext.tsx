@@ -14,8 +14,7 @@ import type { MeResponse, TokenPair } from "@/api/types";
 
 const REFRESH_TOKEN_STORAGE_KEY = "accent.refresh_token";
 
-// Schedule the next refresh this many ms before declared expiry. Matches
-// the 30s cushion the Streamlit client uses (dashboard/lib/api.py:103).
+// Schedule the next refresh this many ms before declared expiry.
 const REFRESH_CUSHION_MS = 30_000;
 
 interface AuthState {

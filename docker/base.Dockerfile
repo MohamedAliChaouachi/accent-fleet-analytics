@@ -1,4 +1,4 @@
-# Base image shared by API, ETL, and dashboard containers.
+# Base image shared by API and ETL containers.
 # Builds the accent_fleet Python package once and caches dependencies.
 FROM python:3.11-slim AS base
 
@@ -6,9 +6,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    # Make the workdir importable so `streamlit run dashboard/Home.py` finds the
-    # `dashboard.lib.*` package. Without this, Streamlit only adds the script's
-    # own folder to sys.path and `from dashboard.lib...` raises ModuleNotFoundError.
+    # Make the workdir importable so scripts like `python scripts/run_batch.py`
+    # resolve sibling packages without each entry point patching sys.path.
     PYTHONPATH=/app
 
 # System packages:
@@ -27,7 +26,7 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN pip install -r requirements.txt
 
-# Copy the package + SQL + config. App/dashboard layers add their own code on top.
+# Copy the package + SQL + config. App/ETL layers add their own code on top.
 COPY pyproject.toml ./
 COPY src ./src
 COPY sql ./sql

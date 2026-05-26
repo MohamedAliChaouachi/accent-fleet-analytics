@@ -23,7 +23,7 @@ window:
   backfill_chunk_days: 30
 
   # Hard cutoff before which no data is ever loaded (matches cleaning rule C1).
-  min_event_time: "2019-10-01T00:00:00Z"
+  min_event_time: "2024-01-01T00:00:00Z"
 
 # ---------------------------------------------------------------------------
 # Source tables — staging tables the pipeline watches

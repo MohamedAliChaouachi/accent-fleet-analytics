@@ -51,7 +51,15 @@ CREATE TABLE IF NOT EXISTS ai.query_log (
     -- authenticated context, which shouldn't happen via the router (it
     -- requires a Principal) but is allowed defensively so a buggy call
     -- site can't crash on a NOT NULL violation.
-    user_id       BIGINT REFERENCES auth.users(user_id),
+    --
+    -- No FK to auth.users on purpose: an audit log must survive a user
+    -- deletion. If a user row goes away later, the historical audit
+    -- record stays — that's the whole point of having an audit trail.
+    -- A dangling user_id is the documented, expected end-state, not a
+    -- referential bug. (Also: accent_etl has no REFERENCES privilege on
+    -- auth.users by sql/52, so the FK would block this migration from
+    -- running outside of a superadmin connection.)
+    user_id       BIGINT,
     tenant_id     INTEGER,
 
     -- What was asked, what we ran. `question` is bounded to AIQueryRequest's
@@ -91,3 +99,21 @@ CREATE INDEX IF NOT EXISTS ix_ai_query_log_user_occurred
 -- monitoring. Stage is low-cardinality so the index is small.
 CREATE INDEX IF NOT EXISTS ix_ai_query_log_stage_occurred
     ON ai.query_log (stage, occurred_at DESC);
+
+-- -----------------------------------------------------------------------------
+-- Grants
+-- -----------------------------------------------------------------------------
+-- The API connects as accent_app (NOBYPASSRLS) and writes one row per
+-- /v1/ai/query call. Without these grants the audit writer fails-open
+-- and logs `ai.audit.write_failed` on every request — the endpoint
+-- still works, but you lose the audit trail. accent_etl gets full
+-- access for offline analytics / retention jobs. accent_superadmin is
+-- already covered by GRANT ALL in sql/52, but we don't rely on it
+-- here for forward-compat with split deploys.
+-- -----------------------------------------------------------------------------
+GRANT USAGE ON SCHEMA ai TO accent_app, accent_etl;
+
+GRANT INSERT, SELECT ON ai.query_log TO accent_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ai.query_log TO accent_etl;
+
+GRANT USAGE, SELECT ON SEQUENCE ai.query_log_event_id_seq TO accent_app, accent_etl;
