@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { useMemo, useState, type ChangeEvent } from "react";
 import {
   Bell,
   Calendar,
@@ -65,25 +65,10 @@ export function TopBar({ onOpenAssistant }: TopBarProps) {
     return `${filters.tenant_ids.length} tenants`;
   }, [filters.tenant_ids, isSuperadmin, user?.tenant_id, user?.tenant_name]);
 
-  // Cmd/Ctrl-K and Cmd/Ctrl-/ both focus the global search. Cmd/Ctrl-K
-  // is reserved for the AI assistant (handled by DashboardShell), so we
-  // listen for "/" alone here as a search-only shortcut.
+  // The "/" focus-search shortcut is registered globally via the shared
+  // shortcuts registry (see DashboardShell). The input below carries the
+  // `data-topbar-search` hook the registry handler looks up.
   const [searchFocused, setSearchFocused] = useState(false);
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "/" && !e.metaKey && !e.ctrlKey && !e.altKey) {
-        const t = e.target as HTMLElement | null;
-        const tag = t?.tagName?.toLowerCase();
-        if (tag === "input" || tag === "textarea" || t?.isContentEditable) return;
-        e.preventDefault();
-        document
-          .querySelector<HTMLInputElement>("input[data-global-search]")
-          ?.focus();
-      }
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
 
   return (
     <header
@@ -96,6 +81,7 @@ export function TopBar({ onOpenAssistant }: TopBarProps) {
       <div className="flex max-w-md flex-1 items-center">
         <Input
           data-global-search
+          data-topbar-search
           placeholder="Search devices, tenants, queries…"
           leadingIcon={<Search />}
           trailing={

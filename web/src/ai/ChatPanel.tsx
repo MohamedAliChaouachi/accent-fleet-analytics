@@ -6,13 +6,14 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Bot, ExternalLink, History, X } from "lucide-react";
+import { Bot, Database, ExternalLink, History, X } from "lucide-react";
 import { useAuth } from "@/auth/AuthContext";
 import { cn } from "@/lib/cn";
 import { Button } from "@/components/ui/Button";
 import { Kbd } from "@/components/ui/Kbd";
 import { AssistantBody } from "./AssistantBody";
 import { ConversationHistory } from "./ConversationHistory";
+import { SchemaExplorer } from "./SchemaExplorer";
 import { useAIChat } from "./useAIChat";
 
 interface ChatPanelProps {
@@ -27,11 +28,15 @@ export function ChatPanel({ open, onOpenChange }: ChatPanelProps) {
   const isSuperadmin = user?.role === "superadmin";
   const chat = useAIChat({ email: user?.email, isSuperadmin });
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [schemaOpen, setSchemaOpen] = useState(false);
 
-  // Close the history sub-panel whenever the drawer itself closes so it
-  // doesn't reappear in that state next time.
+  // Close sub-panels whenever the drawer itself closes so they
+  // don't reappear in that state next time.
   useEffect(() => {
-    if (!open) setHistoryOpen(false);
+    if (!open) {
+      setHistoryOpen(false);
+      setSchemaOpen(false);
+    }
   }, [open]);
 
   function expandToPage() {
@@ -78,7 +83,24 @@ export function ChatPanel({ open, onOpenChange }: ChatPanelProps) {
               <Button
                 variant="ghost"
                 size="icon-sm"
-                onClick={() => setHistoryOpen((v) => !v)}
+                onClick={() => {
+                  setSchemaOpen((v) => !v);
+                  if (!schemaOpen) setHistoryOpen(false);
+                }}
+                aria-label="Toggle schema explorer"
+                title="Browse schema"
+                aria-pressed={schemaOpen}
+                className={cn(schemaOpen && "bg-secondary")}
+              >
+                <Database className="size-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => {
+                  setHistoryOpen((v) => !v);
+                  if (!historyOpen) setSchemaOpen(false);
+                }}
                 aria-label="Toggle conversation history"
                 title="Recent conversations"
                 aria-pressed={historyOpen}
@@ -111,6 +133,12 @@ export function ChatPanel({ open, onOpenChange }: ChatPanelProps) {
           {/* Collapsible history drawer-within-drawer. Keeps the
               transcript dominant by default; one click reveals
               recents without leaving the panel. */}
+          {schemaOpen ? (
+            <div className="max-h-[50%] shrink-0 overflow-hidden border-b border-border">
+              <SchemaExplorer compact className="h-full" />
+            </div>
+          ) : null}
+
           {historyOpen ? (
             <div className="max-h-[40%] shrink-0 overflow-hidden border-b border-border bg-card/40 px-3 py-3">
               <ConversationHistory

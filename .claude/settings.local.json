@@ -126,7 +126,20 @@
       "Bash(echo \"EXIT: $?\")",
       "Bash(ls D:/accent-fleet-analytics/web/src/api/ai*)",
       "Bash(npx vite:*)",
-      "Bash(wc -l D:/accent-fleet-analytics/web/src/pages/*.tsx)"
+      "Bash(wc -l D:/accent-fleet-analytics/web/src/pages/*.tsx)",
+      "Bash(find /d/accent-fleet-analytics/web/src -type f \\\\\\(-name *.tsx -o -name *.ts \\\\\\))",
+      "Bash(find /d/accent-fleet-analytics/app -type f -name *.py)",
+      "Bash(find /d/accent-fleet-analytics/sql -type f -name *.sql)",
+      "Bash(grep -r \"useEffect.*keydown\\\\|Mousetrap\\\\|useHotkeys\\\\|Kbd\" /d/accent-fleet-analytics/web/src --include=*.tsx --include=*.ts)",
+      "Bash(grep -n \"useEffect.*keydown\\\\|document.addEventListener\\\\|onKeyDown\\\\|keypress\" /d/accent-fleet-analytics/web/src/components/shell/*.tsx)",
+      "Bash(find /d/accent-fleet-analytics -name *mock* -type f)",
+      "Bash(grep -E \"\\\\.\\(ts|tsx|js\\)$\")",
+      "Bash(xargs head:*)",
+      "Bash(python -m pytest tests/ai/ -x --tb=short)",
+      "Bash(python -c \"import accent_fleet\")",
+      "Bash(pip install:*)",
+      "Bash(timeout 60 python -c \"from app.ai.routers import ai_query\")",
+      "Bash(python -m pytest tests/ai/test_audit.py --collect-only -q --no-header)"
     ]
   }
 }

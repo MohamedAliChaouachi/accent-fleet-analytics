@@ -12,6 +12,7 @@ import { PageContainer } from "@/components/shell/PageContainer";
 import { useAuth } from "@/auth/AuthContext";
 import { Badge } from "@/components/ui/Badge";
 import { AssistantBody } from "./AssistantBody";
+import { SchemaExplorer } from "./SchemaExplorer";
 import { useAIChat } from "./useAIChat";
 
 export function FullPageAssistant() {
@@ -31,12 +32,17 @@ export function FullPageAssistant() {
         </Badge>
       }
     >
-      <div className="flex h-[calc(100vh-13rem)] w-full flex-col overflow-hidden rounded-2xl border border-border bg-card/40 shadow-card">
-        <AssistantBody
-          chat={chat}
-          pathname={location.pathname}
-          isSuperadmin={isSuperadmin}
-        />
+      <div className="flex h-[calc(100vh-13rem)] w-full gap-3">
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-card/40 shadow-card">
+          <AssistantBody
+            chat={chat}
+            pathname={location.pathname}
+            isSuperadmin={isSuperadmin}
+          />
+        </div>
+        <aside className="hidden w-80 shrink-0 overflow-hidden rounded-2xl border border-border bg-card/40 shadow-card xl:flex">
+          <SchemaExplorer className="w-full" />
+        </aside>
       </div>
     </PageContainer>
   );

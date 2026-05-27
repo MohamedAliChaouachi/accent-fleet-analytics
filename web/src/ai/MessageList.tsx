@@ -18,8 +18,9 @@ interface MessageListProps {
   /** When true, freshly-arrived assistant messages animate in via
    * typewriter. Restored history is rendered instantly regardless. */
   animateLatest?: boolean;
-  /** Per-message feedback state, keyed by message id. */
-  feedback?: Record<number, FeedbackValue>;
+  /** Per-event feedback state, keyed by server event_id. Aligned with
+   * the backend so /history sync resolves cross-device. */
+  feedbackByEventId?: Record<number, FeedbackValue>;
   onFeedbackChange?: (id: number, value: FeedbackValue, comment?: string) => void;
   /** Compact mode for the slide-out panel (smaller padding). */
   compact?: boolean;
@@ -34,7 +35,7 @@ export function MessageList({
   loading,
   error,
   animateLatest = true,
-  feedback,
+  feedbackByEventId,
   onFeedbackChange,
   compact = false,
   className,
@@ -114,9 +115,9 @@ export function MessageList({
                   <MessageMetaChip>
                     {response.provider}/{response.model}
                   </MessageMetaChip>
-                  {onFeedbackChange ? (
+                  {onFeedbackChange && response.event_id !== null ? (
                     <QueryFeedback
-                      value={feedback?.[m.id] ?? null}
+                      value={feedbackByEventId?.[response.event_id] ?? null}
                       onChange={(v, c) => onFeedbackChange(m.id, v, c)}
                     />
                   ) : null}

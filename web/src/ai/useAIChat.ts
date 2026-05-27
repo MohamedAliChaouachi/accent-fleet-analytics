@@ -30,9 +30,14 @@ import {
   askAI,
   AIQueryError,
   MAX_HISTORY_TURNS,
+  fetchAIHistory,
+  postAIFeedback,
+  type AIFeedbackValue,
   type AIQueryResponse,
   type ChatTurn,
 } from "@/api/ai";
+
+import type { FeedbackValue } from "./QueryFeedback";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -60,6 +65,11 @@ interface PersistedStateV2 {
   v: 2;
   conversations: Conversation[];
   activeId: string | null;
+  // Feedback by server event_id, persisted so a refresh shows the right
+  // thumb state even before the server-side /history sync lands.
+  // Optional for forward-compat: older bundles that never saved it will
+  // read it back as undefined and fall through to the server fetch.
+  feedback?: Record<number, FeedbackValue>;
 }
 
 const STORAGE_VERSION = 2;
@@ -89,6 +99,7 @@ function saveConvos(
   email: string | undefined,
   conversations: ReadonlyArray<Conversation>,
   activeId: string | null,
+  feedback: Record<number, FeedbackValue>,
 ): void {
   const key = storageKeyFor(email);
   if (!key) return;
@@ -97,6 +108,7 @@ function saveConvos(
       v: STORAGE_VERSION,
       conversations: conversations as Conversation[],
       activeId,
+      feedback,
     };
     window.localStorage.setItem(key, JSON.stringify(body));
   } catch {
@@ -160,6 +172,13 @@ export interface UseAIChatReturn {
   activeId: string | null;
   messages: ReadonlyArray<DisplayMessage>;
   tenant: string;
+  /**
+   * Feedback by *event_id* — server-aligned so a re-hydration on a
+   * different device picks up the same thumbs state via /history sync.
+   * Components that key off message id should look up the event_id from
+   * the message's response first.
+   */
+  feedbackByEventId: Record<number, FeedbackValue>;
   // Status
   isLoading: boolean;
   error: Error | null;
@@ -172,6 +191,13 @@ export interface UseAIChatReturn {
   deleteConvo: (id: string) => void;
   setTenant: (tenant: string) => void;
   clearError: () => void;
+  /**
+   * Set feedback for one assistant message. Optimistic: updates local
+   * state immediately, then POSTs in the background. Failures are
+   * silent — the worst case is a stale local thumb that resyncs on the
+   * next /history fetch.
+   */
+  setFeedback: (messageId: number, value: FeedbackValue, comment?: string) => void;
 }
 
 export function useAIChat({ email, isSuperadmin }: UseAIChatOptions): UseAIChatReturn {
@@ -179,6 +205,9 @@ export function useAIChat({ email, isSuperadmin }: UseAIChatOptions): UseAIChatR
   const [activeId, setActiveId] = useState<string | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const [feedbackByEventId, setFeedbackByEventId] = useState<
+    Record<number, FeedbackValue>
+  >({});
 
   // AbortController for in-flight requests so the UI can offer a Stop
   // button. Reset on each new send.
@@ -199,6 +228,7 @@ export function useAIChat({ email, isSuperadmin }: UseAIChatOptions): UseAIChatR
     if (!email) {
       setConversations([]);
       setActiveId(null);
+      setFeedbackByEventId({});
       setHydrated(true);
       return;
     }
@@ -224,8 +254,35 @@ export function useAIChat({ email, isSuperadmin }: UseAIChatOptions): UseAIChatR
       setConversations([]);
       setActiveId(null);
     }
+    setFeedbackByEventId(saved?.feedback ?? {});
     setHydrated(true);
   }, [email]);
+
+  // Fan-in server-side feedback once on hydrate. Server is the source of
+  // truth across devices; local writes are merged on top. We never let a
+  // /history failure block hydration — the cached feedback is still good.
+  useEffect(() => {
+    if (!hydrated || !email) return;
+    let cancelled = false;
+    fetchAIHistory(100)
+      .then((res) => {
+        if (cancelled) return;
+        const merged: Record<number, FeedbackValue> = {};
+        for (const item of res.items) {
+          if (item.feedback_value === 1) merged[item.event_id] = "up";
+          else if (item.feedback_value === -1) merged[item.event_id] = "down";
+        }
+        // Local edits since this fetch was kicked off win. Reading the
+        // latest state inside the updater avoids a stale-closure overwrite.
+        setFeedbackByEventId((local) => ({ ...merged, ...local }));
+      })
+      .catch(() => {
+        /* offline / 401 — local state is fine */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [hydrated, email]);
 
   // -------------------------------------------------------------------------
   // Persist on every meaningful change post-hydration. Empty list is a
@@ -235,8 +292,8 @@ export function useAIChat({ email, isSuperadmin }: UseAIChatOptions): UseAIChatR
   useEffect(() => {
     if (!hydrated) return;
     if (conversations.length === 0) return;
-    saveConvos(email, conversations, activeId);
-  }, [hydrated, email, conversations, activeId]);
+    saveConvos(email, conversations, activeId, feedbackByEventId);
+  }, [hydrated, email, conversations, activeId, feedbackByEventId]);
 
   // -------------------------------------------------------------------------
   // Mutation. Note: we pass `convoId` and `historySnapshot` through vars
@@ -411,12 +468,61 @@ export function useAIChat({ email, isSuperadmin }: UseAIChatOptions): UseAIChatR
 
   const clearError = useCallback(() => setError(null), []);
 
+  // Find the event_id for a message id within the active conversation.
+  // Returns null when the message is not an assistant turn or has no
+  // event_id (audit write failed) — callers should NOT POST in that case.
+  const lookupEventId = useCallback(
+    (messageId: number): number | null => {
+      if (!active) return null;
+      const msg = active.messages.find((m) => m.id === messageId);
+      if (!msg || msg.role !== "assistant") return null;
+      const id = msg.response.event_id;
+      return typeof id === "number" ? id : null;
+    },
+    [active],
+  );
+
+  const setFeedback = useCallback(
+    (messageId: number, value: FeedbackValue, comment?: string) => {
+      const eventId = lookupEventId(messageId);
+      if (eventId === null) {
+        // No backend handle for this turn (e.g. audit write failed).
+        // We keep no local state for orphaned feedback — UI just won't
+        // render the buttons in this case (MessageList gates on the
+        // presence of event_id, see below).
+        return;
+      }
+      // Optimistic local update — UI feels instant.
+      setFeedbackByEventId((prev) => {
+        const next = { ...prev };
+        if (value === null) delete next[eventId];
+        else next[eventId] = value;
+        return next;
+      });
+      // Server upsert. -1/1 maps directly to the API; clearing the
+      // thumb (value === null) is a no-op against the backend for now
+      // because the schema doesn't model "retract" — we simply leave
+      // the last vote in place. Cheap to extend later with a DELETE.
+      if (value === null) return;
+      const apiValue: AIFeedbackValue = value === "up" ? 1 : -1;
+      void postAIFeedback({
+        event_id: eventId,
+        value: apiValue,
+        comment: comment ?? null,
+      }).catch(() => {
+        /* server rejected (404, 5xx) — local state stays; resync on next /history */
+      });
+    },
+    [lookupEventId],
+  );
+
   return {
     conversations,
     active,
     activeId,
     messages,
     tenant,
+    feedbackByEventId,
     isLoading: mutation.isPending,
     error,
     hydrated,
@@ -427,6 +533,7 @@ export function useAIChat({ email, isSuperadmin }: UseAIChatOptions): UseAIChatR
     deleteConvo,
     setTenant,
     clearError,
+    setFeedback,
   };
 }
 

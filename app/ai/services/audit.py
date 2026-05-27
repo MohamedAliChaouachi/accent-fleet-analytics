@@ -54,6 +54,7 @@ _INSERT_STMT = text(
     VALUES
         (:user_id, :tenant_id, :question, :sql_text, :stage,
          :row_count, :elapsed_ms, :chart_type, :provider, :model, :error_detail)
+    RETURNING event_id
     """
 )
 
@@ -71,12 +72,18 @@ def write_ai_query_event(
     provider: str | None = None,
     model: str | None = None,
     error_detail: str | None = None,
-) -> None:
+) -> int | None:
     """Insert one row into ``ai.query_log``. Best-effort — never raises.
 
     On success ``stage='success'`` and ``error_detail`` is None. On
     failure ``stage`` is the pipeline stage that failed and the response
     fields (``row_count``, ``chart_type``, ``model``) may be None.
+
+    Returns the inserted ``event_id``, or ``None`` if the audit write
+    failed. The router uses this so the AI response can carry the
+    event_id back to the client (for /ai/feedback follow-ups). None is
+    fine — the response is still valid; the client just can't leave
+    feedback on a query whose audit write was dropped.
 
     The writer never propagates a DB error: an audit failure must not
     turn a successful /ai/query into a 500. Operators should monitor
@@ -106,7 +113,8 @@ def write_ai_query_event(
 
     try:
         with get_engine().begin() as conn:
-            conn.execute(_INSERT_STMT, params)
+            row = conn.execute(_INSERT_STMT, params).first()
+            return int(row[0]) if row is not None else None
     except Exception as exc:  # noqa: BLE001 — fail-open audit writer
         # Log loud so an operator notices the gap. Don't re-raise: by
         # contract, the audit log can never break the endpoint.
@@ -119,3 +127,4 @@ def write_ai_query_event(
                 "error": str(exc),
             },
         )
+        return None

@@ -1,29 +1,34 @@
 import { useCallback, useEffect, useState } from "react";
-import { Outlet, useLocation } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 import { AssistantFAB } from "./AssistantFAB";
 import { ChatPanel } from "@/ai/ChatPanel";
+import { ShortcutsHelp } from "@/shortcuts/ShortcutsHelp";
+import { useShortcuts } from "@/shortcuts/useShortcuts";
 import { cn } from "@/lib/cn";
 
 const SIDEBAR_PREF_KEY = "accent.sidebar.collapsed";
 
 // App shell. Wraps every authenticated route. Owns:
 //   - Sidebar collapse state (persisted to localStorage)
-//   - Cmd/Ctrl-K shortcut to toggle the ChatPanel slide-out
+//   - Global keyboard shortcuts (assistant toggle, ? help, g-prefixed nav)
 //   - Floating action button visibility (hidden on /ai where the
 //     full-page assistant already lives)
-//   - ChatPanel mount + open/closed state
+//   - ChatPanel + ShortcutsHelp mount + open/closed state
 //
-// The Radix Dialog inside ChatPanel handles Esc-to-close on its own,
-// so we don't repeat it here.
+// Shortcut wiring goes through `useShortcuts` so the help overlay's
+// cheat-sheet always matches reality. The Radix Dialog inside ChatPanel
+// handles Esc-to-close on its own, so we don't repeat it here.
 export function DashboardShell() {
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     return localStorage.getItem(SIDEBAR_PREF_KEY) === "1";
   });
   const [assistantOpen, setAssistantOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
   const onAiPage = location.pathname.startsWith("/ai");
 
   useEffect(() => {
@@ -45,26 +50,30 @@ export function DashboardShell() {
     setAssistantOpen(true);
   }, []);
 
-  // Cmd/Ctrl+K toggles the panel. We don't fight Radix's Esc-to-close;
-  // it already handles that via the Dialog primitive. We DO skip the
-  // shortcut when the focus is in an editable element that uses it
-  // (CodeMirror's default save binding is ⌘S, not ⌘K, so this is
-  // safe — but if we later add a ⌘K binding inside CodeMirror this
-  // needs revisiting).
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      const mod = e.metaKey || e.ctrlKey;
-      if (mod && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        // On /ai, ⌘K is a no-op (panel is hidden because the page
-        // already provides the assistant) — would just confuse.
-        if (onAiPage) return;
-        setAssistantOpen((v) => !v);
-      }
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onAiPage]);
+  useShortcuts({
+    "toggle-assistant": () => {
+      // On /ai the panel is hidden (page already provides the assistant)
+      // — a toggle here would just confuse.
+      if (onAiPage) return;
+      setAssistantOpen((v) => !v);
+    },
+    help: () => setHelpOpen((v) => !v),
+    search: () => {
+      // Focus the topbar search if present; falls back to a no-op.
+      const el = document.querySelector<HTMLInputElement>(
+        "[data-topbar-search]",
+      );
+      el?.focus();
+    },
+    "go-executive": () => navigate("/executive"),
+    "go-operations": () => navigate("/operations"),
+    "go-maintenance": () => navigate("/maintenance"),
+    "go-efficiency": () => navigate("/fleet-efficiency"),
+    "go-risk": () => navigate("/risk"),
+    "go-safety": () => navigate("/safety"),
+    "go-alerts": () => navigate("/alerts"),
+    "go-ai": () => navigate("/ai"),
+  });
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
@@ -77,6 +86,7 @@ export function DashboardShell() {
       </div>
       {!onAiPage ? <AssistantFAB onClick={openAssistant} /> : null}
       <ChatPanel open={assistantOpen} onOpenChange={setAssistantOpen} />
+      <ShortcutsHelp open={helpOpen} onOpenChange={setHelpOpen} />
     </div>
   );
 }

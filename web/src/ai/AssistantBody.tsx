@@ -29,7 +29,6 @@ import { ChatComposer, type ChatComposerHandle } from "./ChatComposer";
 import { ConversationHistory } from "./ConversationHistory";
 import { MessageList } from "./MessageList";
 import { QuerySuggestions } from "./QuerySuggestions";
-import type { FeedbackValue } from "./QueryFeedback";
 import type { UseAIChatReturn } from "./useAIChat";
 
 interface AssistantBodyProps {
@@ -52,10 +51,6 @@ export function AssistantBody({
 }: AssistantBodyProps) {
   const composerRef = useRef<ChatComposerHandle | null>(null);
   const [input, setInput] = useState("");
-  // Feedback state is per-message-per-session. It would belong on the
-  // persisted message if the backend grew a feedback endpoint; for now
-  // we hold it in-memory so the UI is reactive without churning storage.
-  const [feedback, setFeedback] = useState<Record<number, FeedbackValue>>({});
 
   // Focus the composer when the body mounts or the active conversation
   // changes. This is the "instantly typeable" behaviour the brief asks
@@ -107,10 +102,8 @@ export function AssistantBody({
               loading={chat.isLoading}
               error={chat.error}
               compact={compact}
-              feedback={feedback}
-              onFeedbackChange={(id, value) =>
-                setFeedback((prev) => ({ ...prev, [id]: value }))
-              }
+              feedbackByEventId={chat.feedbackByEventId}
+              onFeedbackChange={chat.setFeedback}
             />
           )}
 
