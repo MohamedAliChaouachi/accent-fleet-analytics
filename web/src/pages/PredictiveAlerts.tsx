@@ -1,5 +1,12 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  AlertOctagon,
+  BellRing,
+  Clock3,
+  Layers,
+  RefreshCw,
+} from "lucide-react";
 import { fetchPredictiveAlerts } from "@/api/dashboards";
 import type {
   LiveAlertRow,
@@ -7,21 +14,21 @@ import type {
   PredictiveAlertsDashboardResponse,
 } from "@/api/types";
 import { useFilters } from "@/filters/FiltersContext";
-import { KpiCard } from "@/components/KpiCard";
-import { Panel } from "@/components/Panel";
-import { PageHeader } from "@/components/PageHeader";
+import { PageContainer } from "@/components/shell";
+import { Badge, Button, KpiCard, Panel, Skeleton } from "@/components/ui";
 import { StateMessage } from "@/components/StateMessage";
 import { DataTable, type ColumnDef } from "@/components/DataTable";
 import { BarChart } from "@/components/charts/BarChart";
 import { PieChart } from "@/components/charts/PieChart";
+import { cn } from "@/lib/cn";
 import { RISK_COLORS } from "@/lib/colors";
 import { fmtDec, fmtInt } from "@/lib/format";
 
 const SEVERITY_ICON: Record<string, string> = {
-  critical: "🔴",
-  high: "🟠",
-  medium: "🟡",
-  low: "🟢",
+  critical: "●",
+  high: "●",
+  medium: "●",
+  low: "●",
 };
 const SEVERITY_OPTIONS = ["critical", "high", "medium", "low"] as const;
 const ALERT_TYPE_OPTIONS = [
@@ -57,37 +64,38 @@ export function PredictiveAlerts() {
   }
 
   return (
-    <section>
-      <PageHeader
-        title="Predictive alerts"
-        caption="Proactive alerts + last-24h live stream. Auto-refreshes via the TanStack Query staleTime (5 min); use the button for a manual refresh."
-      />
-
-      <div className="mb-4 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={onRefresh}
-          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
-        >
-          ↻ Refresh now
-        </button>
-        <div className="ml-auto inline-flex rounded-md border border-slate-200 bg-white p-0.5 text-xs">
-          {(["alerts", "stream"] as const).map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setTab(t)}
-              className={`rounded px-3 py-1 transition ${
-                tab === t ? "bg-brand text-white" : "text-slate-600 hover:bg-slate-100"
-              }`}
-            >
-              {t === "alerts" ? "Active alerts (proactive)" : "Live stream (last 24h)"}
-            </button>
-          ))}
+    <PageContainer
+      title="Predictive alerts"
+      description="Proactive alerts plus a last-24h live stream. Auto-refreshes every 5 minutes; tap refresh for a manual pull."
+      actions={
+        <div className="flex items-center gap-2">
+          <Badge variant="ai">AI-driven</Badge>
+          <Button variant="outline" size="sm" onClick={onRefresh}>
+            <RefreshCw className="size-3.5" />
+            Refresh
+          </Button>
         </div>
+      }
+    >
+      <div className="mb-4 inline-flex rounded-md border border-border bg-card p-0.5 text-xs">
+        {(["alerts", "stream"] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setTab(t)}
+            className={cn(
+              "rounded px-3 py-1.5 font-medium transition-colors",
+              tab === t
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground",
+            )}
+          >
+            {t === "alerts" ? "Active alerts (proactive)" : "Live stream (last 24h)"}
+          </button>
+        ))}
       </div>
 
-      {isPending ? <StateMessage>Loading alerts…</StateMessage> : null}
+      {isPending ? <LoadingSkeleton /> : null}
       {isError ? (
         <StateMessage tone="error">
           Failed to load alerts: {(error as Error).message}
@@ -104,7 +112,20 @@ export function PredictiveAlerts() {
         />
       ) : null}
       {data && tab === "stream" ? <StreamTab data={data} /> : null}
-    </section>
+    </PageContainer>
+  );
+}
+
+function LoadingSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <KpiCard key={i} label="" value="" loading />
+        ))}
+      </div>
+      <Skeleton className="h-72 w-full rounded-lg" />
+    </div>
   );
 }
 
@@ -143,15 +164,13 @@ function ProactiveTab({
 
   return (
     <div className="space-y-6">
-      {/* Filters ------------------------------------------------------- */}
-      <Panel title="Filters" padding="sm">
+      <Panel title="Filters" tone="default">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <FilterChips
             label="Severity"
             options={[...SEVERITY_OPTIONS]}
             selected={sevFilter}
             onChange={setSevFilter}
-            renderLabel={(s) => `${SEVERITY_ICON[s] ?? ""} ${s}`}
           />
           <FilterChips
             label="Alert type"
@@ -162,57 +181,70 @@ function ProactiveTab({
         </div>
       </Panel>
 
-      {/* KPIs ---------------------------------------------------------- */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <KpiCard label="Active alerts" value={fmtInt(summary.total)} accent="#1f3a5f" />
+        <KpiCard
+          label="Active alerts"
+          value={fmtInt(summary.total)}
+          icon={<BellRing />}
+          tone="primary"
+        />
         <KpiCard
           label="High / critical"
           value={fmtInt(summary.high_or_critical)}
-          accent={RISK_COLORS.critical}
+          icon={<AlertOctagon />}
+          tone="danger"
         />
         <KpiCard
           label="Detected last 24h"
           value={fmtInt(summary.last_24h)}
-          accent={RISK_COLORS.high}
+          icon={<Clock3 />}
+          tone="warning"
         />
         <KpiCard
           label="Unique devices"
           value={fmtInt(summary.unique_devices)}
-          accent="#2a9df4"
+          icon={<Layers />}
+          tone="accent"
         />
       </div>
 
-      {/* Alert table -------------------------------------------------- */}
       <Panel
         title="Active alerts"
         description={`${filtered.length} after filters · ${data.alerts.length} total`}
+        actions={<Badge variant="outline">{filtered.length}</Badge>}
+        flush
       >
         <DataTable
           rows={filtered.slice(0, 200)}
           columns={PROACTIVE_COLUMNS}
           rowKey={(r) => r.alert_id}
+          maxHeight="36rem"
         />
         {filtered.length > 200 ? (
-          <p className="mt-2 text-xs text-slate-500">
+          <p className="px-4 pb-3 pt-2 text-xs text-muted-foreground">
             Showing first 200 of {filtered.length} alerts. Refine filters to narrow.
           </p>
         ) : null}
       </Panel>
 
-      {/* Analytics breakdowns ----------------------------------------- */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Panel title="By type" accent="#9b59b6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <Panel title="By type" description="Share of alerts by category." tone="ai">
           {summary.by_type.length === 0 ? (
-            <p className="text-sm text-slate-500">No alerts.</p>
+            <p className="text-sm text-muted-foreground">No alerts.</p>
           ) : (
             <PieChart
               data={summary.by_type.map((b) => ({ name: b.key, value: b.count }))}
+              donut
             />
           )}
         </Panel>
-        <Panel title="By severity" accent={RISK_COLORS.critical}>
+        <Panel
+          title="By severity"
+          description="Counts grouped by severity tier."
+          tone="warning"
+        >
           {summary.by_severity.length === 0 ? (
-            <p className="text-sm text-slate-500">No alerts.</p>
+            <p className="text-sm text-muted-foreground">No alerts.</p>
           ) : (
             <BarChart
               data={
@@ -221,7 +253,7 @@ function ProactiveTab({
               xKey="key"
               series={[{ dataKey: "count", label: "Count" }]}
               rowColors={summary.by_severity.map(
-                (b) => RISK_COLORS[b.key] ?? "#94a3b8",
+                (b) => RISK_COLORS[b.key] ?? RISK_COLORS.low,
               )}
               yFormatter={(v) => fmtInt(v)}
             />
@@ -247,36 +279,50 @@ function StreamTab({ data }: { data: PredictiveAlertsDashboardResponse }) {
         <KpiCard
           label="Events (last 24h)"
           value={fmtInt(summary.total)}
-          accent="#1f3a5f"
+          icon={<BellRing />}
+          tone="primary"
         />
         <KpiCard
           label="Critical / high"
           value={fmtInt(summary.high_or_critical)}
-          accent={RISK_COLORS.critical}
+          icon={<AlertOctagon />}
+          tone="danger"
         />
         <KpiCard
           label="Avg priority"
           value={fmtDec(summary.avg_priority)}
-          accent={RISK_COLORS.high}
+          icon={<Clock3 />}
+          tone="warning"
         />
         <KpiCard
           label="Unique devices"
           value={fmtInt(summary.unique_devices)}
-          accent="#2a9df4"
+          icon={<Layers />}
+          tone="accent"
         />
       </div>
 
-      <Panel title="Live events" description="Top 200 by priority score.">
+      <Panel
+        title="Live events"
+        description="Top 200 by priority score."
+        actions={<Badge variant="outline">{Math.min(data.stream.length, 200)}</Badge>}
+        flush
+      >
         <DataTable
           rows={data.stream.slice(0, 200)}
           columns={STREAM_COLUMNS}
           rowKey={(r) => r.alert_id}
+          maxHeight="36rem"
         />
       </Panel>
 
-      <Panel title="Events by category" accent="#9b59b6">
+      <Panel
+        title="Events by category"
+        description="24-hour distribution of stream categories."
+        tone="ai"
+      >
         {summary.by_category.length === 0 ? (
-          <p className="text-sm text-slate-500">No events.</p>
+          <p className="text-sm text-muted-foreground">No events.</p>
         ) : (
           <BarChart
             data={summary.by_category as unknown as Array<Record<string, unknown>>}
@@ -296,15 +342,8 @@ interface FilterChipsProps {
   options: ReadonlyArray<string>;
   selected: Set<string>;
   onChange: (next: Set<string>) => void;
-  renderLabel?: (opt: string) => string;
 }
-function FilterChips({
-  label,
-  options,
-  selected,
-  onChange,
-  renderLabel,
-}: FilterChipsProps) {
+function FilterChips({ label, options, selected, onChange }: FilterChipsProps) {
   function toggle(opt: string) {
     const next = new Set(selected);
     if (next.has(opt)) next.delete(opt);
@@ -313,7 +352,7 @@ function FilterChips({
   }
   return (
     <div>
-      <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-slate-500">
+      <p className="mb-2 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
         {label}
       </p>
       <div className="flex flex-wrap gap-1.5">
@@ -324,13 +363,14 @@ function FilterChips({
               key={o}
               type="button"
               onClick={() => toggle(o)}
-              className={`rounded-full border px-3 py-1 text-xs transition ${
+              className={cn(
+                "rounded-full border px-3 py-1 text-xs transition-colors",
                 active
-                  ? "border-sky-500 bg-sky-50 text-sky-700"
-                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
-              }`}
+                  ? "border-accent bg-accent/15 text-accent-foreground"
+                  : "border-border bg-card text-muted-foreground hover:border-accent/40 hover:text-foreground",
+              )}
             >
-              {renderLabel ? renderLabel(o) : o}
+              {o}
             </button>
           );
         })}
@@ -342,13 +382,13 @@ function FilterChips({
 // --- columns --------------------------------------------------------------
 
 function SeverityCell({ severity }: { severity: string }) {
-  const color = RISK_COLORS[severity] ?? "#94a3b8";
+  const color = RISK_COLORS[severity] ?? RISK_COLORS.low;
   return (
     <span
-      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
-      style={{ backgroundColor: `${color}1a`, color }}
+      className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium"
+      style={{ backgroundColor: `${color}26`, color }}
     >
-      <span>{SEVERITY_ICON[severity] ?? "⚪"}</span>
+      <span className="text-[10px]">{SEVERITY_ICON[severity] ?? "●"}</span>
       {severity}
     </span>
   );
@@ -362,7 +402,9 @@ const PROACTIVE_COLUMNS: ReadonlyArray<ColumnDef<PredictiveAlertRow>> = [
     key: "device_id",
     header: "Device",
     accessor: (r) => (
-      <span className="font-mono text-slate-800">{r.device_id ? `#${r.device_id}` : "—"}</span>
+      <span className="font-mono text-foreground">
+        {r.device_id ? `#${r.device_id}` : "—"}
+      </span>
     ),
     align: "right",
   },
@@ -374,7 +416,9 @@ const PROACTIVE_COLUMNS: ReadonlyArray<ColumnDef<PredictiveAlertRow>> = [
   {
     key: "alert_message",
     header: "Message",
-    accessor: (r) => <span className="text-slate-700">{r.alert_message ?? "—"}</span>,
+    accessor: (r) => (
+      <span className="text-foreground">{r.alert_message ?? "—"}</span>
+    ),
   },
   { key: "assigned_to", header: "Assignee", accessor: (r) => r.assigned_to ?? "—" },
 ];
@@ -384,7 +428,9 @@ const STREAM_COLUMNS: ReadonlyArray<ColumnDef<LiveAlertRow>> = [
   {
     key: "priority_score",
     header: "Priority",
-    accessor: (r) => <span className="font-semibold tabular-nums">{fmtDec(r.priority_score)}</span>,
+    accessor: (r) => (
+      <span className="font-semibold tabular-nums">{fmtDec(r.priority_score)}</span>
+    ),
     align: "right",
   },
   {
@@ -398,14 +444,18 @@ const STREAM_COLUMNS: ReadonlyArray<ColumnDef<LiveAlertRow>> = [
     key: "device_id",
     header: "Device",
     accessor: (r) => (
-      <span className="font-mono text-slate-800">{r.device_id ? `#${r.device_id}` : "—"}</span>
+      <span className="font-mono text-foreground">
+        {r.device_id ? `#${r.device_id}` : "—"}
+      </span>
     ),
     align: "right",
   },
   {
     key: "alert_message",
     header: "Message",
-    accessor: (r) => <span className="text-slate-700">{r.alert_message ?? "—"}</span>,
+    accessor: (r) => (
+      <span className="text-foreground">{r.alert_message ?? "—"}</span>
+    ),
   },
   {
     key: "device_risk_category",

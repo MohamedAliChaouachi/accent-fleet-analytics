@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Banknote, Building2, Database, Smartphone } from "lucide-react";
 import { fetchTenantBilling } from "@/api/dashboards";
 import type {
   TenantBillingDashboardResponse,
@@ -7,13 +8,13 @@ import type {
   TenantBillingTier,
 } from "@/api/types";
 import { useFilters } from "@/filters/FiltersContext";
-import { KpiCard } from "@/components/KpiCard";
-import { Panel } from "@/components/Panel";
-import { PageHeader } from "@/components/PageHeader";
+import { PageContainer } from "@/components/shell";
+import { Badge, KpiCard, Panel, Skeleton } from "@/components/ui";
 import { StateMessage } from "@/components/StateMessage";
 import { DataTable, type ColumnDef } from "@/components/DataTable";
 import { LineChart } from "@/components/charts/LineChart";
 import { BarChart } from "@/components/charts/BarChart";
+import { SERIES_PALETTE } from "@/lib/colors";
 import { fmtDec, fmtInt } from "@/lib/format";
 
 // Storage delta is "lower = better" only when you care about infra spend;
@@ -35,27 +36,40 @@ export function TenantBilling() {
   });
 
   return (
-    <section>
-      <PageHeader
-        title="Tenant billing & usage"
-        caption={
-          <>
-            Per-tenant usage, pricing tier, and estimated revenue — sourced from{" "}
-            <code className="rounded bg-slate-200 px-1 py-0.5">
-              marts.v_tenant_billing_dashboard
-            </code>
-            .
-          </>
-        }
-      />
-      {isPending ? <StateMessage>Loading tenant billing…</StateMessage> : null}
+    <PageContainer
+      title="Tenant billing & usage"
+      description={
+        <>
+          Per-tenant usage, pricing tier, and estimated revenue — sourced from{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-2xs text-foreground">
+            marts.v_tenant_billing_dashboard
+          </code>
+          .
+        </>
+      }
+      actions={<Badge variant="accent">Monthly rollup</Badge>}
+    >
+      {isPending ? <LoadingSkeleton /> : null}
       {isError ? (
         <StateMessage tone="error">
           Failed to load tenant billing: {(error as Error).message}
         </StateMessage>
       ) : null}
       {data ? <Content data={data} /> : null}
-    </section>
+    </PageContainer>
+  );
+}
+
+function LoadingSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <KpiCard key={i} label="" value="" loading />
+        ))}
+      </div>
+      <Skeleton className="h-72 w-full rounded-lg" />
+    </div>
   );
 }
 
@@ -86,42 +100,48 @@ function Content({ data }: { data: TenantBillingDashboardResponse }) {
 
   return (
     <div className="space-y-6">
-      {/* KPI strip ----------------------------------------------------- */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <KpiCard
           label="Total tenants"
           value={fmtInt(kpi.total_tenants)}
+          icon={<Building2 />}
+          tone="primary"
           trend={toTrend(kpi.total_tenants_delta, "vs prior")}
-          accent="#1f3a5f"
         />
         <KpiCard
           label="Active devices"
           value={fmtInt(kpi.total_devices)}
+          icon={<Smartphone />}
+          tone="accent"
           trend={toTrend(kpi.total_devices_delta, "vs prior")}
-          accent="#2a9df4"
         />
         <KpiCard
           label="Est. revenue (DA)"
           value={fmtInt(kpi.total_revenue)}
+          icon={<Banknote />}
+          tone="primary"
           trend={toTrend(kpi.total_revenue_delta_pct, "MoM")}
-          accent="#16a085"
         />
         <KpiCard
           label="Storage (GB)"
           value={fmtDec(kpi.total_storage_gb)}
+          icon={<Database />}
+          tone="ai"
           trend={toTrend(kpi.total_storage_delta_pct, "MoM")}
-          accent="#9b59b6"
         />
       </div>
 
-      <p className="text-xs text-slate-500">
-        Latest: <strong>{kpi.year_month}</strong> · {fmtInt(kpi.total_tenants)} tenants ·{" "}
-        {fmtInt(kpi.total_devices)} devices
+      <p className="text-xs text-muted-foreground">
+        Latest: <strong className="text-foreground">{kpi.year_month}</strong> ·{" "}
+        {fmtInt(kpi.total_tenants)} tenants · {fmtInt(kpi.total_devices)} devices
       </p>
 
-      {/* Usage trends -------------------------------------------------- */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <Panel title="Active devices" accent="#2a9df4">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <Panel
+          title="Active devices"
+          description="Monthly active devices."
+          tone="accent"
+        >
           <BarChart
             data={monthly as unknown as Array<Record<string, unknown>>}
             xKey="year_month"
@@ -129,7 +149,11 @@ function Content({ data }: { data: TenantBillingDashboardResponse }) {
             yFormatter={(v) => fmtInt(v)}
           />
         </Panel>
-        <Panel title="Data volume (GB)" accent="#9b59b6">
+        <Panel
+          title="Data volume (GB)"
+          description="Monthly ingested data volume."
+          tone="ai"
+        >
           <LineChart
             data={monthly as unknown as Array<Record<string, unknown>>}
             xKey="year_month"
@@ -137,7 +161,11 @@ function Content({ data }: { data: TenantBillingDashboardResponse }) {
             yFormatter={(v) => fmtDec(v)}
           />
         </Panel>
-        <Panel title="Estimated revenue" accent="#16a085">
+        <Panel
+          title="Estimated revenue"
+          description="DA per month."
+          tone="primary"
+        >
           <LineChart
             data={monthly as unknown as Array<Record<string, unknown>>}
             xKey="year_month"
@@ -147,14 +175,15 @@ function Content({ data }: { data: TenantBillingDashboardResponse }) {
         </Panel>
       </div>
 
-      {/* Per-tenant MoM growth grouped bar ----------------------------- */}
       <Panel
         title={`MoM growth · top ${topGrowth.length} by revenue · ${kpi.year_month}`}
         description="Devices / trips / alerts growth (%) for the current month. Negative = shrinking."
-        accent="#34495e"
+        tone="primary"
       >
         {topGrowth.length === 0 ? (
-          <p className="text-sm text-slate-500">No tenants in scope for the latest month.</p>
+          <p className="text-sm text-muted-foreground">
+            No tenants in scope for the latest month.
+          </p>
         ) : (
           <BarChart
             data={
@@ -167,9 +196,9 @@ function Content({ data }: { data: TenantBillingDashboardResponse }) {
             }
             xKey="tenant"
             series={[
-              { dataKey: "devices", label: "Devices %", color: "#2a9df4" },
-              { dataKey: "trips", label: "Trips %", color: "#16a085" },
-              { dataKey: "alerts", label: "Alerts %", color: "#e67e22" },
+              { dataKey: "devices", label: "Devices %", color: SERIES_PALETTE[0] },
+              { dataKey: "trips", label: "Trips %", color: SERIES_PALETTE[1] },
+              { dataKey: "alerts", label: "Alerts %", color: SERIES_PALETTE[2] },
             ]}
             yFormatter={(v) => `${fmtDec(v)}%`}
             legend
@@ -177,15 +206,15 @@ function Content({ data }: { data: TenantBillingDashboardResponse }) {
         )}
       </Panel>
 
-      {/* Pricing tiers -------------------------------------------------- */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Panel
           title={`Pricing tier breakdown · ${kpi.year_month}`}
           description="Tenants and devices per tier."
-          accent="#f39c12"
+          tone="warning"
+          flush
         >
           {tier_breakdown.length === 0 ? (
-            <p className="text-sm text-slate-500">No tier data.</p>
+            <p className="px-4 py-3 text-sm text-muted-foreground">No tier data.</p>
           ) : (
             <DataTable
               rows={tier_breakdown}
@@ -194,9 +223,13 @@ function Content({ data }: { data: TenantBillingDashboardResponse }) {
             />
           )}
         </Panel>
-        <Panel title="Revenue by tier" accent="#16a085">
+        <Panel
+          title="Revenue by tier"
+          description="Estimated revenue per pricing tier."
+          tone="primary"
+        >
           {tier_breakdown.length === 0 ? (
-            <p className="text-sm text-slate-500">No tier data.</p>
+            <p className="text-sm text-muted-foreground">No tier data.</p>
           ) : (
             <BarChart
               data={
@@ -213,24 +246,31 @@ function Content({ data }: { data: TenantBillingDashboardResponse }) {
         </Panel>
       </div>
 
-      {/* Per-tenant detail (latest month) ----------------------------- */}
       <Panel
         title={`Per-tenant billing · ${kpi.year_month}`}
         description="Sorted by estimated revenue (descending)."
+        actions={<Badge variant="outline">{latestRows.length} tenants</Badge>}
+        flush
       >
         <DataTable
           rows={latestRows}
           columns={PER_TENANT_COLUMNS}
           rowKey={(r) => r.tenant_id ?? `unknown-${r.year_month}`}
+          maxHeight="32rem"
         />
       </Panel>
 
-      {/* Raw rows ------------------------------------------------------ */}
-      <Panel title="Raw table" description="Per-tenant × month rows.">
+      <Panel
+        title="Raw table"
+        description="Per-tenant × month rows."
+        actions={<Badge variant="outline">{rows.length} rows</Badge>}
+        flush
+      >
         <DataTable
           rows={rows}
           columns={RAW_COLUMNS}
           rowKey={(r) => `${r.year_month}::${r.tenant_id ?? "all"}`}
+          maxHeight="32rem"
         />
       </Panel>
     </div>

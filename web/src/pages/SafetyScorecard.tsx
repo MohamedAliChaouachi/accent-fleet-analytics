@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Gauge, ShieldAlert, ShieldCheck, TriangleAlert } from "lucide-react";
 import { fetchSafetyScorecard } from "@/api/dashboards";
 import type {
   SafetyScorecardDashboardResponse,
@@ -7,9 +8,8 @@ import type {
   SafetyScorecardRow,
 } from "@/api/types";
 import { useFilters } from "@/filters/FiltersContext";
-import { KpiCard } from "@/components/KpiCard";
-import { Panel } from "@/components/Panel";
-import { PageHeader } from "@/components/PageHeader";
+import { PageContainer } from "@/components/shell";
+import { Badge, KpiCard, Panel, Skeleton } from "@/components/ui";
 import { StateMessage } from "@/components/StateMessage";
 import { DataTable, type ColumnDef } from "@/components/DataTable";
 import { LineChart } from "@/components/charts/LineChart";
@@ -34,28 +34,40 @@ export function SafetyScorecard() {
   });
 
   return (
-    <section>
-      <PageHeader
-        title="Safety scorecard"
-        caption={
-          <>
-            Normalised safety KPIs (per 1000 km), risk distribution, temporal patterns —
-            from{" "}
-            <code className="rounded bg-slate-200 px-1 py-0.5">
-              marts.v_safety_scorecard_dashboard
-            </code>
-            .
-          </>
-        }
-      />
-      {isPending ? <StateMessage>Loading safety scorecard…</StateMessage> : null}
+    <PageContainer
+      title="Safety scorecard"
+      description={
+        <>
+          Normalised safety KPIs (per 1000 km), risk distribution, temporal patterns — from{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-2xs text-foreground">
+            marts.v_safety_scorecard_dashboard
+          </code>
+          .
+        </>
+      }
+      actions={<Badge variant="warning">Monthly rollup</Badge>}
+    >
+      {isPending ? <LoadingSkeleton /> : null}
       {isError ? (
         <StateMessage tone="error">
           Failed to load safety scorecard: {(error as Error).message}
         </StateMessage>
       ) : null}
       {data ? <Content data={data} /> : null}
-    </section>
+    </PageContainer>
+  );
+}
+
+function LoadingSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <KpiCard key={i} label="" value="" loading />
+        ))}
+      </div>
+      <Skeleton className="h-72 w-full rounded-lg" />
+    </div>
   );
 }
 
@@ -88,58 +100,64 @@ function Content({ data }: { data: SafetyScorecardDashboardResponse }) {
 
   return (
     <div className="space-y-6">
-      {/* KPI strip ----------------------------------------------------- */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <KpiCard
           label="Overspeed / 1000 km"
           value={fmtDec(kpi.overspeed_rate_per_1000km)}
+          icon={<Gauge />}
+          tone="warning"
           trend={
             kpi.overspeed_rate_delta === null
               ? undefined
               : { delta: invertAbs(kpi.overspeed_rate_delta) ?? 0, label: "vs prior" }
           }
-          accent={RISK_COLORS.high}
         />
         <KpiCard
           label="Harsh / 1000 km"
           value={fmtDec(kpi.harsh_events_per_1000km)}
+          icon={<TriangleAlert />}
+          tone="danger"
           trend={
             kpi.harsh_events_delta === null
               ? undefined
               : { delta: invertAbs(kpi.harsh_events_delta) ?? 0, label: "vs prior" }
           }
-          accent={RISK_COLORS.critical}
         />
         <KpiCard
           label="High-risk devices"
           value={fmtInt(kpi.high_or_critical_devices)}
+          icon={<ShieldAlert />}
+          tone="danger"
           trend={
             kpi.high_or_critical_delta === null
               ? undefined
               : { delta: invertAbs(kpi.high_or_critical_delta) ?? 0, label: "vs prior" }
           }
-          accent={RISK_COLORS.critical}
         />
         <KpiCard
           label="Safety score"
           value={`${fmtInt(kpi.safety_score)}`}
+          icon={<ShieldCheck />}
+          tone="primary"
           trend={
             kpi.safety_score_delta === null
               ? undefined
               : { delta: kpi.safety_score_delta ?? 0, label: "vs prior" }
           }
-          accent={RISK_COLORS.low}
         />
       </div>
 
-      <p className="text-xs text-slate-500">
-        Latest: <strong>{kpi.year_month}</strong> · {fmtInt(kpi.active_devices)} active devices ·{" "}
-        {fmtInt(kpi.total_distance_km)} km driven
+      <p className="text-xs text-muted-foreground">
+        Latest: <strong className="text-foreground">{kpi.year_month}</strong> ·{" "}
+        {fmtInt(kpi.active_devices)} active devices · {fmtInt(kpi.total_distance_km)} km driven
       </p>
 
-      {/* Trends -------------------------------------------------------- */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <Panel title="Overspeed rate" accent={RISK_COLORS.high}>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <Panel
+          title="Overspeed rate"
+          description="Events per 1000 km, monthly."
+          tone="warning"
+        >
           <LineChart
             data={monthly as unknown as Array<Record<string, unknown>>}
             xKey="year_month"
@@ -149,9 +167,13 @@ function Content({ data }: { data: SafetyScorecardDashboardResponse }) {
             yFormatter={(v) => fmtDec(v)}
           />
         </Panel>
-        <Panel title="Harsh events by type" accent={RISK_COLORS.critical}>
+        <Panel
+          title="Harsh events by type"
+          description="Stacked monthly counts."
+          tone="warning"
+        >
           {harshSeries.data.length === 0 ? (
-            <p className="text-sm text-slate-500">No harsh-event data.</p>
+            <p className="text-sm text-muted-foreground">No harsh-event data.</p>
           ) : (
             <BarChart
               data={harshSeries.data as unknown as Array<Record<string, unknown>>}
@@ -162,19 +184,24 @@ function Content({ data }: { data: SafetyScorecardDashboardResponse }) {
             />
           )}
         </Panel>
-        <Panel title="Risk distribution (latest)" accent={RISK_COLORS.low}>
+        <Panel
+          title="Risk distribution (latest)"
+          description="Latest-month risk split."
+          tone="primary"
+        >
           {riskDistribution.every((d) => d.value === 0) ? (
-            <p className="text-sm text-slate-500">No scored devices yet.</p>
+            <p className="text-sm text-muted-foreground">No scored devices yet.</p>
           ) : (
-            <PieChart data={riskDistribution} />
+            <PieChart data={riskDistribution} donut />
           )}
         </Panel>
       </div>
 
-      {/* Per-tenant detail ------------------------------------------- */}
       <Panel
         title={`Per-tenant risk · ${kpi.year_month}`}
-        description="One row per tenant in the latest month; sortable in your spreadsheet."
+        description="One row per tenant in the latest month."
+        actions={<Badge variant="outline">{latestPerTenant.length} tenants</Badge>}
+        flush
       >
         <DataTable
           rows={latestPerTenant}
@@ -183,11 +210,17 @@ function Content({ data }: { data: SafetyScorecardDashboardResponse }) {
         />
       </Panel>
 
-      <Panel title="Raw table" description="Per-tenant × month rows.">
+      <Panel
+        title="Raw table"
+        description="Per-tenant × month rows."
+        actions={<Badge variant="outline">{rows.length} rows</Badge>}
+        flush
+      >
         <DataTable
           rows={rows}
           columns={RAW_COLUMNS}
           rowKey={(r) => `${r.year_month}::${r.tenant_id ?? "all"}`}
+          maxHeight="32rem"
         />
       </Panel>
     </div>
@@ -202,9 +235,9 @@ function buildHarshTypeSeries(monthly: ReadonlyArray<SafetyScorecardMonthly>) {
     corner: m.harsh_corner_count ?? 0,
   }));
   const series = [
-    { dataKey: "brake", label: "Brake", color: "#e74c3c", stackId: "harsh" },
-    { dataKey: "accel", label: "Accel", color: "#e67e22", stackId: "harsh" },
-    { dataKey: "corner", label: "Corner", color: "#f1c40f", stackId: "harsh" },
+    { dataKey: "brake", label: "Brake", color: RISK_COLORS.critical, stackId: "harsh" },
+    { dataKey: "accel", label: "Accel", color: RISK_COLORS.high, stackId: "harsh" },
+    { dataKey: "corner", label: "Corner", color: RISK_COLORS.moderate, stackId: "harsh" },
   ];
   return { data, series };
 }

@@ -7,6 +7,7 @@ import {
   Tooltip,
 } from "recharts";
 import { seriesColor } from "@/lib/colors";
+import { tooltipStyle, useChartTheme } from "./theme";
 
 interface PieDatum {
   name: string;
@@ -17,20 +18,28 @@ interface PieDatum {
 interface PieChartProps {
   data: ReadonlyArray<PieDatum>;
   height?: number;
+  /** Render as a full pie (no inner hole) instead of donut. */
+  donut?: boolean;
 }
 
-export function PieChart({ data, height = 260 }: PieChartProps) {
+export function PieChart({ data, height = 260, donut = true }: PieChartProps) {
+  const t = useChartTheme();
   return (
     <ResponsiveContainer width="100%" height={height}>
       <RPieChart>
-        <Tooltip contentStyle={{ fontSize: 12 }} />
-        <Legend wrapperStyle={{ fontSize: 11 }} />
+        <Tooltip contentStyle={tooltipStyle(t)} />
+        <Legend
+          wrapperStyle={{ fontSize: 11, color: t.axisTick }}
+          iconType="circle"
+        />
         <Pie
           data={data as Array<PieDatum>}
           dataKey="value"
           nameKey="name"
           outerRadius={90}
-          innerRadius={45}
+          innerRadius={donut ? 45 : 0}
+          stroke={t.tooltipBg}
+          strokeWidth={2}
           label={({ name, percent }) =>
             `${name} ${((percent ?? 0) * 100).toFixed(0)}%`
           }

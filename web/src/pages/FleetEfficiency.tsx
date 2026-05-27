@@ -1,14 +1,14 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Coins, Droplets, Gauge, TimerReset } from "lucide-react";
 import { fetchFleetEfficiency } from "@/api/dashboards";
 import type {
   FleetEfficiencyDashboardResponse,
   FleetEfficiencyRow,
 } from "@/api/types";
 import { useFilters } from "@/filters/FiltersContext";
-import { KpiCard } from "@/components/KpiCard";
-import { Panel } from "@/components/Panel";
-import { PageHeader } from "@/components/PageHeader";
+import { PageContainer } from "@/components/shell";
+import { Badge, KpiCard, Panel, Skeleton } from "@/components/ui";
 import { StateMessage } from "@/components/StateMessage";
 import { DataTable, type ColumnDef } from "@/components/DataTable";
 import { LineChart } from "@/components/charts/LineChart";
@@ -70,28 +70,41 @@ export function FleetEfficiency() {
   });
 
   return (
-    <section>
-      <PageHeader
-        title="Fleet efficiency"
-        caption={
-          <>
-            Cost-per-km, utilization, fuel economy — sourced from{" "}
-            <code className="rounded bg-slate-200 px-1 py-0.5">
-              marts.v_fleet_efficiency_dashboard
-            </code>
-            .
-          </>
-        }
-      />
-
-      {isPending ? <StateMessage>Loading fleet efficiency…</StateMessage> : null}
+    <PageContainer
+      title="Fleet efficiency"
+      description={
+        <>
+          Cost-per-km, utilization, fuel economy — sourced from{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-2xs text-foreground">
+            marts.v_fleet_efficiency_dashboard
+          </code>
+          .
+        </>
+      }
+      actions={<Badge variant="accent">Monthly rollup</Badge>}
+    >
+      {isPending ? <LoadingSkeleton /> : null}
       {isError ? (
         <StateMessage tone="error">
           Failed to load fleet efficiency: {(error as Error).message}
         </StateMessage>
       ) : null}
       {data ? <Content data={data} /> : null}
-    </section>
+    </PageContainer>
+  );
+}
+
+function LoadingSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <KpiCard key={i} label="" value="" loading />
+        ))}
+      </div>
+      <Skeleton className="h-72 w-full rounded-lg" />
+      <Skeleton className="h-72 w-full rounded-lg" />
+    </div>
   );
 }
 
@@ -114,58 +127,64 @@ function Content({ data }: { data: FleetEfficiencyDashboardResponse }) {
 
   return (
     <div className="space-y-6">
-      {/* KPI strip ----------------------------------------------------- */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <KpiCard
           label="Cost / km (DA)"
           value={fmtDec(kpi.cost_per_km)}
+          icon={<Coins />}
+          tone="primary"
           trend={
             kpi.cost_per_km_delta_pct === null
               ? undefined
               : { delta: invertDelta(kpi.cost_per_km_delta_pct) ?? 0, label: "MoM" }
           }
-          accent="#1f3a5f"
         />
         <KpiCard
           label="Utilization %"
           value={`${fmtDec(kpi.utilization_rate_pct)}%`}
+          icon={<Gauge />}
+          tone="accent"
           trend={
             kpi.utilization_rate_delta_pct === null
               ? undefined
               : { delta: kpi.utilization_rate_delta_pct ?? 0, label: "MoM" }
           }
-          accent="#2a9df4"
         />
         <KpiCard
           label="Fuel L / 100km"
           value={fmtDec(kpi.fuel_litres_per_100km)}
+          icon={<Droplets />}
+          tone="accent"
           trend={
             kpi.fuel_litres_per_100km_delta_pct === null
               ? undefined
               : { delta: invertDelta(kpi.fuel_litres_per_100km_delta_pct) ?? 0, label: "MoM" }
           }
-          accent="#16a085"
         />
         <KpiCard
           label="Idle %"
           value={`${fmtDec(kpi.idle_time_pct)}%`}
+          icon={<TimerReset />}
+          tone="warning"
           trend={
             kpi.idle_time_pct_delta_pct === null
               ? undefined
               : { delta: invertDelta(kpi.idle_time_pct_delta_pct) ?? 0, label: "MoM" }
           }
-          accent="#f39c12"
         />
       </div>
 
-      <p className="text-xs text-slate-500">
-        Latest: <strong>{kpi.year_month}</strong> · {fmtInt(kpi.active_devices)} active devices ·{" "}
-        {fmtInt(kpi.total_trips)} trips
+      <p className="text-xs text-muted-foreground">
+        Latest: <strong className="text-foreground">{kpi.year_month}</strong> ·{" "}
+        {fmtInt(kpi.active_devices)} active devices · {fmtInt(kpi.total_trips)} trips
       </p>
 
-      {/* Trends -------------------------------------------------------- */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Panel title="Cost per km" accent="#1f3a5f">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <Panel
+          title="Cost per km"
+          description="Monthly trend across the selected tenants."
+          tone="primary"
+        >
           <LineChart
             data={monthly as unknown as Array<Record<string, unknown>>}
             xKey="year_month"
@@ -173,7 +192,11 @@ function Content({ data }: { data: FleetEfficiencyDashboardResponse }) {
             yFormatter={(v) => fmtDec(v)}
           />
         </Panel>
-        <Panel title="Utilization trend" accent="#2a9df4">
+        <Panel
+          title="Utilization trend"
+          description="Monthly active-device utilization."
+          tone="accent"
+        >
           <BarChart
             data={monthly as unknown as Array<Record<string, unknown>>}
             xKey="year_month"
@@ -183,12 +206,12 @@ function Content({ data }: { data: FleetEfficiencyDashboardResponse }) {
         </Panel>
       </div>
 
-      {/* Top / bottom performers -------------------------------------- */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Panel
           title={`Best efficiency · ${kpi.year_month}`}
           description="Ordered by cost/km ascending (lower is better)."
-          accent="#16a085"
+          tone="accent"
+          flush
         >
           <DataTable
             rows={best5}
@@ -199,7 +222,8 @@ function Content({ data }: { data: FleetEfficiencyDashboardResponse }) {
         <Panel
           title={`Worst efficiency · ${kpi.year_month}`}
           description="Ordered by cost/km descending — investigate cost drivers."
-          accent="#e67e22"
+          tone="warning"
+          flush
         >
           <DataTable
             rows={worst5}
@@ -212,11 +236,14 @@ function Content({ data }: { data: FleetEfficiencyDashboardResponse }) {
       <Panel
         title="Per-tenant detail"
         description="One row per tenant × month; ratios recomputed from totals at the fleet level."
+        actions={<Badge variant="outline">{data.rows.length} rows</Badge>}
+        flush
       >
         <DataTable
           rows={data.rows}
           columns={RAW_COLUMNS}
           rowKey={(r) => `${r.year_month}::${r.tenant_id ?? "all"}`}
+          maxHeight="32rem"
         />
       </Panel>
     </div>

@@ -119,7 +119,14 @@
       "mcp__Claude_in_Chrome__browser_batch",
       "Bash(curl -s http://localhost:3000/ -o /dev/null -w \"status=%{http_code}\\\\n\")",
       "Bash(curl -s http://localhost:3000/)",
-      "Bash(python scripts/_smoke_ai_risk.py)"
+      "Bash(python scripts/_smoke_ai_risk.py)",
+      "Bash(ls \"C:\\\\Users\\\\Khawla\\\\.claude\\\\projects\\\\D--accent-fleet-analytics\\\\memory\"\" 2>/dev/null || echo \"empty/none \")",
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(ls D:/accent-fleet-analytics/web/src/api/ai*)",
+      "Bash(npx vite:*)",
+      "Bash(wc -l D:/accent-fleet-analytics/web/src/pages/*.tsx)"
     ]
   }
 }
