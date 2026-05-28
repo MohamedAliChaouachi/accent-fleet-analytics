@@ -38,15 +38,6 @@ export function TenantBilling() {
   return (
     <PageContainer
       title="Tenant billing & usage"
-      description={
-        <>
-          Per-tenant usage, pricing tier, and estimated revenue — sourced from{" "}
-          <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-2xs text-foreground">
-            marts.v_tenant_billing_dashboard
-          </code>
-          .
-        </>
-      }
       actions={<Badge variant="accent">Monthly rollup</Badge>}
     >
       {isPending ? <LoadingSkeleton /> : null}

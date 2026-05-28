@@ -36,15 +36,6 @@ export function SafetyScorecard() {
   return (
     <PageContainer
       title="Safety scorecard"
-      description={
-        <>
-          Normalised safety KPIs (per 1000 km), risk distribution, temporal patterns — from{" "}
-          <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-2xs text-foreground">
-            marts.v_safety_scorecard_dashboard
-          </code>
-          .
-        </>
-      }
       actions={<Badge variant="warning">Monthly rollup</Badge>}
     >
       {isPending ? <LoadingSkeleton /> : null}

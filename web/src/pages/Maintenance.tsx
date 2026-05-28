@@ -55,15 +55,6 @@ export function Maintenance() {
   return (
     <PageContainer
       title="Maintenance"
-      description={
-        <>
-          Upcoming work, fueling, and fault counts from{" "}
-          <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-2xs text-foreground">
-            marts.v_maintenance_dashboard
-          </code>
-          .
-        </>
-      }
       actions={<Badge variant="warning">Monthly rollup</Badge>}
     >
       {isPending ? <LoadingSkeleton /> : null}

@@ -72,15 +72,6 @@ export function FleetEfficiency() {
   return (
     <PageContainer
       title="Fleet efficiency"
-      description={
-        <>
-          Cost-per-km, utilization, fuel economy — sourced from{" "}
-          <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-2xs text-foreground">
-            marts.v_fleet_efficiency_dashboard
-          </code>
-          .
-        </>
-      }
       actions={<Badge variant="accent">Monthly rollup</Badge>}
     >
       {isPending ? <LoadingSkeleton /> : null}

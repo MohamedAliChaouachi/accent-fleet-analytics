@@ -24,7 +24,7 @@ import type {
 } from "@/api/types";
 import { useFilters } from "@/filters/FiltersContext";
 import { PageContainer } from "@/components/shell";
-import { KpiCard, Panel, Skeleton, Badge, Button } from "@/components/ui";
+import { KpiCard, Panel, Skeleton, Badge } from "@/components/ui";
 import { StateMessage } from "@/components/StateMessage";
 import { DataTable, type ColumnDef } from "@/components/DataTable";
 import { LineChart } from "@/components/charts/LineChart";
@@ -122,26 +122,7 @@ export function ExecutiveOverview() {
   return (
     <PageContainer
       title="Executive overview"
-      description={
-        <>
-          Fleet-wide KPIs sourced from{" "}
-          <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-2xs text-foreground">
-            marts.v_executive_dashboard
-          </code>{" "}
-          with composite health KPIs from safety, risk, and alerts.
-        </>
-      }
-      actions={
-        <>
-          <Badge variant="accent">Live</Badge>
-          <Button variant="outline" size="sm">
-            Export CSV
-          </Button>
-          <Button variant="primary" size="sm">
-            Share report
-          </Button>
-        </>
-      }
+      actions={<Badge variant="accent">Live</Badge>}
     >
       {isPending ? <LoadingSkeleton /> : null}
 

@@ -166,9 +166,17 @@ SELECT
        THEN c.high_or_critical_devices::FLOAT / c.scored_devices * 100
        ELSE 0 END                                              AS high_risk_device_pct,
   -- ---- Composite Safety Score (0-100; higher = safer) ----
-  -- Penalise overspeed and harsh rates with the severity weights baked in.
-  -- 4× harsh penalty matches a moderate→high tier escalation; the LEAST/0
-  -- bounds keep it in [0,100] regardless of how bad the month gets.
+  -- Penalise overspeed and harsh rates, with weights calibrated against
+  -- the observed data distribution in this fleet:
+  --   * overspeed_per_1000km typically ranges 0–60   → weight 0.4
+  --   * harsh_per_1000km typically ranges 40–500     → weight 0.1
+  -- An earlier draft used 2× / 4× — calibrated for an assumed real-world
+  -- ~5 harsh/1000km, which is 50× smaller than the actual rate produced
+  -- by the synthetic event generator. Every tenant landed at 0 because
+  -- the harsh penalty alone (4× ~150 = ~600) blew past the 100-point
+  -- budget. The recalibrated weights produce scores in the 40–90 band
+  -- and preserve tenant ranking. Re-tune if the underlying event
+  -- generator is later replaced with a real-world feed.
   GREATEST(
     0,
     LEAST(
@@ -176,32 +184,34 @@ SELECT
       100
         - COALESCE(
             CASE WHEN c.total_distance_km > 0
-                 THEN c.total_overspeed::FLOAT / c.total_distance_km * 1000 * 2
+                 THEN c.total_overspeed::FLOAT / c.total_distance_km * 1000 * 0.4
                  ELSE 0 END, 0)
         - COALESCE(
             CASE WHEN c.total_distance_km > 0
-                 THEN c.total_harsh_events::FLOAT / c.total_distance_km * 1000 * 4
+                 THEN c.total_harsh_events::FLOAT / c.total_distance_km * 1000 * 0.1
                  ELSE 0 END, 0)
     )
   )                                                            AS safety_score,
   -- ---- Safety Score MoM Delta (positive = improving) ----
+  -- Same formula as safety_score above, minus the previous-month value.
+  -- Weights must match the safety_score formula or the trend lies.
   COALESCE(
     GREATEST(0, LEAST(100,
       100
       - CASE WHEN c.total_distance_km > 0
-             THEN c.total_overspeed::FLOAT / c.total_distance_km * 1000 * 2
+             THEN c.total_overspeed::FLOAT / c.total_distance_km * 1000 * 0.4
              ELSE 0 END
       - CASE WHEN c.total_distance_km > 0
-             THEN c.total_harsh_events::FLOAT / c.total_distance_km * 1000 * 4
+             THEN c.total_harsh_events::FLOAT / c.total_distance_km * 1000 * 0.1
              ELSE 0 END
     )) - LAG(
       GREATEST(0, LEAST(100,
         100
         - CASE WHEN c.total_distance_km > 0
-               THEN c.total_overspeed::FLOAT / c.total_distance_km * 1000 * 2
+               THEN c.total_overspeed::FLOAT / c.total_distance_km * 1000 * 0.4
                ELSE 0 END
         - CASE WHEN c.total_distance_km > 0
-               THEN c.total_harsh_events::FLOAT / c.total_distance_km * 1000 * 4
+               THEN c.total_harsh_events::FLOAT / c.total_distance_km * 1000 * 0.1
                ELSE 0 END
       ))
     ) OVER w,

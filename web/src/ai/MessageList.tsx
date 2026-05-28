@@ -3,10 +3,7 @@ import { AlertTriangle, Loader2 } from "lucide-react";
 import { ChatMessage, MessageMetaChip } from "./ChatMessage";
 import { StreamingMessage } from "./StreamingMessage";
 import { TypingIndicator } from "./TypingIndicator";
-import { SqlCodeBlock } from "./SqlCodeBlock";
 import { ResultsTable } from "./ResultsTable";
-import { ExplanationPanel } from "./ExplanationPanel";
-import { deriveConfidence } from "./ConfidenceBadge";
 import { QueryFeedback, type FeedbackValue } from "./QueryFeedback";
 import { prettyAIError, type DisplayMessage } from "./useAIChat";
 import { cn } from "@/lib/cn";
@@ -96,10 +93,6 @@ export function MessageList({
           const { response } = m;
           const isLatest = m.id === lastAssistantId;
           const animate = animateLatest && isLatest;
-          const confidence = deriveConfidence({
-            rowCount: response.row_count,
-            summaryLength: response.summary.length,
-          });
           return (
             <ChatMessage
               key={m.id}
@@ -126,14 +119,6 @@ export function MessageList({
             >
               <div className="flex flex-col gap-3">
                 <StreamingMessage text={response.summary} animate={animate} />
-                <SqlCodeBlock
-                  sql={response.sql}
-                  source="ai"
-                  confidence={confidence}
-                />
-                {!compact ? (
-                  <ExplanationPanel sql={response.sql} />
-                ) : null}
                 <ResultsTable
                   rows={response.rows}
                   columns={response.columns}

@@ -95,15 +95,6 @@ export function Operations() {
   return (
     <PageContainer
       title="Operations"
-      description={
-        <>
-          Trip volume, harsh events, and overspeed hotspots from{" "}
-          <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-2xs text-foreground">
-            marts.v_operational_dashboard
-          </code>
-          .
-        </>
-      }
       actions={<Badge variant="accent">Daily rollup</Badge>}
     >
       {isPending ? <LoadingSkeleton /> : null}

@@ -413,6 +413,46 @@ def _pct_delta(current: float | None, prior: float | None) -> float | None:
     return (current - prior) / prior * 100
 
 
+def _last_day_of_ym(year_month: str) -> date:
+    """Return the calendar last day of a 'YYYY-MM' string.
+
+    Used to decide whether a month-grain row has *complete* coverage in the
+    underlying daily facts. A month is complete when its last calendar day
+    is on or before the latest observed fact date.
+    """
+    y, m = year_month.split("-")
+    first_next = date(int(y) + (1 if m == "12" else 0), 1 if m == "12" else int(m) + 1, 1)
+    return first_next - timedelta(days=1)
+
+
+def _filter_complete_months(
+    conn: Connection,
+    monthly_year_months: list[str],
+    f: DashboardFilters,
+) -> list[str]:
+    """Drop partial-month entries so MoM comparisons aren't misleading.
+
+    Background: dashboards aggregate to (tenant, year_month). When the
+    underlying daily facts (fact_trip etc.) only cover part of the current
+    month — common during demos / staging where seeded data ends mid-month —
+    that month's totals look catastrophically lower than the previous one's,
+    and every MoM-growth bar collapses to a deep-negative value.
+
+    Heuristic: ask the warehouse for the latest observed ``trip_date`` under
+    the active tenant filter, then keep only months whose calendar end is at
+    or before that date. The KPI / MoM-chart consumer should fall back to
+    the full list if literally nothing is complete (e.g. a brand-new tenant
+    with one partial month of data).
+    """
+    if not monthly_year_months:
+        return []
+    sql = "SELECT MAX(trip_date) FROM warehouse.fact_trip WHERE 1=1 " + f.tenant_clause()
+    latest_trip_date = conn.execute(text(sql), f.params()).scalar()
+    if latest_trip_date is None:
+        return list(monthly_year_months)
+    return [ym for ym in monthly_year_months if _last_day_of_ym(ym) <= latest_trip_date]
+
+
 def fetch_fleet_efficiency(
     conn: Connection, f: DashboardFilters
 ) -> FleetEfficiencyDashboardResponse:
@@ -780,10 +820,19 @@ def fetch_tenant_billing(
     tier_breakdown: list[TenantBillingTier] = []
     latest_month: str | None = None
     if monthly:
-        latest_ym = monthly[-1].year_month
+        # Pick the latest *complete* month for the KPI strip / MoM chart.
+        # The full `monthly` list still flows into the time-series and raw
+        # tables, but using a partial month as "current" would crash the
+        # MoM-growth bars to -60 / -90 % across the board (the chart the
+        # user reported as "not correctly showed up").
+        all_yms = [m.year_month for m in monthly]
+        complete_yms = _filter_complete_months(conn, all_yms, f)
+        kpi_yms = complete_yms or all_yms  # fallback for very early datasets
+        latest_ym = kpi_yms[-1]
         latest_month = latest_ym
         latest_rows = [r for r in rows if r.year_month == latest_ym]
-        prior_ym = monthly[-2].year_month if len(monthly) > 1 else None
+        # Prior month must also be complete to make the delta meaningful.
+        prior_ym = kpi_yms[-2] if len(kpi_yms) > 1 else None
         prior_rows = [r for r in rows if r.year_month == prior_ym] if prior_ym else []
 
         total_tenants = len({r.tenant_id for r in latest_rows if r.tenant_id is not None})

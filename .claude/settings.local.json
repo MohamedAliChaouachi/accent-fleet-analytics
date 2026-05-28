@@ -139,7 +139,12 @@
       "Bash(python -c \"import accent_fleet\")",
       "Bash(pip install:*)",
       "Bash(timeout 60 python -c \"from app.ai.routers import ai_query\")",
-      "Bash(python -m pytest tests/ai/test_audit.py --collect-only -q --no-header)"
+      "Bash(python -m pytest tests/ai/test_audit.py --collect-only -q --no-header)",
+      "Bash(python scripts/_smoke_tenant_billing.py)",
+      "Bash(curl -s http://localhost:3000)",
+      "Bash(curl -s \"http://localhost:3000/assets/index-CkI7V_Bc.js\")",
+      "Bash(curl -s \"http://localhost:3000/assets/index-2Fat2ve2.js\")",
+      "Bash(curl -s \"http://localhost:3000/assets/index-H7MHmX0v.js\")"
     ]
   }
 }
