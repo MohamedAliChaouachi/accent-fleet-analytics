@@ -15,18 +15,29 @@ tests without going through HTTP.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 
 from app.ai.config import ai_settings
 from app.ai.providers.base import LLMProviderError
 from app.ai.providers.factory import get_provider
 from app.ai.schemas.ai import (
+    MAX_HISTORY_PAGE,
     MAX_HISTORY_TURNS,
+    AIFeedbackRequest,
+    AIFeedbackResponse,
+    AIHistoryItem,
+    AIHistoryResponse,
     AIQueryError,
     AIQueryRequest,
     AIQueryResponse,
+    AISchemaColumn,
+    AISchemaResponse,
+    AISchemaTable,
 )
+from app.ai.schemas.catalog import CATALOG
 from app.ai.services.audit import write_ai_query_event
+from app.ai.services.feedback import FeedbackError, upsert_feedback
+from app.ai.services.history import read_user_history
 from app.ai.services.pipeline import PipelineError, PipelineInput, run
 from app.ai.services.rate_limit import (
     AIRateLimitExceededError,
@@ -142,7 +153,7 @@ def ai_query(
     # Happy path — one row recording what we ran, how long it took, and
     # which provider/model answered. Volume bound is "one row per /ai/query
     # call", which is exactly what we want for cost reporting.
-    write_ai_query_event(
+    event_id = write_ai_query_event(
         user_id=principal.user_id,
         tenant_id=tenant_id,
         question=body.question,
@@ -154,6 +165,10 @@ def ai_query(
         provider=response.provider,
         model=response.model,
     )
+    # event_id is None only if the audit write failed (fail-open). The
+    # client falls back to "feedback unavailable for this turn" in that
+    # case; everything else still works.
+    response.event_id = event_id
     return response
 
 
@@ -204,3 +219,111 @@ def _resolve_tenant(*, principal: Principal, requested: int | None) -> int:
     # invariant for any non-superadmin role.
     assert principal.tenant_id is not None
     return principal.tenant_id
+
+
+# ---------------------------------------------------------------------------
+# GET /ai/history — the caller's own past queries
+# ---------------------------------------------------------------------------
+#
+# Strictly per-user. We don't paginate (yet) — the UI is a sidebar list
+# capped at MAX_HISTORY_PAGE rows, which is enough for the conversation-
+# history use case. When/if we add a "full history" view, this is the
+# right place to add a cursor parameter.
+
+
+@router.get("/history", response_model=AIHistoryResponse)
+def ai_history(
+    principal: Principal = CurrentPrincipalDep,
+    limit: int = Query(
+        default=50,
+        ge=1,
+        le=MAX_HISTORY_PAGE,
+        description=(
+            "Maximum number of past queries to return, newest first. "
+            f"Capped server-side at {MAX_HISTORY_PAGE}."
+        ),
+    ),
+) -> AIHistoryResponse:
+    rows = read_user_history(user_id=principal.user_id, limit=limit)
+    return AIHistoryResponse(items=[AIHistoryItem(**r) for r in rows])
+
+
+# ---------------------------------------------------------------------------
+# POST /ai/feedback — thumbs up/down on a past query
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/feedback",
+    response_model=AIFeedbackResponse,
+    status_code=status.HTTP_200_OK,
+)
+def ai_feedback(
+    body: AIFeedbackRequest,
+    principal: Principal = CurrentPrincipalDep,
+) -> AIFeedbackResponse:
+    """Record (or update) the caller's feedback on one past /ai/query call.
+
+    A 404 means the ``event_id`` doesn't correspond to a query owned by
+    the authenticated user — either the user is spoofing someone else's
+    event_id, or their local conversation state is stale (e.g. audit row
+    was aged out). Either way the UI's right move is to drop the local
+    thumbs state and re-fetch ``/history``.
+    """
+    try:
+        row = upsert_feedback(
+            user_id=principal.user_id,
+            event_id=body.event_id,
+            value=body.value,
+            comment=body.comment,
+        )
+    except FeedbackError as e:
+        if e.kind == "not_found":
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=e.detail,
+            ) from e
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=e.detail,
+        ) from e
+    return AIFeedbackResponse(**row)
+
+
+# ---------------------------------------------------------------------------
+# GET /ai/schema — the curated catalog the SQL guard admits
+# ---------------------------------------------------------------------------
+#
+# Static within a deploy. The client can cache the response indefinitely
+# (we don't set ETag headers — the response is small enough that adding
+# the round-trip back for revalidation is more code than it's worth).
+
+
+@router.get("/schema", response_model=AISchemaResponse)
+def ai_schema(
+    principal: Principal = CurrentPrincipalDep,  # noqa: ARG001 — auth required
+) -> AISchemaResponse:
+    """Return the curated table catalog the AI assistant queries against.
+
+    The response is a serialized snapshot of the in-process
+    :data:`app.ai.schemas.catalog.CATALOG` — every table the SQL guard
+    will admit. This is intentionally a whitelist, not a live
+    ``information_schema`` dump, so adding a table here is an explicit
+    decision (see ``app/ai/schemas/catalog.py``).
+    """
+    tables = [
+        AISchemaTable(
+            fqname=spec.fqname,
+            schema_name=spec.schema,
+            name=spec.name,
+            description=spec.description,
+            grain=spec.grain,
+            tenant_scoped=spec.tenant_scoped,
+            columns=[
+                AISchemaColumn(name=c.name, type=c.type, description=c.description)
+                for c in spec.columns
+            ],
+        )
+        for spec in CATALOG.values()
+    ]
+    return AISchemaResponse(tables=tables)

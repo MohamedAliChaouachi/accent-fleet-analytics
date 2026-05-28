@@ -2,8 +2,190 @@
 @tailwind components;
 @tailwind utilities;
 
-html,
-body,
-#root {
-  height: 100%;
+/* ---------------------------------------------------------------------
+ * Design tokens.
+ *
+ * Token values are HSL channel triplets so they can be wrapped by
+ * Tailwind's `hsl(var(--token) / <alpha-value>)` pattern, which lets us
+ * use opacity utilities like `bg-primary/10` without redefining a new
+ * variable per opacity step.
+ *
+ * `--radius` is the base radius; Tailwind exposes lg/md/sm derived from
+ * it so a single number controls roundness across the whole UI.
+ * ------------------------------------------------------------------- */
+
+@layer base {
+  :root {
+    /* Light theme — enterprise B2B, low chroma, high contrast. */
+    --background: 210 40% 98%;
+    --foreground: 215 28% 17%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 215 28% 17%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 28% 17%;
+
+    --primary: 213 51% 25%;            /* deep navy #1E3A5F */
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 214 32% 91%;
+    --secondary-foreground: 215 28% 17%;
+
+    --muted: 214 32% 95%;
+    --muted-foreground: 215 16% 47%;
+
+    --accent: 187 85% 43%;             /* teal/cyan */
+    --accent-foreground: 215 28% 17%;
+
+    --destructive: 0 75% 50%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214 32% 88%;
+    --input: 214 32% 88%;
+    --ring: 187 85% 43%;
+
+    /* AI accent — distinct violet/magenta lane. */
+    --ai: 262 83% 58%;
+    --ai-foreground: 210 40% 98%;
+    --ai-muted: 262 83% 96%;
+
+    /* Risk ramp — semantic, color-blind safe-ish. */
+    --risk-low: 152 60% 44%;
+    --risk-moderate: 38 92% 50%;
+    --risk-high: 24 95% 53%;
+    --risk-critical: 0 75% 50%;
+
+    --success: 152 60% 44%;
+    --warning: 38 92% 50%;
+    --info: 199 89% 48%;
+
+    --radius: 0.625rem;
+  }
+
+  .dark {
+    /* Dark theme — primary surface. */
+    --background: 222 47% 7%;          /* near-black slate */
+    --foreground: 210 40% 96%;
+
+    --card: 222 40% 11%;
+    --card-foreground: 210 40% 96%;
+
+    --popover: 222 40% 11%;
+    --popover-foreground: 210 40% 96%;
+
+    --primary: 213 70% 60%;            /* brighter navy/blue for dark bg */
+    --primary-foreground: 222 47% 7%;
+
+    --secondary: 217 33% 18%;
+    --secondary-foreground: 210 40% 96%;
+
+    --muted: 217 33% 15%;
+    --muted-foreground: 217 15% 65%;
+
+    --accent: 187 90% 50%;             /* punched-up cyan */
+    --accent-foreground: 222 47% 7%;
+
+    --destructive: 0 75% 55%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217 33% 20%;
+    --input: 217 33% 20%;
+    --ring: 187 90% 50%;
+
+    --ai: 262 90% 68%;
+    --ai-foreground: 222 47% 7%;
+    --ai-muted: 262 60% 18%;
+
+    --risk-low: 152 60% 50%;
+    --risk-moderate: 38 92% 58%;
+    --risk-high: 24 95% 60%;
+    --risk-critical: 0 75% 60%;
+
+    --success: 152 60% 50%;
+    --warning: 38 92% 58%;
+    --info: 199 89% 58%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased font-sans;
+    font-feature-settings: "rlig" 1, "calt" 1, "ss01" 1, "cv11" 1;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Focus ring — accessible, brand-tinted, never browser default. */
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
+  /* Slick scrollbars in dark + light. Keep system-native on mobile. */
+  @media (pointer: fine) {
+    ::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+    ::-webkit-scrollbar-thumb {
+      @apply bg-border rounded-full;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      @apply bg-muted-foreground/40;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+  }
+}
+
+@layer utilities {
+  /* Glassmorphism card — used by sidebar, AI panels, top bar. */
+  .glass {
+    @apply bg-card/70 backdrop-blur-xl border border-border/60;
+  }
+
+  .glass-strong {
+    @apply bg-card/85 backdrop-blur-2xl border border-border/60;
+  }
+
+  /* Skeleton shimmer — paired with `animate-shimmer`. */
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--muted)) 0%,
+      hsl(var(--muted) / 0.5) 50%,
+      hsl(var(--muted)) 100%
+    );
+    background-size: 200% 100%;
+    @apply animate-shimmer rounded-md;
+  }
+
+  /* Tabular numerals — for KPI values, tables, money. */
+  .num {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1, "cv11" 1;
+  }
+
+  /* AI-content marker — subtle violet wash + ring. */
+  .ai-surface {
+    @apply bg-ai/5 border border-ai/20;
+  }
+
+  /* Hide the increment buttons on number inputs. */
+  .no-spin::-webkit-outer-spin-button,
+  .no-spin::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  .no-spin {
+    -moz-appearance: textfield;
+  }
 }

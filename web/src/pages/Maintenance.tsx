@@ -1,14 +1,14 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Banknote, Wrench } from "lucide-react";
 import { fetchMaintenance } from "@/api/dashboards";
 import type {
   MaintenanceDashboardResponse,
   MaintenanceRow,
 } from "@/api/types";
 import { useFilters } from "@/filters/FiltersContext";
-import { KpiCard } from "@/components/KpiCard";
-import { Panel } from "@/components/Panel";
-import { PageHeader } from "@/components/PageHeader";
+import { PageContainer } from "@/components/shell";
+import { Badge, KpiCard, Panel, Skeleton } from "@/components/ui";
 import { StateMessage } from "@/components/StateMessage";
 import { DataTable, type ColumnDef } from "@/components/DataTable";
 import { BarChart } from "@/components/charts/BarChart";
@@ -53,25 +53,40 @@ export function Maintenance() {
   });
 
   return (
-    <section>
-      <PageHeader
-        title="Maintenance"
-        caption={
-          <>
-            Upcoming work, fueling, fault counts from{" "}
-            <code className="rounded bg-slate-200 px-1 py-0.5">marts.v_maintenance_dashboard</code>.
-          </>
-        }
-      />
-
-      {isPending ? <StateMessage>Loading maintenance…</StateMessage> : null}
+    <PageContainer
+      title="Maintenance"
+      description={
+        <>
+          Upcoming work, fueling, and fault counts from{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-2xs text-foreground">
+            marts.v_maintenance_dashboard
+          </code>
+          .
+        </>
+      }
+      actions={<Badge variant="warning">Monthly rollup</Badge>}
+    >
+      {isPending ? <LoadingSkeleton /> : null}
       {isError ? (
         <StateMessage tone="error">
           Failed to load maintenance: {(error as Error).message}
         </StateMessage>
       ) : null}
       {data ? <Content data={data} /> : null}
-    </section>
+    </PageContainer>
+  );
+}
+
+function LoadingSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {Array.from({ length: 2 }).map((_, i) => (
+          <KpiCard key={i} label="" value="" loading />
+        ))}
+      </div>
+      <Skeleton className="h-72 w-full rounded-lg" />
+    </div>
   );
 }
 
@@ -83,7 +98,8 @@ function Content({ data }: { data: MaintenanceDashboardResponse }) {
   const topRows = useMemo(() => {
     const out = new Map<string, { label: string; total_cost: number }>();
     for (const row of data.top_cost_vehicles) {
-      const label = row.matricule ?? (row.vehicle_id !== null ? `#${row.vehicle_id}` : "—");
+      const label =
+        row.matricule ?? (row.vehicle_id !== null ? `#${row.vehicle_id}` : "—");
       const prev = out.get(label)?.total_cost ?? 0;
       out.set(label, { label, total_cost: prev + (row.total_cost ?? 0) });
     }
@@ -100,17 +116,30 @@ function Content({ data }: { data: MaintenanceDashboardResponse }) {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-2">
-        <KpiCard label="Maintenance events" value={fmtInt(data.kpi.maintenance_events)} />
-        <KpiCard label="Total cost" value={fmtInt(data.kpi.total_cost)} />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <KpiCard
+          label="Maintenance events"
+          value={fmtInt(data.kpi.maintenance_events)}
+          icon={<Wrench />}
+          tone="warning"
+        />
+        <KpiCard
+          label="Total cost"
+          value={fmtInt(data.kpi.total_cost)}
+          icon={<Banknote />}
+          tone="accent"
+        />
       </div>
 
       <Panel
         title="Highest-cost vehicles"
-        description="Top 20 vehicles by total_cost in the selected window."
+        description="Top vehicles by total_cost in the selected window."
+        tone="accent"
       >
         {topRows.length === 0 ? (
-          <p className="text-sm text-slate-500">No top-cost vehicles for this filter.</p>
+          <p className="text-sm text-muted-foreground">
+            No top-cost vehicles for this filter.
+          </p>
         ) : (
           <BarChart
             data={topRows as unknown as Array<Record<string, unknown>>}
@@ -123,13 +152,19 @@ function Content({ data }: { data: MaintenanceDashboardResponse }) {
         )}
       </Panel>
 
-      <Panel title="Detail" description="One row per tenant × vehicle × month.">
+      <Panel
+        title="Detail"
+        description="One row per tenant × vehicle × month."
+        actions={<Badge variant="outline">{data.rows.length} rows</Badge>}
+        flush
+      >
         <DataTable
           rows={data.rows}
           columns={ROW_COLUMNS}
           rowKey={(r) =>
             `${r.year_month}::${r.tenant_id ?? "all"}::${r.vehicle_id ?? r.matricule ?? "?"}`
           }
+          maxHeight="32rem"
         />
       </Panel>
     </div>

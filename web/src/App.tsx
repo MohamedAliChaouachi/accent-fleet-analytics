@@ -5,7 +5,9 @@ import { AuthProvider, useAuth } from "@/auth/AuthContext";
 import { LoginPage } from "@/auth/LoginPage";
 import { RequireAuth } from "@/auth/RequireAuth";
 import { FiltersProvider } from "@/filters/FiltersContext";
-import { Layout } from "@/components/Layout";
+import { ThemeProvider } from "@/theme/ThemeProvider";
+import { TooltipProvider } from "@/components/ui/Tooltip";
+import { DashboardShell } from "@/components/shell";
 import { ExecutiveOverview } from "@/pages/ExecutiveOverview";
 import { Operations } from "@/pages/Operations";
 import { Maintenance } from "@/pages/Maintenance";
@@ -43,13 +45,15 @@ const queryClient = new QueryClient({
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <AuthProvider>
-          <FiltersProvider>
-            <Routes>
-              <Route path="/login" element={<LoginPage />} />
-              <Route element={<RequireAuth />}>
-                <Route element={<Layout />}>
+      <ThemeProvider defaultTheme="dark">
+        <TooltipProvider delayDuration={150}>
+          <BrowserRouter>
+            <AuthProvider>
+              <FiltersProvider>
+                <Routes>
+                  <Route path="/login" element={<LoginPage />} />
+                  <Route element={<RequireAuth />}>
+                    <Route element={<DashboardShell />}>
                   <Route index element={<Navigate to="/executive" replace />} />
                   <Route path="/executive" element={<ExecutiveOverview />} />
                   <Route path="/operations" element={<Operations />} />
@@ -66,14 +70,16 @@ export function App() {
                       </SuperadminOnly>
                     }
                   />
-                  <Route path="/ai" element={<AIChat />} />
-                </Route>
-              </Route>
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </FiltersProvider>
-        </AuthProvider>
-      </BrowserRouter>
+                      <Route path="/ai" element={<AIChat />} />
+                    </Route>
+                  </Route>
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </FiltersProvider>
+            </AuthProvider>
+          </BrowserRouter>
+        </TooltipProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

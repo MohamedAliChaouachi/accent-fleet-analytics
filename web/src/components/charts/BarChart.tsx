@@ -9,7 +9,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { BRAND, seriesColor } from "@/lib/colors";
+import { seriesColor } from "@/lib/colors";
+import { tooltipStyle, useChartTheme } from "./theme";
 
 export interface BarSeries {
   dataKey: string;
@@ -41,6 +42,7 @@ export function BarChart({
   rowColors,
   legend,
 }: BarChartProps) {
+  const t = useChartTheme();
   const horizontal = layout === "horizontal";
   return (
     <ResponsiveContainer width="100%" height={height}>
@@ -49,34 +51,65 @@ export function BarChart({
         layout={layout}
         margin={{ top: 8, right: 16, bottom: 8, left: horizontal ? 8 : 80 }}
       >
-        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+        <CartesianGrid strokeDasharray="3 3" stroke={t.grid} />
         {horizontal ? (
           <>
-            <XAxis dataKey={xKey} tick={{ fontSize: 11, fill: "#475569" }} />
-            <YAxis tick={{ fontSize: 11, fill: "#475569" }} tickFormatter={yFormatter} width={60} />
+            <XAxis
+              dataKey={xKey}
+              tick={{ fontSize: 11, fill: t.axisTick }}
+              axisLine={{ stroke: t.axisLine }}
+              tickLine={{ stroke: t.axisLine }}
+            />
+            <YAxis
+              tick={{ fontSize: 11, fill: t.axisTick }}
+              tickFormatter={yFormatter}
+              width={60}
+              axisLine={{ stroke: t.axisLine }}
+              tickLine={{ stroke: t.axisLine }}
+            />
           </>
         ) : (
           <>
-            <XAxis type="number" tick={{ fontSize: 11, fill: "#475569" }} tickFormatter={yFormatter} />
-            <YAxis type="category" dataKey={xKey} tick={{ fontSize: 11, fill: "#475569" }} width={120} />
+            <XAxis
+              type="number"
+              tick={{ fontSize: 11, fill: t.axisTick }}
+              tickFormatter={yFormatter}
+              axisLine={{ stroke: t.axisLine }}
+              tickLine={{ stroke: t.axisLine }}
+            />
+            <YAxis
+              type="category"
+              dataKey={xKey}
+              tick={{ fontSize: 11, fill: t.axisTick }}
+              width={120}
+              axisLine={{ stroke: t.axisLine }}
+              tickLine={{ stroke: t.axisLine }}
+            />
           </>
         )}
         <Tooltip
           formatter={(v: number) => (yFormatter ? yFormatter(v) : v)}
-          contentStyle={{ fontSize: 12 }}
+          contentStyle={tooltipStyle(t)}
+          cursor={{ fill: t.grid }}
         />
-        {legend ? <Legend wrapperStyle={{ fontSize: 11 }} /> : null}
+        {legend ? (
+          <Legend
+            wrapperStyle={{ fontSize: 11, color: t.axisTick, paddingTop: 8 }}
+            iconType="circle"
+          />
+        ) : null}
         {series.map((s, i) => (
           <Bar
             key={s.dataKey}
             dataKey={s.dataKey}
             name={s.label ?? s.dataKey}
-            fill={s.color ?? (i === 0 ? BRAND.accent : seriesColor(i))}
+            fill={s.color ?? seriesColor(i)}
             stackId={s.stackId}
+            radius={[4, 4, 0, 0]}
           >
             {rowColors && i === 0
               ? data.map((_, idx) => (
-                  <Cell key={idx} fill={rowColors[idx] ?? BRAND.accent} />
+                  <Cell key={idx} fill={rowColors[idx] ?? seriesColor(0)} />
                 ))
               : null}
           </Bar>

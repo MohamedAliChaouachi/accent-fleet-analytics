@@ -1,4 +1,14 @@
+import { useMemo } from "react";
 import { useQueries, useQuery } from "@tanstack/react-query";
+import {
+  Activity,
+  AlertTriangle,
+  Banknote,
+  Cpu,
+  Gauge,
+  Route,
+  ShieldCheck,
+} from "lucide-react";
 import {
   fetchExecutive,
   fetchPredictiveAlerts,
@@ -13,15 +23,27 @@ import type {
   SafetyScorecardDashboardResponse,
 } from "@/api/types";
 import { useFilters } from "@/filters/FiltersContext";
-import { KpiCard } from "@/components/KpiCard";
-import { Panel } from "@/components/Panel";
-import { PageHeader } from "@/components/PageHeader";
+import { PageContainer } from "@/components/shell";
+import { KpiCard, Panel, Skeleton, Badge, Button } from "@/components/ui";
 import { StateMessage } from "@/components/StateMessage";
 import { DataTable, type ColumnDef } from "@/components/DataTable";
 import { LineChart } from "@/components/charts/LineChart";
 import { BarChart } from "@/components/charts/BarChart";
-import { RISK_COLORS } from "@/lib/colors";
 import { fmtDec, fmtInt } from "@/lib/format";
+
+// Numbers as a sparkline series — pull the last N months of one metric
+// from the monthly rows. Keeps the KPI sparks coherent with the charts
+// below: same data, no second API call.
+function trail<T>(
+  rows: ReadonlyArray<T>,
+  pick: (r: T) => number | null | undefined,
+  n = 8,
+): number[] {
+  return rows
+    .slice(-n)
+    .map(pick)
+    .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+}
 
 const ROW_COLUMNS: ReadonlyArray<ColumnDef<ExecutiveMonthlyRow>> = [
   { key: "year_month", header: "Month", accessor: (r) => r.year_month },
@@ -72,8 +94,8 @@ export function ExecutiveOverview() {
 
   // Fan out to the v2.0 endpoints so the top "health strip" can show
   // composite KPIs without bloating the executive view payload. These
-  // pages already fetch their own data when navigated to, so paying
-  // for them here costs little after the first hit (TanStack cache).
+  // pages already fetch their own data when navigated to, so paying for
+  // them here costs little after the first hit (TanStack cache).
   const sideQueries = useQueries({
     queries: [
       {
@@ -98,19 +120,30 @@ export function ExecutiveOverview() {
   const alerts = alertsQ.data as PredictiveAlertsDashboardResponse | undefined;
 
   return (
-    <section>
-      <PageHeader
-        title="Executive overview"
-        caption={
-          <>
-            Fleet-wide KPIs sourced from{" "}
-            <code className="rounded bg-slate-200 px-1 py-0.5">marts.v_executive_dashboard</code>{" "}
-            with composite health KPIs from safety / risk / alerts.
-          </>
-        }
-      />
-
-      {isPending ? <StateMessage>Loading executive overview…</StateMessage> : null}
+    <PageContainer
+      title="Executive overview"
+      description={
+        <>
+          Fleet-wide KPIs sourced from{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-2xs text-foreground">
+            marts.v_executive_dashboard
+          </code>{" "}
+          with composite health KPIs from safety, risk, and alerts.
+        </>
+      }
+      actions={
+        <>
+          <Badge variant="accent">Live</Badge>
+          <Button variant="outline" size="sm">
+            Export CSV
+          </Button>
+          <Button variant="primary" size="sm">
+            Share report
+          </Button>
+        </>
+      }
+    >
+      {isPending ? <LoadingSkeleton /> : null}
 
       {isError ? (
         <StateMessage tone="error">
@@ -121,7 +154,21 @@ export function ExecutiveOverview() {
       {data ? (
         <Content data={data} safety={safety} risk={risk} alerts={alerts} />
       ) : null}
-    </section>
+    </PageContainer>
+  );
+}
+
+function LoadingSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <KpiCard key={i} label="" value="" loading />
+        ))}
+      </div>
+      <Skeleton className="h-72 w-full rounded-lg" />
+      <Skeleton className="h-72 w-full rounded-lg" />
+    </div>
   );
 }
 
@@ -169,6 +216,24 @@ function Content({
   const activeAlerts = alerts?.alerts_summary.total ?? null;
   const highCritical = alerts?.alerts_summary.high_or_critical ?? null;
 
+  // Derive sparkline series once so they re-use the same trimming.
+  const tripsTrail = useMemo(
+    () => trail(monthly, (r) => r.total_trips),
+    [monthly],
+  );
+  const distanceTrail = useMemo(
+    () => trail(monthly, (r) => r.total_distance_km),
+    [monthly],
+  );
+  const costPerKmTrail = useMemo(
+    () => trail(monthly, (r) => r.cost_per_km),
+    [monthly],
+  );
+  const devicesTrail = useMemo(
+    () => trail(monthly, (r) => r.active_devices),
+    [monthly],
+  );
+
   return (
     <div className="space-y-6">
       {/* Fleet health composite strip — pulls from the v2.0 endpoints. */}
@@ -176,75 +241,119 @@ function Content({
         <KpiCard
           label="Fleet health"
           value={safetyScore !== null ? `${fmtInt(safetyScore)} / 100` : "—"}
+          icon={<ShieldCheck />}
+          tone="success"
           trend={
             safety?.kpi?.safety_score_delta == null
               ? undefined
               : { delta: safety.kpi.safety_score_delta, label: "vs prior" }
           }
-          accent={RISK_COLORS.low}
           hint="Safety score (higher = safer)"
+          loading={!safety}
         />
         <KpiCard
           label="Avg risk score"
           value={avgRisk !== null ? fmtDec(avgRisk) : "—"}
-          accent={RISK_COLORS.high}
+          icon={<Gauge />}
+          tone="warning"
           hint="Device-weighted, 0–100"
+          loading={!risk}
         />
         <KpiCard
           label="Active devices"
           value={fmtInt(kpi.active_devices)}
-          accent="#1f3a5f"
+          icon={<Cpu />}
+          tone="primary"
+          sparkline={devicesTrail}
         />
         <KpiCard
           label="Cost / km"
           value={fmtDec(kpi.cost_per_km)}
-          accent="#2a9df4"
+          icon={<Banknote />}
+          tone="accent"
+          sparkline={costPerKmTrail}
         />
         <KpiCard
           label="Active alerts"
           value={fmtInt(activeAlerts)}
-          accent={RISK_COLORS.critical}
+          icon={<AlertTriangle />}
+          tone="danger"
           hint={
             highCritical !== null
               ? `${fmtInt(highCritical)} high / critical`
               : undefined
           }
+          loading={!alerts}
         />
       </div>
 
+      {/* Operational KPI strip — fleet totals for latest month. */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard label="Active devices" value={fmtInt(kpi.active_devices)} />
-        <KpiCard label="Total trips" value={fmtInt(kpi.total_trips)} />
-        <KpiCard label="Distance (km)" value={fmtInt(kpi.total_distance_km)} />
-        <KpiCard label="Cost / km" value={fmtDec(kpi.cost_per_km)} />
+        <KpiCard
+          label="Active devices"
+          value={fmtInt(kpi.active_devices)}
+          icon={<Cpu />}
+          sparkline={devicesTrail}
+        />
+        <KpiCard
+          label="Total trips"
+          value={fmtInt(kpi.total_trips)}
+          icon={<Activity />}
+          sparkline={tripsTrail}
+        />
+        <KpiCard
+          label="Distance (km)"
+          value={fmtInt(kpi.total_distance_km)}
+          icon={<Route />}
+          sparkline={distanceTrail}
+        />
+        <KpiCard
+          label="Cost / km"
+          value={fmtDec(kpi.cost_per_km)}
+          icon={<Banknote />}
+          sparkline={costPerKmTrail}
+        />
       </div>
 
-      <p className="text-xs text-slate-500">
-        KPIs above are the fleet total for <strong>{kpi.year_month}</strong>, summed across{" "}
+      <p className="text-xs text-muted-foreground">
+        KPIs above are the fleet total for{" "}
+        <strong className="text-foreground">{kpi.year_month}</strong>, summed across{" "}
         {kpi.tenants_in_latest_month} tenant(s) in scope.
       </p>
 
-      <Panel title="Trip volume over time">
-        <LineChart
-          data={monthly as unknown as Array<Record<string, unknown>>}
-          xKey="year_month"
-          series={[{ dataKey: "total_trips", label: "Trips" }]}
-          yFormatter={(v) => fmtInt(v)}
-        />
-      </Panel>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Panel
+          title="Trip volume over time"
+          description="Monthly trip counts across all tenants in scope."
+          tone="primary"
+        >
+          <LineChart
+            data={monthly as unknown as Array<Record<string, unknown>>}
+            xKey="year_month"
+            series={[{ dataKey: "total_trips", label: "Trips" }]}
+            yFormatter={(v) => fmtInt(v)}
+          />
+        </Panel>
 
-      <Panel title="Operating cost trend">
-        <BarChart
-          data={monthly as unknown as Array<Record<string, unknown>>}
-          xKey="year_month"
-          series={[{ dataKey: "total_operating_cost", label: "Operating cost" }]}
-          yFormatter={(v) => fmtInt(v)}
-        />
-      </Panel>
+        <Panel
+          title="Operating cost trend"
+          description="Monthly aggregate spend across the fleet."
+          tone="accent"
+        >
+          <BarChart
+            data={monthly as unknown as Array<Record<string, unknown>>}
+            xKey="year_month"
+            series={[{ dataKey: "total_operating_cost", label: "Operating cost" }]}
+            yFormatter={(v) => fmtInt(v)}
+          />
+        </Panel>
+      </div>
 
       <Panel
-        title="Raw table"
+        title="Tenant × month detail"
         description="One row per tenant × month, ordered by year_month then tenant_id."
+        actions={<Badge variant="outline">{data.rows.length} rows</Badge>}
+        flush
       >
         <DataTable
           rows={data.rows}

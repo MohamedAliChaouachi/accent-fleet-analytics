@@ -258,6 +258,12 @@ class TestWriterFailOpen:
         verbatim in ai.query_log."""
         seen: dict[str, Any] = {}
 
+        # Minimal stub mirroring the SQLAlchemy ``Result.first()`` contract
+        # the writer relies on for RETURNING event_id.
+        class _StubResult:
+            def first(self) -> tuple[int]:
+                return (123,)
+
         class _CaptureConn:
             def __enter__(self) -> _CaptureConn:
                 return self
@@ -265,18 +271,20 @@ class TestWriterFailOpen:
             def __exit__(self, *exc: Any) -> None:
                 return None
 
-            def execute(self, _stmt: Any, params: dict[str, Any]) -> None:
+            def execute(self, _stmt: Any, params: dict[str, Any]) -> _StubResult:
                 seen.update(params)
+                return _StubResult()
 
         class _CaptureEngine:
             def begin(self) -> _CaptureConn:
                 return _CaptureConn()
 
         monkeypatch.setattr(audit_module, "get_engine", lambda: _CaptureEngine())
-        audit_module.write_ai_query_event(
+        event_id = audit_module.write_ai_query_event(
             user_id=1,
             tenant_id=42,
             question="x" * 50_000,
             stage="success",
         )
         assert len(seen["question"]) == 8000
+        assert event_id == 123

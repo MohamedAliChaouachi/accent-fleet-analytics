@@ -106,3 +106,103 @@ class AIQueryResponse(BaseModel):
     provider: str
     model: str
     elapsed_ms: int
+    # event_id of the audit row this answer was logged under. Surfaced so
+    # the client can POST /ai/feedback referencing the exact query that
+    # was rated, even after the user moves on to other questions.
+    event_id: int | None = None
+
+
+# ---------------------------------------------------------------------------
+# History
+# ---------------------------------------------------------------------------
+
+
+# Cap the page size of GET /ai/history. Picked at 100 because the UI
+# renders a sidebar list — anything bigger requires pagination anyway,
+# and an unbounded scan would let a single user pin the audit table.
+MAX_HISTORY_PAGE = 100
+
+
+class AIHistoryItem(BaseModel):
+    """One row of the user's own /v1/ai/query audit log.
+
+    Includes any feedback the user has left on this query so the UI can
+    render the right thumb state without a second round-trip.
+    """
+
+    event_id: int
+    occurred_at: str  # ISO-8601 UTC
+    question: str
+    sql: str | None
+    stage: str
+    row_count: int | None
+    elapsed_ms: int | None
+    chart_type: ChartType | None
+    provider: str | None
+    model: str | None
+    error_detail: str | None
+    # -1 / 1 / None — None means "no feedback left yet"
+    feedback_value: int | None = None
+    feedback_comment: str | None = None
+
+
+class AIHistoryResponse(BaseModel):
+    items: list[AIHistoryItem]
+
+
+# ---------------------------------------------------------------------------
+# Feedback
+# ---------------------------------------------------------------------------
+
+
+class AIFeedbackRequest(BaseModel):
+    """Thumbs up/down (+ optional comment) on a single past query.
+
+    ``event_id`` references ``ai.query_log.event_id``. The server upserts
+    on (user_id, event_id), so re-voting flips the value in place rather
+    than appending — matches how the UI is wired (one thumb per message).
+    """
+
+    event_id: int = Field(..., ge=1)
+    value: Literal[-1, 1]
+    comment: str | None = Field(default=None, max_length=2_000)
+
+
+class AIFeedbackResponse(BaseModel):
+    feedback_id: int
+    event_id: int
+    value: int
+    comment: str | None
+    created_at: str
+
+
+# ---------------------------------------------------------------------------
+# Schema explorer
+# ---------------------------------------------------------------------------
+
+
+class AISchemaColumn(BaseModel):
+    name: str
+    type: str
+    description: str = ""
+
+
+class AISchemaTable(BaseModel):
+    fqname: str
+    schema_name: str  # split out so the UI can group by schema cheaply
+    name: str
+    description: str
+    grain: str
+    tenant_scoped: bool
+    columns: list[AISchemaColumn]
+
+
+class AISchemaResponse(BaseModel):
+    """Snapshot of the curated catalog the SQL guard admits.
+
+    This is a *whitelist*, not a live ``information_schema`` dump — see
+    :mod:`app.ai.schemas.catalog` for why. The shape is stable across
+    requests within a deploy; the client may cache it indefinitely.
+    """
+
+    tables: list[AISchemaTable]
