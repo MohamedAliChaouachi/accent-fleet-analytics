@@ -107,7 +107,7 @@ function Content({ data }: { data: TenantBillingDashboardResponse }) {
           trend={toTrend(kpi.total_devices_delta, "vs prior")}
         />
         <KpiCard
-          label="Est. revenue (DA)"
+          label="Est. revenue (DT)"
           value={fmtInt(kpi.total_revenue)}
           icon={<Banknote />}
           tone="primary"
@@ -154,7 +154,7 @@ function Content({ data }: { data: TenantBillingDashboardResponse }) {
         </Panel>
         <Panel
           title="Estimated revenue"
-          description="DA per month."
+          description="DT per month."
           tone="primary"
         >
           <LineChart
@@ -230,7 +230,7 @@ function Content({ data }: { data: TenantBillingDashboardResponse }) {
                 })) as unknown as Array<Record<string, unknown>>
               }
               xKey="tier"
-              series={[{ dataKey: "revenue", label: "Revenue (DA)" }]}
+              series={[{ dataKey: "revenue", label: "Revenue (DT)" }]}
               yFormatter={(v) => fmtInt(v)}
             />
           )}
@@ -274,7 +274,7 @@ const TIER_COLUMNS: ReadonlyArray<ColumnDef<TenantBillingTier>> = [
   { key: "devices", header: "Devices", accessor: (r) => fmtInt(r.devices), align: "right" },
   {
     key: "revenue",
-    header: "Revenue (DA)",
+    header: "Revenue (DT)",
     accessor: (r) => fmtInt(r.revenue),
     align: "right",
   },
@@ -312,7 +312,7 @@ const PER_TENANT_COLUMNS: ReadonlyArray<ColumnDef<TenantBillingRow>> = [
   },
   {
     key: "estimated_revenue",
-    header: "Revenue (DA)",
+    header: "Revenue (DT)",
     accessor: (r) => fmtInt(r.estimated_revenue),
     align: "right",
   },
@@ -363,7 +363,7 @@ const RAW_COLUMNS: ReadonlyArray<ColumnDef<TenantBillingRow>> = [
   },
   {
     key: "estimated_revenue",
-    header: "Revenue (DA)",
+    header: "Revenue (DT)",
     accessor: (r) => fmtInt(r.estimated_revenue),
     align: "right",
   },

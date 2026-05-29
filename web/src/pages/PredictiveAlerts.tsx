@@ -65,11 +65,10 @@ export function PredictiveAlerts() {
 
   return (
     <PageContainer
-      title="Predictive alerts"
-      description="Proactive alerts plus a last-24h live stream. Auto-refreshes every 5 minutes; tap refresh for a manual pull."
+      title="Alerts"
+      description="Active alerts plus a last-24h live stream. Auto-refreshes every 5 minutes; tap refresh for a manual pull."
       actions={
         <div className="flex items-center gap-2">
-          <Badge variant="ai">AI-driven</Badge>
           <Button variant="outline" size="sm" onClick={onRefresh}>
             <RefreshCw className="size-3.5" />
             Refresh
@@ -90,7 +89,7 @@ export function PredictiveAlerts() {
                 : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground",
             )}
           >
-            {t === "alerts" ? "Active alerts (proactive)" : "Live stream (last 24h)"}
+            {t === "alerts" ? "Active alerts" : "Live stream (last 24h)"}
           </button>
         ))}
       </div>

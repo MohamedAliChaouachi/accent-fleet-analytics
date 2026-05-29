@@ -66,9 +66,17 @@ class ExecutiveKpi(BaseModel):
     year_month: str
     tenants_in_latest_month: int = Field(..., ge=0)
     active_devices: int | None = None
+    # Total registered devices (provisioned in dim_device) for the tenants in
+    # scope. Superset of active_devices, which only counts devices that
+    # actually moved in the latest month.
+    total_devices: int | None = None
     total_trips: int | None = None
     total_distance_km: float | None = None
     cost_per_km: float | None = None
+    # Total fuel cost (DT) for the latest month, summed across tenants in
+    # scope. Uses v_executive_dashboard's three-tier cascade so it reflects
+    # real refuel events / engine-burn / distance synthetic — never raw 0.
+    total_fuel_cost: float | None = None
 
 
 class ExecutiveDashboardResponse(BaseModel):

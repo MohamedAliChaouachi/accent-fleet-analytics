@@ -62,7 +62,7 @@ export const SHORTCUTS: ReadonlyArray<ShortcutSpec> = [
   { id: "go-maintenance", chord: "g m", label: "Go to Maintenance", group: "Navigation" },
   { id: "go-risk", chord: "g r", label: "Go to Risk & behavior", group: "Navigation" },
   { id: "go-safety", chord: "g s", label: "Go to Safety scorecard", group: "Navigation" },
-  { id: "go-alerts", chord: "g a", label: "Go to Predictive alerts", group: "Navigation" },
+  { id: "go-alerts", chord: "g a", label: "Go to Alerts", group: "Navigation" },
   { id: "go-efficiency", chord: "g f", label: "Go to Efficiency", group: "Navigation" },
   { id: "go-ai", chord: "g i", label: "Go to AI assistant", group: "Navigation" },
 ];

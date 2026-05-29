@@ -5,8 +5,10 @@ import {
   AlertTriangle,
   Banknote,
   Cpu,
+  Fuel,
   Gauge,
   Route,
+  ServerCog,
   ShieldCheck,
 } from "lucide-react";
 import {
@@ -214,6 +216,12 @@ function Content({
     () => trail(monthly, (r) => r.active_devices),
     [monthly],
   );
+  // Sparkline for the new Fuel cost card on the operational strip. Same
+  // source as the operating-cost bar chart below — month-aggregated total.
+  const fuelCostTrail = useMemo(
+    () => trail(monthly, (r) => r.total_fuel_cost),
+    [monthly],
+  );
 
   return (
     <div className="space-y-6">
@@ -268,13 +276,17 @@ function Content({
         />
       </div>
 
-      {/* Operational KPI strip — fleet totals for latest month. */}
+      {/* Operational KPI strip — fleet totals for latest month.
+       *  Two of these used to mirror the top "health" strip (Active devices
+       *  and Cost/km). We now split them so each strip carries a distinct
+       *  signal: the top strip is the headline composite, this one is the
+       *  raw operational total (registered devices, fleet fuel spend). */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
-          label="Active devices"
-          value={fmtInt(kpi.active_devices)}
-          icon={<Cpu />}
-          sparkline={devicesTrail}
+          label="Total devices"
+          value={fmtInt(kpi.total_devices)}
+          icon={<ServerCog />}
+          hint="Provisioned in dim_device"
         />
         <KpiCard
           label="Total trips"
@@ -289,10 +301,10 @@ function Content({
           sparkline={distanceTrail}
         />
         <KpiCard
-          label="Cost / km"
-          value={fmtDec(kpi.cost_per_km)}
-          icon={<Banknote />}
-          sparkline={costPerKmTrail}
+          label="Fuel cost (DT)"
+          value={fmtInt(kpi.total_fuel_cost)}
+          icon={<Fuel />}
+          sparkline={fuelCostTrail}
         />
       </div>
 

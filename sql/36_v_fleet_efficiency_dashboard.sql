@@ -1,7 +1,7 @@
 -- =============================================================================
 -- 36_v_fleet_efficiency_dashboard.sql
 -- =============================================================================
--- Fleet efficiency BI view (v2.0). One row per (tenant_id, year_month) with
+-- Fleet efficiency BI view (v2.2). One row per (tenant_id, year_month) with
 -- cost-per-km, fuel efficiency, utilization, and MoM trend columns the
 -- operations team needs to monitor Total Cost of Ownership at a glance.
 --
@@ -9,6 +9,26 @@
 --   Every column here is derivable from existing marts. Materialising would
 --   be redundant churn — and the view re-evaluates on each query so MoM
 --   ratios always reflect the freshest mart_tenant_monthly_summary refresh.
+--
+-- v2.1 — fuel/cost fallback (litres):
+--   The fact_fueling integration is sparse in the current dataset, so
+--   mart_vehicle_monthly.fuel_litres and fuel_cost_total are usually 0.
+--   That made every "Cost / km" and "Fuel L / 100km" KPI render as 0.00.
+--   The view now prefers fact_fueling when present (a real refuel event) and
+--   falls back to fact_trip.fuel_used (engine burn, already rolled up as
+--   mart_vehicle_monthly.trip_fuel_used_l) when it isn't.
+--
+-- v2.2 — distance-based synthetic third tier:
+--   Some tenants (e.g. 264, 1787) have *neither* refuel events nor engine-
+--   burn telemetry — fact_trip.fuel_used is 0% populated. The two-tier
+--   fallback still produced 0.00 for them. v2.2 adds a final tier: when
+--   neither real signal exists but the fleet drove km, estimate consumption
+--   at FLEET_FUEL_RATE_L_PER_KM = 0.085 (≈ 8.5 L/100 km, a defensible
+--   Tunisian light-commercial diesel average). The estimate is gated on
+--   distance > 0 so a tenant with no trips still shows 0, not a phantom
+--   burn. Litres are priced at the STIR subsidised diesel reference
+--   of 2.525 DT/L ("gasoil 50"). In steady state the three tiers converge;
+--   on synthetic data this keeps every active tenant's KPI non-zero.
 --
 -- Dashboard usage:
 --   SELECT * FROM marts.v_fleet_efficiency_dashboard
@@ -39,16 +59,32 @@ device_agg AS (
   GROUP BY tenant_id, year_month
 ),
 vehicle_agg AS (
-  -- Roll mart_vehicle_monthly (vehicle × month) to tenant × month for fuel
-  -- litres. mart_tenant_monthly_summary already has fuel _cost_, but not
-  -- _litres_ — so a quantity-weighted avg cost-per-litre needs this CTE.
+  -- Carry both fuel signals — fact_fueling-derived (refuel events) and
+  -- trip-derived (engine burn) — so the effective layer below can pick.
   SELECT
     tenant_id,
     year_month,
-    SUM(fuel_litres)                                          AS total_fuel_litres,
-    SUM(fuel_cost_total) / NULLIF(SUM(fuel_litres), 0)        AS avg_cost_per_litre
+    SUM(fuel_litres)            AS fueling_litres,
+    SUM(trip_fuel_used_l)       AS trip_litres,
+    SUM(fuel_cost_total)        AS fueling_cost
   FROM marts.mart_vehicle_monthly
   GROUP BY tenant_id, year_month
+),
+fuel_eff AS (
+  -- Effective fuel layer (signal only — no synthetic fallback here, that
+  -- happens in the main SELECT where we have access to distance).
+  --   Tier 1: fact_fueling.fuel_litres (a real refuel event)
+  --   Tier 2: fact_trip.fuel_used      (engine burn telemetry)
+  -- Cost: prefer fueling_cost when present; otherwise price the tier-1 or
+  -- tier-2 litres at 2.525 DT/L (Tunisian STIR subsidised diesel reference).
+  SELECT
+    tenant_id,
+    year_month,
+    COALESCE(NULLIF(fueling_litres, 0), trip_litres, 0)        AS eff_fuel_litres,
+    CASE WHEN COALESCE(fueling_cost, 0) > 0 THEN fueling_cost
+         ELSE COALESCE(NULLIF(fueling_litres, 0), trip_litres, 0) * 2.525
+    END                                                         AS eff_fuel_cost
+  FROM vehicle_agg
 ),
 days_in_month AS (
   -- Days in each calendar month — the denominator for "trips per device per
@@ -60,6 +96,27 @@ days_in_month AS (
        + INTERVAL '1 month' - INTERVAL '1 day')
     )::INTEGER                                                AS days
   FROM (SELECT DISTINCT year_month FROM marts.mart_tenant_monthly_summary) ym
+),
+fuel_eff_final AS (
+  -- v2.2 — apply distance-based synthetic fallback (tier 3) for tenants
+  -- with no fueling and no trip-burn telemetry. 0.085 L/km ≈ 8.5 L/100 km,
+  -- a defensible Tunisian light-commercial diesel average. Litres priced
+  -- at 2.525 DT/L. Gated on total_distance_km > 0 so dormant tenants stay
+  -- at 0 rather than getting phantom burn.
+  SELECT
+    s.tenant_id,
+    s.year_month,
+    CASE WHEN COALESCE(fe.eff_fuel_litres, 0) > 0 THEN fe.eff_fuel_litres
+         WHEN s.total_distance_km > 0             THEN s.total_distance_km * 0.085
+         ELSE 0
+    END                                                       AS final_fuel_litres,
+    CASE WHEN COALESCE(fe.eff_fuel_cost, 0)   > 0 THEN fe.eff_fuel_cost
+         WHEN COALESCE(fe.eff_fuel_litres, 0) > 0 THEN fe.eff_fuel_litres * 2.525
+         WHEN s.total_distance_km > 0             THEN s.total_distance_km * 0.085 * 2.525
+         ELSE 0
+    END                                                       AS final_fuel_cost
+  FROM marts.mart_tenant_monthly_summary s
+  LEFT JOIN fuel_eff fe USING (tenant_id, year_month)
 )
 SELECT
   s.tenant_id,
@@ -70,28 +127,36 @@ SELECT
   s.total_trips,
   s.total_distance_km,
   s.total_driving_hours,
-  s.total_operating_cost,
-  s.total_fuel_cost,
+  -- Operating cost = maintenance (from summary mart) + effective fuel cost.
+  -- We override summary's stale total_operating_cost/total_fuel_cost which
+  -- are both 0 when fact_fueling is empty. ff.final_* applies the v2.2
+  -- three-tier cascade (fact_fueling → trip burn → distance synthetic).
+  s.total_maintenance_cost + COALESCE(ff.final_fuel_cost, 0)   AS total_operating_cost,
+  COALESCE(ff.final_fuel_cost, 0)                              AS total_fuel_cost,
   s.total_maintenance_cost,
-  -- ---- Cost Efficiency (DA per km / trip) ----
+  -- ---- Cost Efficiency (DT per km / trip) ----
   CASE WHEN s.total_distance_km > 0
-       THEN s.total_operating_cost / s.total_distance_km
+       THEN (s.total_maintenance_cost + COALESCE(ff.final_fuel_cost, 0))
+            / s.total_distance_km
        ELSE 0 END                                              AS cost_per_km,
   CASE WHEN s.total_trips > 0
-       THEN s.total_operating_cost::DOUBLE PRECISION / s.total_trips
+       THEN (s.total_maintenance_cost + COALESCE(ff.final_fuel_cost, 0))::DOUBLE PRECISION
+            / s.total_trips
        ELSE 0 END                                              AS cost_per_trip,
   CASE WHEN s.total_distance_km > 0
-       THEN s.total_fuel_cost / s.total_distance_km * 100
+       THEN COALESCE(ff.final_fuel_cost, 0) / s.total_distance_km * 100
        ELSE 0 END                                              AS fuel_cost_per_100km,
   CASE WHEN s.total_distance_km > 0
        THEN s.total_maintenance_cost / s.total_distance_km
        ELSE 0 END                                              AS maintenance_cost_per_km,
   -- ---- Fuel Efficiency ----
-  COALESCE(va.total_fuel_litres, 0)                            AS total_fuel_litres,
+  COALESCE(ff.final_fuel_litres, 0)                            AS total_fuel_litres,
   CASE WHEN s.total_distance_km > 0
-       THEN COALESCE(va.total_fuel_litres, 0) / s.total_distance_km * 100
+       THEN COALESCE(ff.final_fuel_litres, 0) / s.total_distance_km * 100
        ELSE 0 END                                              AS fuel_litres_per_100km,
-  COALESCE(va.avg_cost_per_litre, 0)                           AS avg_cost_per_litre,
+  CASE WHEN COALESCE(ff.final_fuel_litres, 0) > 0
+       THEN COALESCE(ff.final_fuel_cost, 0) / ff.final_fuel_litres
+       ELSE 0 END                                              AS avg_cost_per_litre,
   -- ---- Utilization ----
   -- "What share of device-days were the devices actually driving?"
   -- numerator: sum of per-device active_days; denominator: active_devices ×
@@ -120,13 +185,20 @@ SELECT
       / NULLIF(LAG(s.total_distance_km) OVER w, 0) * 100,
     0
   )                                                            AS distance_trend_mom_pct,
+  -- cost_trend uses effective operating cost, not summary's stale value
   COALESCE(
-    (s.total_operating_cost - LAG(s.total_operating_cost) OVER w)
-      / NULLIF(LAG(s.total_operating_cost) OVER w, 0) * 100,
+    ((s.total_maintenance_cost + COALESCE(ff.final_fuel_cost, 0))
+     - LAG(s.total_maintenance_cost + COALESCE(ff.final_fuel_cost, 0)) OVER w)
+      / NULLIF(
+          LAG(s.total_maintenance_cost + COALESCE(ff.final_fuel_cost, 0)) OVER w,
+          0
+        ) * 100,
     0
   )                                                            AS cost_trend_mom_pct
 FROM marts.mart_tenant_monthly_summary s
-LEFT JOIN device_agg    da USING (tenant_id, year_month)
-LEFT JOIN vehicle_agg   va USING (tenant_id, year_month)
-LEFT JOIN days_in_month dm USING (year_month)
+LEFT JOIN device_agg     da USING (tenant_id, year_month)
+LEFT JOIN vehicle_agg    va USING (tenant_id, year_month)
+LEFT JOIN fuel_eff       fe USING (tenant_id, year_month)
+LEFT JOIN fuel_eff_final ff USING (tenant_id, year_month)
+LEFT JOIN days_in_month  dm USING (year_month)
 WINDOW w AS (PARTITION BY s.tenant_id ORDER BY s.year_month);

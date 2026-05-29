@@ -102,10 +102,20 @@ function LoadingSkeleton() {
 function Content({ data }: { data: FleetEfficiencyDashboardResponse }) {
   const { kpi, monthly, best_worst_latest: rows } = data;
 
-  const best5 = useMemo(() => rows.slice(0, 10), [rows]);
-  // Slice tail for worst, then reverse so the worst is first (most negative
-  // efficiency at the top of the list).
-  const worst5 = useMemo(() => [...rows.slice(-10)].reverse(), [rows]);
+  // Split the sorted-ascending list into two non-overlapping halves so Best
+  // and Worst never show the same tenants — capped at 5 per side so big
+  // fleets don't produce wall-of-text panels. With an odd row count the
+  // median tenant is dropped (neither best nor worst); with very few
+  // tenants both sides may end up empty and the panels collapse to a hint.
+  const { best5, worst5 } = useMemo(() => {
+    const half = Math.floor(rows.length / 2);
+    const k = Math.min(5, half);
+    return {
+      best5: rows.slice(0, k),
+      worst5: rows.slice(rows.length - k).reverse(),
+    };
+  }, [rows]);
+  const tooFewForSplit = best5.length === 0;
 
   if (!kpi || monthly.length === 0) {
     return (
@@ -120,7 +130,7 @@ function Content({ data }: { data: FleetEfficiencyDashboardResponse }) {
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <KpiCard
-          label="Cost / km (DA)"
+          label="Cost / km (DT)"
           value={fmtDec(kpi.cost_per_km)}
           icon={<Coins />}
           tone="primary"
@@ -197,32 +207,40 @@ function Content({ data }: { data: FleetEfficiencyDashboardResponse }) {
         </Panel>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Panel
-          title={`Best efficiency · ${kpi.year_month}`}
-          description="Ordered by cost/km ascending (lower is better)."
-          tone="accent"
-          flush
-        >
-          <DataTable
-            rows={best5}
-            columns={PER_TENANT_COLUMNS}
-            rowKey={(r) => r.tenant_id ?? "all"}
-          />
-        </Panel>
-        <Panel
-          title={`Worst efficiency · ${kpi.year_month}`}
-          description="Ordered by cost/km descending — investigate cost drivers."
-          tone="warning"
-          flush
-        >
-          <DataTable
-            rows={worst5}
-            columns={PER_TENANT_COLUMNS}
-            rowKey={(r) => r.tenant_id ?? "all"}
-          />
-        </Panel>
-      </div>
+      {tooFewForSplit ? (
+        <StateMessage tone="info">
+          Only {rows.length} tenant{rows.length === 1 ? "" : "s"} in scope for{" "}
+          {kpi.year_month} — need at least 2 to split best vs worst. See the
+          per-tenant detail table below.
+        </StateMessage>
+      ) : (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <Panel
+            title={`Best efficiency · ${kpi.year_month}`}
+            description={`Lowest ${best5.length} cost/km tenant${best5.length === 1 ? "" : "s"} of ${rows.length}.`}
+            tone="accent"
+            flush
+          >
+            <DataTable
+              rows={best5}
+              columns={PER_TENANT_COLUMNS}
+              rowKey={(r) => r.tenant_id ?? "all"}
+            />
+          </Panel>
+          <Panel
+            title={`Worst efficiency · ${kpi.year_month}`}
+            description={`Highest ${worst5.length} cost/km tenant${worst5.length === 1 ? "" : "s"} of ${rows.length} — investigate cost drivers.`}
+            tone="warning"
+            flush
+          >
+            <DataTable
+              rows={worst5}
+              columns={PER_TENANT_COLUMNS}
+              rowKey={(r) => r.tenant_id ?? "all"}
+            />
+          </Panel>
+        </div>
+      )}
 
       <Panel
         title="Per-tenant detail"

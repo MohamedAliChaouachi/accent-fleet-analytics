@@ -102,9 +102,15 @@ export interface ExecutiveKpi {
   year_month: string;
   tenants_in_latest_month: number;
   active_devices: number | null;
+  /** Provisioned devices across tenants in scope (dim_device). Superset of
+   *  active_devices, which only counts devices that moved this month. */
+  total_devices: number | null;
   total_trips: number | null;
   total_distance_km: number | null;
   cost_per_km: number | null;
+  /** Latest-month fuel cost in DT, summed across tenants. Uses the
+   *  v_executive_dashboard three-tier cascade so it's never raw 0. */
+  total_fuel_cost: number | null;
 }
 
 export interface ExecutiveDashboardResponse {

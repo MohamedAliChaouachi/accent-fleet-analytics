@@ -214,13 +214,27 @@ def fetch_executive(conn: Connection, f: DashboardFilters) -> ExecutiveDashboard
     kpi = None
     if monthly:
         latest = monthly[-1]
+        # total_devices: provisioned count from dim_device, scoped to the
+        # same tenants as the rest of the KPIs. Distinct from active_devices
+        # which is "moved this month". RLS / SET ROLE on the connection has
+        # already pinned visibility; the tenant_clause here is the optional
+        # explicit filter from the URL params.
+        total_devices_sql = (
+            "SELECT COUNT(DISTINCT device_id) "
+            "FROM warehouse.dim_device WHERE 1=1 " + f.tenant_clause()
+        )
+        total_devices_row = conn.execute(text(total_devices_sql), f.params()).scalar()
+        total_devices = int(total_devices_row) if total_devices_row is not None else None
+
         kpi = ExecutiveKpi(
             year_month=latest.year_month,
             tenants_in_latest_month=len(tenants_in_month[latest.year_month]),
             active_devices=latest.active_devices,
+            total_devices=total_devices,
             total_trips=latest.total_trips,
             total_distance_km=latest.total_distance_km,
             cost_per_km=latest.cost_per_km,
+            total_fuel_cost=latest.total_fuel_cost,
         )
 
     return ExecutiveDashboardResponse(rows=rows, monthly=monthly, kpi=kpi)
@@ -619,8 +633,14 @@ def fetch_safety_scorecard(
         dist = b["total_distance_km"]
         os_rate = (b["total_overspeed"] / dist * 1000) if dist else 0.0
         harsh_rate = (b["total_harsh_events"] / dist * 1000) if dist else 0.0
-        # Composite safety_score formula mirrors the SQL view exactly.
-        safety_score = max(0.0, min(100.0, 100.0 - 2 * os_rate - 4 * harsh_rate))
+        # Composite safety_score formula mirrors v_safety_scorecard_dashboard
+        # exactly. Weights 0.4 (overspeed) and 0.1 (harsh) are calibrated for
+        # the observed per-1000km distributions in this fleet so scores land
+        # in the 40–90 band; an older draft used 2× / 4× which made the
+        # fleet aggregate (~200 harsh/1000km) blow past the 100-point budget
+        # and clamp every score to 0. Re-tune in lockstep with the SQL view
+        # if the underlying event generator is replaced with a real feed.
+        safety_score = max(0.0, min(100.0, 100.0 - 0.4 * os_rate - 0.1 * harsh_rate))
         scored = b["scored_devices"]
         hr_pct = (b["high_or_critical_devices"] / scored * 100) if scored else 0.0
         monthly.append(

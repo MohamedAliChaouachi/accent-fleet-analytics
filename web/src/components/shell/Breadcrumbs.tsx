@@ -11,7 +11,7 @@ const SEGMENT_LABELS: Record<string, string> = {
   risk: "Risk & behavior",
   "fleet-efficiency": "Fleet efficiency",
   safety: "Safety scorecard",
-  alerts: "Predictive alerts",
+  alerts: "Alerts",
   billing: "Tenant billing",
   ai: "Ask the data",
 };

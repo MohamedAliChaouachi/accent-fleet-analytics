@@ -41,9 +41,9 @@ const NAV_ITEMS: ReadonlyArray<NavItem> = [
   { to: "/operations", label: "Operations", icon: Activity, group: "analytics" },
   { to: "/maintenance", label: "Maintenance", icon: Wrench, group: "analytics" },
   { to: "/fleet-efficiency", label: "Efficiency", icon: Gauge, group: "analytics" },
+  { to: "/alerts", label: "Alerts", icon: AlertTriangle, group: "analytics" },
   { to: "/risk", label: "Risk & behavior", icon: ShieldAlert, group: "intelligence" },
   { to: "/safety", label: "Safety scorecard", icon: ShieldCheck, group: "intelligence" },
-  { to: "/alerts", label: "Predictive alerts", icon: AlertTriangle, group: "intelligence" },
   { to: "/ai", label: "Ask the data", icon: Bot, group: "intelligence", badge: "AI" },
   { to: "/billing", label: "Tenant billing", icon: Building2, group: "admin", superadminOnly: true },
 ];

@@ -144,7 +144,13 @@
       "Bash(curl -s http://localhost:3000)",
       "Bash(curl -s \"http://localhost:3000/assets/index-CkI7V_Bc.js\")",
       "Bash(curl -s \"http://localhost:3000/assets/index-2Fat2ve2.js\")",
-      "Bash(curl -s \"http://localhost:3000/assets/index-H7MHmX0v.js\")"
+      "Bash(curl -s \"http://localhost:3000/assets/index-H7MHmX0v.js\")",
+      "Bash(docker system *)",
+      "Bash(mkdir -p \"C:\\\\Users\\\\amine\\\\Downloads\\\\report_extracted\")",
+      "Bash(unzip -o \"C:\\\\Users\\\\amine\\\\Downloads\\\\report.zip\")",
+      "Bash(grep -n \"\\\\\\\\\\\\\\\\begin{figure}\\\\[h\\\\]\\\\|\\\\\\\\\\\\\\\\begin{table}\\\\[h\\\\]\" \"C:\\\\Users\\\\amine\\\\Downloads\\\\report_extracted\\\\chapters\\\\chapter7_deployment.tex\")",
+      "Bash(curl -s -X POST http://127.0.0.1:8000/v1/auth/login -H \"Content-Type: application/json\" -d '{\"email\":\"superadmin@accent.local\",\"password\":\"daldal\"}')",
+      "Bash(python -c \"import sys,json; t=json.load\\(sys.stdin\\); print\\('TOKEN_OK' if 'access_token' in t else t\\); open\\('/tmp/tok','w'\\).write\\(t.get\\('access_token',''\\)\\)\")"
     ]
   }
 }
