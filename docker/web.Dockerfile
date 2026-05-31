@@ -32,4 +32,4 @@ COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 80
 
 HEALTHCHECK --interval=15s --timeout=3s --start-period=10s --retries=5 \
-    CMD wget -q -O - http://localhost/healthz || exit 1
+    CMD wget -q -O - http://127.0.0.1/healthz || exit 1
