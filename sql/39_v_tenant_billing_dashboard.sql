@@ -8,9 +8,9 @@
 --   - estimate revenue and infrastructure cost allocation
 --
 -- Pricing model (v2.0 placeholder — wire to a real pricing table later):
---   Tier 1 (1-50 devices):    100 DA / device / month
---   Tier 2 (51-200 devices):  80 DA / device / month
---   Tier 3 (201+ devices):    60 DA / device / month
+--   Tier 1 (1-50 devices):    100 DT / device / month
+--   Tier 2 (51-200 devices):  80 DT / device / month
+--   Tier 3 (201+ devices):    60 DT / device / month
 --
 -- Storage is approximated from row counts × avg per-row footprint per fact
 -- table. A true pg_total_relation_size split per-tenant requires partition-

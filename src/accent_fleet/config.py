@@ -119,6 +119,29 @@ class Settings(BaseSettings):
         15 * 60, alias="AUTH_LOGIN_RATE_WINDOW_SECONDS"
     )
 
+    # --- Fuel price (dashboards 33/36 value fuel cost in DT/L) ---
+    # Provider-agnostic fetcher (src/accent_fleet/ingestion/fuel_price.py)
+    # pulls the live diesel price and stores it in warehouse.ref_fuel_price.
+    # When the URL is empty the fetcher is disabled and the dashboards use the
+    # last stored value (or the seeded STIR reference). The price is a
+    # regulated/slow-moving figure, so the refresh runs monthly.
+    #   FUEL_PRICE_API_URL       — provider endpoint returning JSON. Empty = off.
+    #   FUEL_PRICE_API_KEY       — sent as the Authorization header when set.
+    #   FUEL_PRICE_JSON_PATH     — dotted path into the JSON to the numeric price.
+    #   FUEL_PRICE_FUEL_TYPE     — registry key ('diesel'); matches the views.
+    #   FUEL_PRICE_CURRENCY      — currency label stored alongside the price.
+    #   FUEL_PRICE_FALLBACK_PER_LITRE — STIR "gasoil 50" reference, last resort.
+    #   FUEL_PRICE_REFRESH_DAYS  — skip the fetch if a live row is newer than this.
+    fuel_price_api_url: str = Field("", alias="FUEL_PRICE_API_URL")
+    fuel_price_api_key: str = Field("", alias="FUEL_PRICE_API_KEY")
+    fuel_price_json_path: str = Field("price", alias="FUEL_PRICE_JSON_PATH")
+    fuel_price_fuel_type: str = Field("diesel", alias="FUEL_PRICE_FUEL_TYPE")
+    fuel_price_currency: str = Field("DT", alias="FUEL_PRICE_CURRENCY")
+    fuel_price_fallback_per_litre: float = Field(
+        2.525, alias="FUEL_PRICE_FALLBACK_PER_LITRE"
+    )
+    fuel_price_refresh_days: int = Field(28, alias="FUEL_PRICE_REFRESH_DAYS")
+
     @field_validator(
         "pipeline_batch_size",
         "pipeline_overlap_minutes",

@@ -83,6 +83,50 @@ CREATE INDEX IF NOT EXISTS idx_quarantine_device
   ON warehouse.quarantine_rejected (tenant_id, device_id, event_time);
 
 -- -----------------------------------------------------------------------------
+-- ref_fuel_price: reference fuel price used to value fuel cost in the
+-- executive (sql/33) and fleet-efficiency (sql/36) dashboards.
+-- -----------------------------------------------------------------------------
+-- Append-only history; one row per refresh. The dashboards read the most
+-- recent row per fuel_type (ORDER BY effective_at DESC LIMIT 1) and fall back
+-- to the seeded STIR reference if the table is somehow empty.
+--
+-- Populated by src/accent_fleet/ingestion/fuel_price.py, which pulls a live
+-- price from a configurable provider (FUEL_PRICE_API_URL) on a monthly
+-- cadence. When the provider is unset or unreachable the fetcher writes
+-- nothing, so the latest good value (or this seed) keeps the dashboards live.
+--
+-- NOT tenant-scoped: deliberately left out of sql/51_rls_policies.sql so it
+-- carries no RLS and is readable by every role (the security_invoker
+-- dashboard views query it as accent_app). sql/59 grants SELECT on all
+-- warehouse tables to accent_app, which covers this one.
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS warehouse.ref_fuel_price (
+  fuel_type        TEXT          NOT NULL DEFAULT 'diesel',
+  price_per_litre  NUMERIC(10,4) NOT NULL CHECK (price_per_litre > 0),
+  currency         TEXT          NOT NULL DEFAULT 'DT',
+  source           TEXT          NOT NULL,   -- 'STIR-reference' | API host
+  effective_at     TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (fuel_type, effective_at)
+);
+
+-- Seed the STIR subsidised diesel ("gasoil 50") reference of 2.525 DT/L so the
+-- dashboards have a value before the first live fetch. Idempotent: the fixed
+-- effective_at means re-running bootstrap never inserts a duplicate seed.
+INSERT INTO warehouse.ref_fuel_price (fuel_type, price_per_litre, currency, source, effective_at)
+VALUES ('diesel', 2.525, 'DT', 'STIR-reference', 'epoch'::timestamptz)
+ON CONFLICT (fuel_type, effective_at) DO NOTHING;
+
+-- Grant SELECT to accent_app when that role already exists (it is created
+-- later, in sql/50-52). Guarded so a fresh bootstrap — which runs this file
+-- before the roles exist — does not error. sql/59 also backfills this grant.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'accent_app') THEN
+    GRANT SELECT ON warehouse.ref_fuel_price TO accent_app;
+  END IF;
+END $$;
+
+-- -----------------------------------------------------------------------------
 -- Seed the watermark table with the tables the pipeline watches. Idempotent
 -- via ON CONFLICT DO NOTHING — re-running bootstrap never resets progress.
 -- -----------------------------------------------------------------------------

@@ -13,9 +13,15 @@
 --
 --   This view now derives a corrected fuel cost using a three-tier
 --   cascade — fact_fueling → fact_trip.fuel_used → distance synthetic
---   (0.085 L/km, priced at 2.525 DT/L) — and republishes total_fuel_cost,
---   total_operating_cost and cost_per_km from it. Activity columns
---   (devices, trips, km, alerts) pass through unchanged.
+--   (0.085 L/km, priced at the current fuel price) — and republishes
+--   total_fuel_cost, total_operating_cost and cost_per_km from it. Activity
+--   columns (devices, trips, km, alerts) pass through unchanged.
+--
+-- Fuel price (DT/L) is read live from warehouse.ref_fuel_price (latest row
+-- per fuel_type), refreshed monthly from a configurable provider by
+-- src/accent_fleet/ingestion/fuel_price.py. If that table is empty the
+-- COALESCE falls back to the 2.525 DT/L STIR reference, so the cascade
+-- always has a price.
 --
 -- Dashboard usage:
 --   SELECT * FROM marts.v_executive_dashboard WHERE tenant_id = :t;
@@ -23,6 +29,17 @@
 
 CREATE OR REPLACE VIEW marts.v_executive_dashboard AS
 WITH
+fuel_price AS (
+  -- Current diesel price in DT/L. Latest row in warehouse.ref_fuel_price,
+  -- with the STIR reference (2.525) as the empty-table fallback.
+  SELECT COALESCE(
+    (SELECT price_per_litre
+       FROM warehouse.ref_fuel_price
+      WHERE fuel_type = 'diesel'
+      ORDER BY effective_at DESC
+      LIMIT 1),
+    2.525)::numeric AS dt_per_litre
+),
 vehicle_agg AS (
   -- Roll mart_vehicle_monthly up to tenant × month for the two real fuel
   -- signals (fueling-fact litres/cost; trip-burn telemetry litres).
@@ -45,12 +62,13 @@ fuel_eff_final AS (
     s.year_month,
     CASE WHEN COALESCE(va.fueling_cost, 0) > 0 THEN va.fueling_cost
          WHEN COALESCE(NULLIF(va.fueling_litres, 0), va.trip_litres, 0) > 0
-              THEN COALESCE(NULLIF(va.fueling_litres, 0), va.trip_litres, 0) * 2.525
+              THEN COALESCE(NULLIF(va.fueling_litres, 0), va.trip_litres, 0) * fp.dt_per_litre
          WHEN s.total_distance_km > 0
-              THEN s.total_distance_km * 0.085 * 2.525
+              THEN s.total_distance_km * 0.085 * fp.dt_per_litre
          ELSE 0
     END                                                       AS final_fuel_cost
   FROM marts.mart_tenant_monthly_summary s
+  CROSS JOIN fuel_price fp
   LEFT JOIN vehicle_agg va USING (tenant_id, year_month)
 )
 SELECT

@@ -38,6 +38,19 @@
 
 CREATE OR REPLACE VIEW marts.v_fleet_efficiency_dashboard AS
 WITH
+fuel_price AS (
+  -- Current diesel price in DT/L. Latest row in warehouse.ref_fuel_price,
+  -- refreshed monthly from a configurable provider by
+  -- src/accent_fleet/ingestion/fuel_price.py. Falls back to the STIR
+  -- reference (2.525 DT/L) when the table is empty.
+  SELECT COALESCE(
+    (SELECT price_per_litre
+       FROM warehouse.ref_fuel_price
+      WHERE fuel_type = 'diesel'
+      ORDER BY effective_at DESC
+      LIMIT 1),
+    2.525)::numeric AS dt_per_litre
+),
 device_agg AS (
   -- Roll mart_device_monthly_behavior (device × month) up to tenant × month
   -- for "active device-days" (utilization denominator) and the typical trip
@@ -76,15 +89,17 @@ fuel_eff AS (
   --   Tier 1: fact_fueling.fuel_litres (a real refuel event)
   --   Tier 2: fact_trip.fuel_used      (engine burn telemetry)
   -- Cost: prefer fueling_cost when present; otherwise price the tier-1 or
-  -- tier-2 litres at 2.525 DT/L (Tunisian STIR subsidised diesel reference).
+  -- tier-2 litres at the current fuel price (fuel_price.dt_per_litre, sourced
+  -- from warehouse.ref_fuel_price with the STIR reference as fallback).
   SELECT
     tenant_id,
     year_month,
     COALESCE(NULLIF(fueling_litres, 0), trip_litres, 0)        AS eff_fuel_litres,
     CASE WHEN COALESCE(fueling_cost, 0) > 0 THEN fueling_cost
-         ELSE COALESCE(NULLIF(fueling_litres, 0), trip_litres, 0) * 2.525
+         ELSE COALESCE(NULLIF(fueling_litres, 0), trip_litres, 0) * fp.dt_per_litre
     END                                                         AS eff_fuel_cost
   FROM vehicle_agg
+  CROSS JOIN fuel_price fp
 ),
 days_in_month AS (
   -- Days in each calendar month — the denominator for "trips per device per
@@ -100,9 +115,10 @@ days_in_month AS (
 fuel_eff_final AS (
   -- v2.2 — apply distance-based synthetic fallback (tier 3) for tenants
   -- with no fueling and no trip-burn telemetry. 0.085 L/km ≈ 8.5 L/100 km,
-  -- a defensible Tunisian light-commercial diesel average. Litres priced
-  -- at 2.525 DT/L. Gated on total_distance_km > 0 so dormant tenants stay
-  -- at 0 rather than getting phantom burn.
+  -- a defensible Tunisian light-commercial diesel average. Litres priced at
+  -- the current fuel price (fuel_price.dt_per_litre). Gated on
+  -- total_distance_km > 0 so dormant tenants stay at 0 rather than getting
+  -- phantom burn.
   SELECT
     s.tenant_id,
     s.year_month,
@@ -111,11 +127,12 @@ fuel_eff_final AS (
          ELSE 0
     END                                                       AS final_fuel_litres,
     CASE WHEN COALESCE(fe.eff_fuel_cost, 0)   > 0 THEN fe.eff_fuel_cost
-         WHEN COALESCE(fe.eff_fuel_litres, 0) > 0 THEN fe.eff_fuel_litres * 2.525
-         WHEN s.total_distance_km > 0             THEN s.total_distance_km * 0.085 * 2.525
+         WHEN COALESCE(fe.eff_fuel_litres, 0) > 0 THEN fe.eff_fuel_litres * fp.dt_per_litre
+         WHEN s.total_distance_km > 0             THEN s.total_distance_km * 0.085 * fp.dt_per_litre
          ELSE 0
     END                                                       AS final_fuel_cost
   FROM marts.mart_tenant_monthly_summary s
+  CROSS JOIN fuel_price fp
   LEFT JOIN fuel_eff fe USING (tenant_id, year_month)
 )
 SELECT

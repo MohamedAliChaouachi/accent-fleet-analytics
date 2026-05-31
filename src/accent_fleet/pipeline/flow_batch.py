@@ -355,6 +355,25 @@ def task_ensure_views() -> None:
             run_sql_file(conn, f)
 
 
+@task
+def task_refresh_fuel_price() -> None:
+    """Refresh warehouse.ref_fuel_price from the configured provider.
+
+    Non-fatal: a missing/unreachable provider or a DB hiccup must never fail
+    the flow, because the dashboards fall back to the last good value (or the
+    seeded STIR reference). The refresh itself is gated to run at most once per
+    FUEL_PRICE_REFRESH_DAYS, so calling this every run is cheap.
+    """
+    try:
+        from accent_fleet.ingestion.fuel_price import refresh_fuel_price
+
+        result = refresh_fuel_price()
+        log.info("fuel_price.refresh", status=result.status,
+                 price=result.price_per_litre, source=result.source)
+    except Exception as exc:  # noqa: BLE001 — best-effort, never fail the flow
+        log.warning("fuel_price.refresh_error", error=str(exc))
+
+
 def _view_name_from_sql_filename(filename: str) -> str | None:
     """Derive `v_<name>` from `NN_v_<name>.sql`. Returns None if mismatched."""
     base = filename.rsplit(".", 1)[0]
@@ -675,6 +694,7 @@ def bootstrap_flow() -> None:
         task_refresh_dimensions()
         task_ensure_mart_structure()
         task_ensure_views()
+        task_refresh_fuel_price()
         end_run(run_id, status="success")
     except Exception as exc:
         end_run(run_id, status="failed", error_message=str(exc))
@@ -755,6 +775,10 @@ def incremental_flow(window_end: datetime | None = None) -> None:
 
         # 5. Views are views — they don't need refreshing, but we keep
         #    the task in case we switch to materialised views later.
+
+        # 5b. Refresh the reference fuel price (monthly-gated, best-effort).
+        #     Feeds the DT/L used by the executive + fleet-efficiency views.
+        task_refresh_fuel_price()
 
         # 6. Validation
         task_run_validation(run_id)
