@@ -108,6 +108,9 @@ services:
     environment:
       # Make sure the API talks to the in-network MLflow regardless of .env.
       MLFLOW_TRACKING_URI: http://mlflow:5000
+    extra_hosts:
+      # Native Linux Docker needs this for PG_HOST=host.docker.internal.
+      - "host.docker.internal:host-gateway"
     ports:
       - "${API_PORT:-8000}:8000"
     volumes:
@@ -158,6 +161,9 @@ services:
       # First-run Prefect 3 ephemeral API startup can exceed the 20s default
       # inside Docker Desktop while migrations/imports warm up.
       PREFECT_SERVER_EPHEMERAL_STARTUP_TIMEOUT_SECONDS: 120
+    extra_hosts:
+      # Native Linux Docker needs this for PG_HOST=host.docker.internal.
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./models:/app/models
     networks: [fleet-net]
@@ -192,6 +198,9 @@ services:
       # localhost which only works on the host; inside the compose network we
       # must hit the mlflow service by name.
       MLFLOW_TRACKING_URI: http://mlflow:5000
+    extra_hosts:
+      # Native Linux Docker needs this for PG_HOST=host.docker.internal.
+      - "host.docker.internal:host-gateway"
     volumes:
       # Same model artefacts directory as etl so a promoted candidate's local
       # files (kmeans.pkl, scaler.pkl, train_meta.json) appear where the api
