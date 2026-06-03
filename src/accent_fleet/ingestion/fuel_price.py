@@ -61,10 +61,7 @@ def _extract(payload: Any, dotted_path: str) -> Any:
     """
     node = payload
     for segment in dotted_path.split("."):
-        if isinstance(node, list):
-            node = node[int(segment)]
-        else:
-            node = node[segment]
+        node = node[int(segment)] if isinstance(node, list) else node[segment]
     return node
 
 
