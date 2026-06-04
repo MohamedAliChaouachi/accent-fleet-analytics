@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
@@ -10,16 +10,6 @@ import { cn } from "@/lib/cn";
 
 const SIDEBAR_PREF_KEY = "accent.sidebar.collapsed";
 
-// App shell. Wraps every authenticated route. Owns:
-//   - Sidebar collapse state (persisted to localStorage)
-//   - Global keyboard shortcuts (assistant toggle, ? help, g-prefixed nav)
-//   - Floating action button visibility (hidden on /ai where the
-//     full-page assistant already lives)
-//   - ChatPanel + ShortcutsHelp mount + open/closed state
-//
-// Shortcut wiring goes through `useShortcuts` so the help overlay's
-// cheat-sheet always matches reality. The Radix Dialog inside ChatPanel
-// handles Esc-to-close on its own, so we don't repeat it here.
 export function DashboardShell() {
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
@@ -30,6 +20,7 @@ export function DashboardShell() {
   const location = useLocation();
   const navigate = useNavigate();
   const onAiPage = location.pathname.startsWith("/ai");
+  const mainRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     try {
@@ -39,9 +30,13 @@ export function DashboardShell() {
     }
   }, [collapsed]);
 
-  // Auto-close the slide-out when the user is on /ai — the full-page
-  // assistant is already showing the same conversation, so the drawer
-  // would just be visual noise on top of itself.
+  // Scroll to top on route change
+  useEffect(() => {
+    if (mainRef.current) {
+      mainRef.current.scrollTop = 0;
+    }
+  }, [location.pathname]);
+
   useEffect(() => {
     if (onAiPage && assistantOpen) setAssistantOpen(false);
   }, [onAiPage, assistantOpen]);
@@ -52,14 +47,11 @@ export function DashboardShell() {
 
   useShortcuts({
     "toggle-assistant": () => {
-      // On /ai the panel is hidden (page already provides the assistant)
-      // — a toggle here would just confuse.
       if (onAiPage) return;
       setAssistantOpen((v) => !v);
     },
     help: () => setHelpOpen((v) => !v),
     search: () => {
-      // Focus the topbar search if present; falls back to a no-op.
       const el = document.querySelector<HTMLInputElement>(
         "[data-topbar-search]",
       );
@@ -80,7 +72,7 @@ export function DashboardShell() {
       <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((c) => !c)} />
       <div className={cn("flex min-w-0 flex-1 flex-col")}>
         <TopBar onOpenAssistant={openAssistant} />
-        <main className="flex-1 overflow-y-auto">
+        <main ref={mainRef} className="flex-1 overflow-y-auto">
           <Outlet />
         </main>
       </div>

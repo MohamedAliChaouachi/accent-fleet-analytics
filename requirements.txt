@@ -77,3 +77,4 @@ sqlglot>=25.0.0
 # missing SDK doesn't break app boot, only /v1/ai/query for that vendor).
 openai>=1.40.0
 anthropic>=0.34.0
+redis[hiredis]>=5.0.0

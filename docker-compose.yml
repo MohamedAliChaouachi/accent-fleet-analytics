@@ -255,11 +255,31 @@ services:
       - "9644:9644"
     networks: [fleet-net]
 
+  # ---------------------------------------------------------------------------
+  # Redis cache for dashboard and AI query caching.
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: accent_redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [fleet-net]
+
 networks:
   fleet-net:
     driver: bridge
 
 volumes:
+  redis_data:
   postgres_data:
   mlflow_data:
   mlflow_artifacts:

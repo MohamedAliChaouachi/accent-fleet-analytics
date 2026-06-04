@@ -1,5 +1,4 @@
-"""
-Provider factory.
+"""Provider factory.
 
 Single entry point — :func:`get_provider` — returns a singleton
 configured from environment variables. Tests inject a stub via
@@ -13,13 +12,11 @@ from threading import Lock
 from app.ai.config import AISettings, ai_settings
 from app.ai.providers.base import BaseLLMProvider, LLMProviderError, LLMResponse
 
-# Lazily-built singleton plus a test override slot, guarded by _lock.
 _lock = Lock()
 _singleton: BaseLLMProvider | None = None
 _override: BaseLLMProvider | None = None
 
 
-# No-network provider used by tests in place of a real LLM.
 class _StubProvider(BaseLLMProvider):
     """Deterministic non-network provider for tests.
 
@@ -41,7 +38,6 @@ class _StubProvider(BaseLLMProvider):
         return LLMResponse(text="Stub provider response.", model=self.model)
 
 
-# Construct the concrete provider selected by AI_PROVIDER.
 def _build(settings: AISettings) -> BaseLLMProvider:
     if settings.provider == "stub":
         return _StubProvider()
@@ -53,16 +49,18 @@ def _build(settings: AISettings) -> BaseLLMProvider:
         from app.ai.providers.anthropic_provider import AnthropicProvider
 
         return AnthropicProvider(settings)
+    if settings.provider == "bedrock":
+        from app.ai.providers.bedrock_provider import BedrockProvider
+
+        return BedrockProvider(settings)
     raise LLMProviderError(f"unknown AI_PROVIDER={settings.provider!r}")
 
 
 def get_provider() -> BaseLLMProvider:
     """Return the configured singleton, or the test-injected override."""
-    # Test override short-circuits before any real provider is built.
     if _override is not None:
         return _override
     global _singleton
-    # Double-checked build under the lock so it happens at most once.
     with _lock:
         if _singleton is None:
             _singleton = _build(ai_settings())

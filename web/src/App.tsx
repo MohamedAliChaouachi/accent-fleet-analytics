@@ -18,10 +18,6 @@ import { PredictiveAlerts } from "@/pages/PredictiveAlerts";
 import { TenantBilling } from "@/pages/TenantBilling";
 import { AIChat } from "@/pages/AIChat";
 
-// Routes that only make sense for cross-tenant operators. A
-// tenant_admin who deep-links to /billing should land on their default
-// page instead of seeing a "Tenant billing" view that's structurally
-// cross-tenant.
 function SuperadminOnly({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   if (user && user.role !== "superadmin") {
@@ -30,9 +26,6 @@ function SuperadminOnly({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-// staleTime is 5 min: the marts views are refreshed by the Prefect
-// incremental flow on the same cadence, so anything fresher wouldn't
-// pay rent.
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

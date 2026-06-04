@@ -9,7 +9,8 @@ USER root
 RUN pip install --default-timeout=300 \
         "argon2-cffi>=23.1.0" \
         "PyJWT>=2.9.0" \
-        "email-validator>=2.2.0"
+        "email-validator>=2.2.0" \
+        "boto3>=1.34.0"
 USER fleet
 
 # API code lives in /app/app. Models live in /app/models (mounted as a volume in compose).

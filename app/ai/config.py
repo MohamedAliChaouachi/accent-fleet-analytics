@@ -1,5 +1,4 @@
-"""
-AI-assistant settings.
+"""AI-assistant settings.
 
 Kept separate from the global `accent_fleet.config.settings` so the AI
 feature can be deployed independently (e.g. behind a feature flag) and so
@@ -18,11 +17,9 @@ from typing import Literal
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Selectable LLM backends; "stub" is the test-only deterministic provider.
-Provider = Literal["openai", "anthropic", "stub"]
+Provider = Literal["openai", "anthropic", "bedrock", "stub"]
 
 
-# Pydantic settings model read from env vars / .env at startup.
 class AISettings(BaseSettings):
     """Runtime configuration for the Text2SQL assistant.
 
@@ -43,6 +40,10 @@ class AISettings(BaseSettings):
     # --- Anthropic ---
     anthropic_api_key: str = Field("", alias="ANTHROPIC_API_KEY")
     anthropic_model: str = Field("claude-3-5-sonnet-latest", alias="ANTHROPIC_MODEL")
+
+    # --- AWS Bedrock ---
+    bedrock_model: str = Field("zai.glm-5", alias="BEDROCK_MODEL")
+    aws_region: str = Field("us-east-1", alias="AWS_REGION")
 
     # --- Execution guardrails ---
     # Hard cap on rows the executor will return. Two reasons: (1) cap the
@@ -79,7 +80,6 @@ class AISettings(BaseSettings):
     )
 
 
-# Process-wide singleton accessor — settings are read from env once.
 @lru_cache(maxsize=1)
 def ai_settings() -> AISettings:
     return AISettings()  # type: ignore[call-arg]

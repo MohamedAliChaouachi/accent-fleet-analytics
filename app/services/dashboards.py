@@ -1,7 +1,7 @@
 """
 Service layer for the /v1/dashboards/* endpoints.
 
-Wraps the marts views (``marts.v_executive_dashboard``,
+Wraps the marts views (``marts.mv_executive_dashboard``,
 ``v_operational_dashboard``, ``v_maintenance_dashboard``,
 ``v_fleet_risk_dashboard``, ``v_device_risk_profile``,
 ``fact_device_cluster_assignment``) and the per-month / per-category
@@ -170,7 +170,7 @@ def fetch_executive(conn: Connection, f: DashboardFilters) -> ExecutiveDashboard
     # Pull per-tenant x month rows within the filter window.
     sql = f"""
         SELECT *
-          FROM marts.v_executive_dashboard
+          FROM marts.mv_executive_dashboard
          WHERE 1=1
            {f.tenant_clause()}
            {f.month_clause('year_month')}
@@ -292,7 +292,7 @@ def fetch_operations(conn: Connection, f: DashboardFilters) -> OperationsDashboa
 def fetch_maintenance(conn: Connection, f: DashboardFilters) -> MaintenanceDashboardResponse:
     sql = f"""
         SELECT *
-          FROM marts.v_maintenance_dashboard
+          FROM marts.mv_maintenance_dashboard
          WHERE 1=1
            {f.tenant_clause()}
            {f.month_clause('year_month')}
