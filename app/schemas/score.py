@@ -61,6 +61,7 @@ class FeatureVector(BaseModel):
         return self.model_dump(exclude_none=False)
 
 
+# Risk scoring result: 0-100 score, category band, and z-score components.
 class RiskScoreResponse(BaseModel):
     risk_score: float = Field(..., ge=0, le=100)
     category: str = Field(..., description="low | moderate | high | critical")
@@ -82,6 +83,7 @@ class RiskScoreResponse(BaseModel):
     version: str = Field(..., description="Config hash that produced this score.")
 
 
+# Cluster assignment result: cluster id + distance to its centroid.
 class ClusterScoreResponse(BaseModel):
     cluster_id: int
     distance: float = Field(..., description="Euclidean distance to the assigned centroid.")

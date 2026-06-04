@@ -62,6 +62,7 @@ def read_user_history(*, user_id: int, limit: int) -> list[dict[str, object]]:
     migration hasn't run — returns an empty list and logs once, mirroring
     the fail-open posture of the audit writer.
     """
+    # Read the user's rows; on any DB error fail open with an empty list.
     try:
         with get_engine().connect() as conn:
             result = conn.execute(

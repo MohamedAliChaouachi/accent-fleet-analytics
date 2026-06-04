@@ -77,6 +77,7 @@ def ai_query(
     principal: Principal = CurrentPrincipalDep,
 ) -> AIQueryResponse:
     """Run one natural-language question through the Text2SQL pipeline."""
+    # Derive the authoritative tenant scope (JWT-driven, not body-trusted).
     tenant_id = _resolve_tenant(principal=principal, requested=body.tenant_id)
 
     # Rate limit AFTER tenant resolution so the tenant bucket sees the
@@ -108,6 +109,7 @@ def ai_query(
     # dropped silently so a runaway client can't blow up the prompt.
     trimmed_history = tuple(body.history[-MAX_HISTORY_TURNS:])
 
+    # Hand off to the pipeline; translate its typed failures into HTTP below.
     try:
         response = run(
             inp=PipelineInput(
@@ -192,6 +194,7 @@ def _resolve_tenant(*, principal: Principal, requested: int | None) -> int:
        requires a single bind value — supporting cross-tenant queries
        is a Phase 2 feature with its own audit story.
     """
+    # Superadmin must name a tenant explicitly; no "all tenants" in v1.
     if principal.is_superadmin:
         if requested is None:
             raise HTTPException(
@@ -206,7 +209,7 @@ def _resolve_tenant(*, principal: Principal, requested: int | None) -> int:
             )
         return requested
 
-    # tenant_user / tenant_admin path
+    # tenant_user / tenant_admin path: reject any body tenant that differs.
     if requested is not None and requested != principal.tenant_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -244,6 +247,7 @@ def ai_history(
         ),
     ),
 ) -> AIHistoryResponse:
+    # Per-user history rows, already shaped by the reader for the schema.
     rows = read_user_history(user_id=principal.user_id, limit=limit)
     return AIHistoryResponse(items=[AIHistoryItem(**r) for r in rows])
 
@@ -270,6 +274,7 @@ def ai_feedback(
     was aged out). Either way the UI's right move is to drop the local
     thumbs state and re-fetch ``/history``.
     """
+    # Upsert the vote; map ownership misses to 404 and DB errors to 500.
     try:
         row = upsert_feedback(
             user_id=principal.user_id,
@@ -311,6 +316,7 @@ def ai_schema(
     ``information_schema`` dump, so adding a table here is an explicit
     decision (see ``app/ai/schemas/catalog.py``).
     """
+    # Serialize each in-process catalog spec into the wire schema model.
     tables = [
         AISchemaTable(
             fqname=spec.fqname,

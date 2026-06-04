@@ -27,6 +27,7 @@ from app.deps import ClusterPredictorDep, RiskPredictorDep
 
 logger = logging.getLogger("accent_fleet.api.admin")
 
+# Admin router — all endpoints gated behind the X-API-Key check below.
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
@@ -54,6 +55,7 @@ def reload_model(
     x_api_key: str | None = Header(default=None, alias="X-API-Key"),
 ) -> dict[str, str]:
     """Force a fresh ClusterPredictor load from MLflow."""
+    # Authenticate first, then re-read the latest Production cluster model.
     _check_admin_key(x_api_key)
     logger.info("admin: reloading cluster model")
     info = predictor.reload()
@@ -75,6 +77,7 @@ def reload_risk_model(
     x_api_key: str | None = Header(default=None, alias="X-API-Key"),
 ) -> dict[str, str]:
     """Force a fresh RiskPredictor load from MLflow."""
+    # Authenticate first, then re-read the latest per-tenant risk model.
     _check_admin_key(x_api_key)
     logger.info("admin: reloading risk model")
     info = predictor.reload()

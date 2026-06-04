@@ -29,6 +29,7 @@ DIMENSION_FILES = [
 
 def refresh_all_dimensions() -> None:
     """Run every dimension loader in order. Idempotent."""
+    # Full-reload each dimension SQL file inside one transaction.
     with transaction() as conn:
         for filename in DIMENSION_FILES:
             log.info("dim_refresh.start", file=filename)

@@ -142,6 +142,7 @@ class Settings(BaseSettings):
     )
     fuel_price_refresh_days: int = Field(28, alias="FUEL_PRICE_REFRESH_DAYS")
 
+    # Strip trailing inline comments off int env vars before pydantic coerces them.
     @field_validator(
         "pipeline_batch_size",
         "pipeline_overlap_minutes",
@@ -162,6 +163,7 @@ class Settings(BaseSettings):
             value = value.split("#", 1)[0].strip()
         return value
 
+    # Build the psycopg v3 connection URL, URL-encoding credentials and SSL mode.
     @property
     def sqlalchemy_url(self) -> str:
         """
@@ -183,37 +185,44 @@ class Settings(BaseSettings):
 # -----------------------------------------------------------------------------
 # YAML config loaders
 # -----------------------------------------------------------------------------
+# Read and parse a YAML file into a plain dict.
 def _load_yaml(path: Path) -> dict[str, Any]:
     with open(path, encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
+# Cached loader for pipeline behaviour config.
 @lru_cache(maxsize=1)
 def load_pipeline_config() -> dict[str, Any]:
     return _load_yaml(CONFIG_DIR / "pipeline.yaml")
 
 
+# Cached loader for the cleaning rule catalog.
 @lru_cache(maxsize=1)
 def load_cleaning_rules() -> dict[str, Any]:
     return _load_yaml(CONFIG_DIR / "cleaning_rules.yaml")
 
 
+# Cached loader for feature definitions.
 @lru_cache(maxsize=1)
 def load_feature_definitions() -> dict[str, Any]:
     return _load_yaml(CONFIG_DIR / "feature_definitions.yaml")
 
 
+# Fingerprint the config YAMLs so each ETL run records which rules/features it used.
 def config_hash() -> str:
     """
     MD5 of the three config YAMLs, stored on every etl_run_log row.
     Lets us tell later whether any two runs used the same rules/features.
     """
     h = hashlib.md5()
+    # Fold each config file's bytes into one combined digest.
     for name in ("pipeline.yaml", "cleaning_rules.yaml", "feature_definitions.yaml"):
         h.update((CONFIG_DIR / name).read_bytes())
     return h.hexdigest()
 
 
+# Cached singleton so settings are loaded/validated only once per process.
 @lru_cache(maxsize=1)
 def settings() -> Settings:
     """Singleton accessor. Cached so `settings()` is cheap everywhere."""

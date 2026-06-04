@@ -61,6 +61,7 @@ MIN_ROWS = 50
 ARTIFACT_DIR = PROJECT_ROOT / "models" / "clustering"
 
 
+# Summary of a clustering training run — consumed by the promotion gate.
 @dataclass
 class TrainResult:
     k: int
@@ -74,11 +75,13 @@ class TrainResult:
 
 
 # ---------------------------------------------------------------------------
+# Read a list of tenant ids (e.g. expected/required) from pipeline config.
 def _configured_tenants(key: str) -> tuple[int, ...]:
     cfg = load_pipeline_config().get("modeling") or {}
     return tuple(int(t) for t in cfg.get(key, []) or [])
 
 
+# Count training rows per tenant for coverage logging.
 def _rows_by_tenant(df: pd.DataFrame) -> dict[int, int]:
     if df.empty or "tenant_id" not in df:
         return {}
@@ -86,6 +89,7 @@ def _rows_by_tenant(df: pd.DataFrame) -> dict[int, int]:
     return {int(tenant_id): int(n) for tenant_id, n in counts.items()}
 
 
+# Loud-fail on missing required tenants, soft-warn on missing expected ones.
 def _validate_tenant_coverage(df: pd.DataFrame) -> None:
     rows_by_tenant = _rows_by_tenant(df)
     present = set(rows_by_tenant)
@@ -94,10 +98,12 @@ def _validate_tenant_coverage(df: pd.DataFrame) -> None:
 
     logger.info("training tenant coverage: %s", rows_by_tenant)
 
+    # Expected-but-absent tenants are only a warning.
     missing_expected = sorted(expected - present)
     if missing_expected:
         logger.warning("expected modeling tenant(s) absent after filters: %s", missing_expected)
 
+    # Required-but-absent tenants abort training with remediation steps.
     missing_required = sorted(required - present)
     if missing_required:
         raise ValueError(
@@ -123,6 +129,7 @@ def load_training_frame(month_from: str = "2025-01") -> pd.DataFrame:
     with get_engine().connect() as conn:
         df = pd.read_sql(sql, conn, params={"month_from": month_from})
     logger.info("loaded %d rows for clustering (window >= %s)", len(df), month_from)
+    # Fail fast if a required tenant produced no rows.
     _validate_tenant_coverage(df)
     return df
 
@@ -136,10 +143,12 @@ def fit_clustering(
     if len(df) < MIN_ROWS:
         raise ValueError(f"need at least {MIN_ROWS} rows, got {len(df)}")
 
+    # Build the feature matrix and standardise it before clustering.
     X = df[list(FEATURES)].fillna(0).to_numpy(dtype=float)
     scaler = StandardScaler().fit(X)
     Xs = scaler.transform(X)
 
+    # Sweep k and keep the fit with the highest silhouette.
     best_km: KMeans | None = None
     best_sil = -1.0
     best_k = -1
@@ -157,10 +166,12 @@ def fit_clustering(
     if best_km is None:
         raise RuntimeError("KMeans selection produced no model")
 
+    # Tally cluster sizes from the winning model's labels.
     labels, counts = np.unique(best_km.labels_, return_counts=True)
     # strict=True: labels and counts come from np.unique → guaranteed same length.
     sizes = {int(lab): int(c) for lab, c in zip(labels, counts, strict=True)}
 
+    # Package metrics and tenant coverage into the result object.
     result = TrainResult(
         k=best_k,
         silhouette=float(best_sil),
@@ -176,9 +187,11 @@ def fit_clustering(
 # ---------------------------------------------------------------------------
 def save_local(kmeans: KMeans, scaler: StandardScaler, result: TrainResult) -> None:
     """Write joblib + metadata under models/clustering/."""
+    # Dump both estimators as joblib files.
     ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
     joblib.dump(kmeans, ARTIFACT_DIR / "kmeans_v1.joblib")
     joblib.dump(scaler, ARTIFACT_DIR / "scaler_v1.joblib")
+    # Write the metadata sidecar the inference loader reads.
     metadata: dict[str, Any] = {
         "version": "v1",
         "trained_at": datetime.now(UTC).isoformat(),
@@ -210,6 +223,7 @@ def log_to_mlflow(
     server unreachable). Returns the version even when promote=False so
     callers can gate the promotion themselves (see ml/promotion.py).
     """
+    # mlflow optional — skip registry logging when it isn't installed.
     try:
         import mlflow
         import mlflow.sklearn
@@ -222,12 +236,14 @@ def log_to_mlflow(
     mlflow.set_tracking_uri(s.mlflow_tracking_uri)
     mlflow.set_experiment(s.mlflow_experiment_name)
 
+    # Bundle the estimators + feature order as one registered model.
     artifact = {
         "kmeans": kmeans,
         "scaler": scaler,
         "feature_order": result.feature_order,
     }
 
+    # Log params, metrics, metadata, and the model under one run.
     with mlflow.start_run() as run:
         mlflow.log_params({
             "k": result.k,
@@ -257,6 +273,7 @@ def log_to_mlflow(
     versions = client.search_model_versions(f"name='{s.mlflow_model_name}'")
     latest = max(versions, key=lambda v: int(v.version))
 
+    # Promote to the serving stage only when asked; the gate handles the rest.
     if promote:
         client.transition_model_version_stage(
             name=s.mlflow_model_name,
@@ -283,6 +300,7 @@ def run(month_from: str = "2025-01", promote: bool = True) -> TrainResult:
         level=os.environ.get("PIPELINE_LOG_LEVEL", "INFO"),
         format="%(asctime)s %(levelname)s %(name)s | %(message)s",
     )
+    # Load → fit → persist locally → register in MLflow.
     df = load_training_frame(month_from=month_from)
     kmeans, scaler, result = fit_clustering(df)
     result.training_window = f">= {month_from}"

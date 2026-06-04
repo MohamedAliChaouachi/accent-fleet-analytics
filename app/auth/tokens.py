@@ -63,6 +63,7 @@ class IssuedTokens:
     refresh_token_id: str    # UUID string; the opaque value handed to client
 
 
+# Return the configured signing key, or raise if it is unset/empty.
 def _require_signing_key() -> str:
     key = settings().jwt_signing_key
     if not key:
@@ -83,10 +84,12 @@ def issue_access_token(principal: Principal) -> tuple[str, int]:
     compatibility, costs nothing now, and would be a breaking change
     to add later.
     """
+    # Compute issue/expiry timestamps from the configured access TTL.
     s = settings()
     key = _require_signing_key()
     now = int(time.time())
     exp = now + int(s.jwt_access_ttl_seconds)
+    # Assemble the OIDC-compatible claim set, including a unique jti.
     payload: dict[str, Any] = {
         "sub": str(principal.user_id),
         "tnt": principal.tenant_id,  # None for superadmin; OK in JSON
@@ -96,6 +99,7 @@ def issue_access_token(principal: Principal) -> tuple[str, int]:
         "exp": exp,
         "jti": uuid.uuid4().hex,
     }
+    # Sign the payload with the current key and return token + expiry.
     token = jwt.encode(payload, key, algorithm=ALGORITHM)
     return token, exp
 
@@ -121,12 +125,14 @@ def verify_access_token(token: str) -> dict[str, Any]:
     set) for the rotation window. Raises `TokenExpiredError` on `exp` in
     the past, `TokenInvalidError` on everything else.
     """
+    # Build the candidate key list: current first, then previous if rotating.
     s = settings()
     current = _require_signing_key()
     keys = [current]
     if s.jwt_signing_key_previous:
         keys.append(s.jwt_signing_key_previous)
 
+    # Try each key until one decodes; track the last failure for reporting.
     last_error: Exception | None = None
     for key in keys:
         try:
@@ -149,6 +155,7 @@ def verify_access_token(token: str) -> dict[str, Any]:
             last_error = exc
             continue
 
+    # No key accepted the token: surface it as an invalid-token error.
     raise TokenInvalidError(str(last_error) if last_error else "token rejected")
 
 
@@ -160,6 +167,7 @@ def principal_from_payload(payload: dict[str, Any]) -> Principal:
     (e.g. role=tenant_user but tnt is None) — the verify step alone
     can't catch that because pyjwt doesn't know our invariants.
     """
+    # Extract and coerce the claims; any shape error is a malformed token.
     try:
         user_id = int(payload["sub"])
         tenant_id_raw = payload.get("tnt")
@@ -169,6 +177,7 @@ def principal_from_payload(payload: dict[str, Any]) -> Principal:
     except (KeyError, TypeError, ValueError) as exc:
         raise TokenInvalidError(f"malformed claims: {exc}") from exc
 
+    # Construct the Principal; its invariant check may reject the claims.
     try:
         return Principal(
             user_id=user_id,

@@ -89,11 +89,13 @@ def write_ai_query_event(
     turn a successful /ai/query into a 500. Operators should monitor
     the ``ai.audit.write_failed`` log line to notice gaps.
     """
+    # Warn (but still write) on a stage value this writer doesn't know.
     if stage not in STAGES:
         # Don't reject — we want the row even if the caller passes a
         # newly-added stage that this writer hasn't been updated for.
         log.warning("ai.audit.unknown_stage", extra={"stage": stage})
 
+    # Assemble the bind parameters for the single INSERT.
     params = {
         "user_id": user_id,
         "tenant_id": tenant_id,
@@ -111,6 +113,7 @@ def write_ai_query_event(
         "error_detail": error_detail,
     }
 
+    # Commit on a dedicated connection so the row survives request rollback.
     try:
         with get_engine().begin() as conn:
             row = conn.execute(_INSERT_STMT, params).first()

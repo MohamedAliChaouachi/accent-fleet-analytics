@@ -79,6 +79,7 @@ class ExecutiveKpi(BaseModel):
     total_fuel_cost: float | None = None
 
 
+# Full executive page payload: raw rows + monthly aggregate + KPI strip.
 class ExecutiveDashboardResponse(BaseModel):
     rows: list[ExecutiveMonthlyRow]
     monthly: list[ExecutiveMonthlyAggregate]
@@ -119,6 +120,7 @@ class OperationsDailyRow(BaseModel):
     alerts_7d_avg: float | None = None
 
 
+# Window totals for the operations KPI strip.
 class OperationsKpi(BaseModel):
     total_trips: int = 0
     total_distance_km: float = 0.0
@@ -126,6 +128,7 @@ class OperationsKpi(BaseModel):
     total_overspeed: int = 0
 
 
+# Full operations page payload: daily rows + KPI strip.
 class OperationsDashboardResponse(BaseModel):
     rows: list[OperationsDailyRow]
     kpi: OperationsKpi
@@ -164,11 +167,13 @@ class MaintenanceRow(BaseModel):
     cost_rank_in_tenant: int | None = None
 
 
+# Window totals for the maintenance KPI strip.
 class MaintenanceKpi(BaseModel):
     maintenance_events: int = 0
     total_cost: float = 0.0
 
 
+# Full maintenance page payload: rows + KPI strip + top-cost vehicles.
 class MaintenanceDashboardResponse(BaseModel):
     rows: list[MaintenanceRow]
     kpi: MaintenanceKpi
@@ -181,6 +186,7 @@ class MaintenanceDashboardResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+# One per-tenant fleet risk rollup row from v_fleet_risk_dashboard.
 class FleetRiskRow(BaseModel):
     tenant_id: int | None = None
     tenant_label: str | None = None
@@ -198,6 +204,7 @@ class FleetRiskRow(BaseModel):
     fleet_avg_night_ratio: float | None = None
 
 
+# One device's rolling 3-month risk row from v_device_risk_profile.
 class DeviceRiskRow(BaseModel):
     tenant_id: int | None = None
     device_id: int
@@ -211,6 +218,7 @@ class DeviceRiskRow(BaseModel):
     risk_category: str | None = None
 
 
+# One device-month cluster assignment joined with its risk score.
 class ClusterAssignmentRow(BaseModel):
     tenant_id: int | None = None
     device_id: int
@@ -222,22 +230,26 @@ class ClusterAssignmentRow(BaseModel):
     risk_category: str | None = None
 
 
+# Device count per risk category, for the distribution chart.
 class RiskCategoryCount(BaseModel):
     category: str
     device_count: int
 
 
+# One cell of the cluster x risk-category crosstab.
 class ClusterRiskCrossRow(BaseModel):
     cluster_id: int
     risk_category: str
     devices: int
 
 
+# Device count per cluster.
 class ClusterSize(BaseModel):
     cluster_id: int
     devices: int
 
 
+# Full risk page payload: fleet rollup, device rows, and cluster overlays.
 class RiskDashboardResponse(BaseModel):
     fleet: list[FleetRiskRow]
     devices: list[DeviceRiskRow]
@@ -319,6 +331,7 @@ class FleetEfficiencyKpi(BaseModel):
     total_trips: int | None = None
 
 
+# Full fleet-efficiency page payload: rows, monthly aggregate, KPI, best/worst.
 class FleetEfficiencyDashboardResponse(BaseModel):
     rows: list[FleetEfficiencyRow]
     monthly: list[FleetEfficiencyMonthly]
@@ -403,6 +416,7 @@ class SafetyScorecardKpi(BaseModel):
     total_distance_km: float | None = None
 
 
+# Full safety-scorecard page payload: rows, monthly aggregate, KPI strip.
 class SafetyScorecardDashboardResponse(BaseModel):
     rows: list[SafetyScorecardRow]
     monthly: list[SafetyScorecardMonthly]
@@ -450,6 +464,7 @@ class LiveAlertRow(BaseModel):
     priority_score: float | None = None
 
 
+# Generic labelled count, e.g. alerts grouped by severity or type.
 class AlertCount(BaseModel):
     key: str
     count: int
@@ -466,6 +481,7 @@ class PredictiveAlertsSummary(BaseModel):
     by_type: list[AlertCount] = Field(default_factory=list)
 
 
+# Pre-aggregated counts for the live 24h alert stream.
 class LiveAlertsSummary(BaseModel):
     total: int = 0
     high_or_critical: int = 0
@@ -474,6 +490,7 @@ class LiveAlertsSummary(BaseModel):
     by_category: list[AlertCount] = Field(default_factory=list)
 
 
+# Full predictive-alerts page payload: proactive alerts + live stream + summaries.
 class PredictiveAlertsDashboardResponse(BaseModel):
     alerts: list[PredictiveAlertRow]
     stream: list[LiveAlertRow]
@@ -541,6 +558,7 @@ class TenantBillingKpi(BaseModel):
     total_storage_delta_pct: float | None = None
 
 
+# Per-pricing-tier rollup of tenants, devices, and revenue.
 class TenantBillingTier(BaseModel):
     pricing_tier: int
     tenants: int
@@ -548,6 +566,7 @@ class TenantBillingTier(BaseModel):
     revenue: float
 
 
+# Full tenant-billing page payload: rows, monthly aggregate, KPI, tier breakdown.
 class TenantBillingDashboardResponse(BaseModel):
     rows: list[TenantBillingRow]
     monthly: list[TenantBillingMonthly]

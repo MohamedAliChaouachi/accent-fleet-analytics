@@ -42,21 +42,26 @@ class FeatureRegistry:
     """Read-only catalogue of the 35 features for Project P1."""
 
     def __init__(self, specs: list[FeatureSpec]) -> None:
+        # Build two lookup indexes up front: by feature name and by group.
         self._by_name: dict[str, FeatureSpec] = {s.name: s for s in specs}
         self._by_group: dict[str, list[FeatureSpec]] = {}
         for s in specs:
             self._by_group.setdefault(s.group, []).append(s)
 
     # ------------------------------------------------------------------
+    # Look up a single feature spec by name (raises KeyError if absent).
     def get(self, name: str) -> FeatureSpec:
         return self._by_name[name]
 
+    # Every feature spec, in insertion (YAML) order.
     def all_features(self) -> list[FeatureSpec]:
         return list(self._by_name.values())
 
+    # All features belonging to one group (empty list if unknown).
     def group(self, name: str) -> list[FeatureSpec]:
         return self._by_group.get(name, [])
 
+    # The set of distinct group names.
     def groups(self) -> list[str]:
         return list(self._by_group.keys())
 
@@ -72,9 +77,11 @@ class FeatureRegistry:
 
 
 # ---------------------------------------------------------------------------
+# Turn one YAML feature-group block into a list of FeatureSpec objects.
 def _parse_group(group_cfg: dict[str, Any]) -> list[FeatureSpec]:
     out: list[FeatureSpec] = []
     group_name = group_cfg["name"]
+    # One spec per feature entry, pulling optional keys with safe defaults.
     for f in group_cfg["features"]:
         out.append(
             FeatureSpec(
@@ -96,6 +103,7 @@ def _parse_group(group_cfg: dict[str, Any]) -> list[FeatureSpec]:
 def load_feature_registry() -> FeatureRegistry:
     """Build the registry from YAML. Cached — safe to call repeatedly."""
     cfg = load_feature_definitions()
+    # Flatten every group's features into a single spec list.
     specs: list[FeatureSpec] = []
     for group in cfg["feature_groups"]:
         specs.extend(_parse_group(group))

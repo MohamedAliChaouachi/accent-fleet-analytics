@@ -146,6 +146,7 @@ class TrainResult:
 # ---------------------------------------------------------------------------
 # YAML accessors
 # ---------------------------------------------------------------------------
+# Load the risk_score_model block from YAML, erroring if it's absent.
 def _risk_model_config() -> dict[str, Any]:
     cfg = load_feature_definitions().get("risk_score_model") or {}
     if not cfg:
@@ -166,6 +167,7 @@ def _min_rows_per_tenant() -> int:
 
 def _quantiles() -> tuple[float, float, float]:
     """Return (low->moderate, moderate->high, high->critical) quantiles."""
+    # Fall back to 0.50/0.80/0.95 when YAML omits a boundary.
     q = _risk_model_config().get("thresholds", {}).get("quantiles", {}) or {}
     return (
         float(q.get("low_to_moderate", 0.50)),
@@ -190,11 +192,13 @@ def _mlflow_model_stage() -> str:
 # Tenant cohort validation — same shape as train_clustering._validate_tenant_coverage
 # but reusable independently.
 # ---------------------------------------------------------------------------
+# Read a list of tenant ids (e.g. expected/required) from pipeline config.
 def _configured_tenants(key: str) -> tuple[int, ...]:
     cfg = load_pipeline_config().get("modeling") or {}
     return tuple(int(t) for t in cfg.get(key, []) or [])
 
 
+# Count training rows per tenant for coverage logging.
 def _rows_by_tenant(df: pd.DataFrame) -> dict[int, int]:
     if df.empty or "tenant_id" not in df:
         return {}
@@ -216,10 +220,12 @@ def _validate_tenant_coverage(df: pd.DataFrame) -> None:
 
     logger.info("risk training tenant coverage: %s", rows_by_tenant)
 
+    # Expected-but-absent tenants are only a warning.
     missing_expected = sorted(expected - present)
     if missing_expected:
         logger.warning("expected modeling tenant(s) absent after filters: %s", missing_expected)
 
+    # Required-but-absent tenants abort training with remediation steps.
     missing_required = sorted(required - present)
     if missing_required:
         raise ValueError(
@@ -255,6 +261,7 @@ def load_training_frame(month_from: str = "2025-01") -> pd.DataFrame:
     with get_engine().connect() as conn:
         df = pd.read_sql(sql, conn, params={"month_from": month_from})
     logger.info("loaded %d rows for risk training (window >= %s)", len(df), month_from)
+    # Fail fast if a required tenant produced no rows.
     _validate_tenant_coverage(df)
     return df
 
@@ -346,18 +353,22 @@ def fit_one_tenant(
     Returns ``None`` when the tenant has fewer than ``min_rows`` rows — the
     caller treats this as a skip and logs it in ``TrainResult.skipped_tenants``.
     """
+    # Skip tenants without enough rows to fit a meaningful model.
     rows = len(sub)
     threshold = min_rows if min_rows is not None else _min_rows_per_tenant()
     if rows < threshold:
         return None
 
+    # Resolve hyperparameters/quantiles, falling back to YAML defaults.
     hp = dict(hyperparams or _hyperparams())
     quants = quantiles or _quantiles()
 
+    # Standardise features before fitting the Isolation Forest.
     X = sub[list(FEATURES)].fillna(0).to_numpy(dtype=float)
     scaler = StandardScaler().fit(X)
     Xs = scaler.transform(X)
 
+    # Fit the per-tenant Isolation Forest.
     iso = IsolationForest(
         n_estimators=int(hp.get("n_estimators", 200)),
         contamination=hp.get("contamination", "auto"),
@@ -365,10 +376,12 @@ def fit_one_tenant(
         n_jobs=int(hp.get("n_jobs", -1)),
     ).fit(Xs)
 
+    # Capture fit-time raw-score bounds so inference rescales identically.
     raw = -iso.decision_function(Xs)  # higher = more anomalous
     raw_min = float(raw.min())
     raw_max = float(raw.max())
 
+    # Rescale to 0-100, derive band thresholds, and label the training rows.
     scores = rescale_raw_to_0_100(raw, raw_min, raw_max)
     t_m, t_h, t_c = quantile_thresholds(scores, quants)
     labels = categorize_scores(scores, (t_m, t_h, t_c))
@@ -412,10 +425,12 @@ def fit_risk_model(df: pd.DataFrame) -> tuple[dict[str, Any], TrainResult]:
     if "tenant_id" not in df.columns:
         raise ValueError("training frame must include a tenant_id column")
 
+    # Resolve fit-time config shared across all tenants.
     hp = _hyperparams()
     quants = _quantiles()
     threshold = _min_rows_per_tenant()
 
+    # Seed the bundled artifact with feature order and reproducibility config.
     artifact: dict[str, Any] = {
         "tenants": {},
         "feature_order": list(FEATURES),
@@ -439,6 +454,7 @@ def fit_risk_model(df: pd.DataFrame) -> tuple[dict[str, Any], TrainResult]:
     overall_counts = {"low": 0, "moderate": 0, "high": 0, "critical": 0}
     overall_n = 0
 
+    # Fit each tenant independently, accumulating per-tenant + cohort stats.
     for tenant_id, sub in df.groupby("tenant_id", sort=True):
         tid = int(tenant_id)
         entry = fit_one_tenant(
@@ -447,12 +463,14 @@ def fit_risk_model(df: pd.DataFrame) -> tuple[dict[str, Any], TrainResult]:
             quantiles=quants,
             min_rows=threshold,
         )
+        # Below-threshold tenants are recorded as skipped, not fitted.
         if entry is None:
             reason = f"below_min_rows ({len(sub)} < {threshold})"
             result.skipped_tenants[tid] = reason
             logger.info("skipped tenant %d: %s", tid, reason)
             continue
 
+        # Store the fitted entry and roll its stats into the result.
         artifact["tenants"][tid] = entry
         n_rows = entry["n_rows"]
         share = entry["score_share"]
@@ -470,16 +488,19 @@ def fit_risk_model(df: pd.DataFrame) -> tuple[dict[str, Any], TrainResult]:
             share_high=share["high"],
             share_critical=share["critical"],
         )
+        # Accumulate weighted category counts for the cohort-wide share.
         for cat, frac in share.items():
             overall_counts[cat] += int(round(frac * n_rows))
         overall_n += n_rows
 
+    # Refuse to register an empty model if every tenant was skipped.
     if not result.tenants:
         raise ValueError(
             "no tenant had >= min_rows_per_tenant rows; refusing to register "
             "an empty risk model."
         )
 
+    # Normalise the cohort counts into fractions for the promotion gate.
     if overall_n > 0:
         result.overall_share = {k: v / overall_n for k, v in overall_counts.items()}
     return artifact, result
@@ -490,8 +511,10 @@ def fit_risk_model(df: pd.DataFrame) -> tuple[dict[str, Any], TrainResult]:
 # ---------------------------------------------------------------------------
 def save_local(artifact: dict[str, Any], result: TrainResult) -> None:
     """Write the bundled artifact + metadata under models/risk_score/."""
+    # Dump the bundled per-tenant artifact as a single joblib file.
     ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
     joblib.dump(artifact, ARTIFACT_DIR / ARTIFACT_FILENAME)
+    # Write the metadata sidecar the inference loader reads.
     metadata: dict[str, Any] = {
         "version": "v1",
         "model_name": _mlflow_model_name(),
@@ -540,6 +563,7 @@ def log_to_mlflow(
     or server unreachable). Returns the version even when ``promote=False``
     so callers (see ml/promotion.py) can gate the transition.
     """
+    # mlflow optional — skip registry logging when it isn't installed.
     try:
         import mlflow
         import mlflow.sklearn
@@ -556,6 +580,7 @@ def log_to_mlflow(
     mlflow.set_tracking_uri(s.mlflow_tracking_uri)
     mlflow.set_experiment(experiment_name)
 
+    # Log params, cohort/per-tenant metrics, metadata, and the model.
     with mlflow.start_run() as run:
         mlflow.log_params({
             "algorithm": artifact["config"].get("algorithm", "isolation_forest"),
@@ -602,6 +627,7 @@ def log_to_mlflow(
     versions = client.search_model_versions(f"name='{model_name}'")
     latest = max(versions, key=lambda v: int(v.version))
 
+    # Promote to the serving stage only when asked; the gate handles the rest.
     if promote:
         client.transition_model_version_stage(
             name=model_name,
@@ -630,6 +656,7 @@ def run(month_from: str = "2025-01", promote: bool = True) -> TrainResult:
         level=os.environ.get("PIPELINE_LOG_LEVEL", "INFO"),
         format="%(asctime)s %(levelname)s %(name)s | %(message)s",
     )
+    # Load → fit per tenant → persist locally → register in MLflow.
     df = load_training_frame(month_from=month_from)
     artifact, result = fit_risk_model(df)
     result.training_window = f">= {month_from}"

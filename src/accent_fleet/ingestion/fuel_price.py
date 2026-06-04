@@ -60,6 +60,7 @@ def _extract(payload: Any, dotted_path: str) -> Any:
     caller treats that as a fetch failure.
     """
     node = payload
+    # Descend one segment at a time: integer index for lists, key for dicts.
     for segment in dotted_path.split("."):
         node = node[int(segment)] if isinstance(node, list) else node[segment]
     return node
@@ -72,14 +73,17 @@ def fetch_price_from_provider(s: Settings) -> tuple[float, str] | None:
     unparseable / out-of-band value. Every failure is logged, never raised,
     so a flaky API can't fail the ETL run.
     """
+    # No URL configured → provider disabled.
     url = s.fuel_price_api_url.strip()
     if not url:
         return None
 
+    # Optional bearer/API-key header.
     headers = {}
     if s.fuel_price_api_key:
         headers["Authorization"] = s.fuel_price_api_key
 
+    # Fetch and parse the price; any error is swallowed (logged, not raised).
     try:
         resp = httpx.get(url, headers=headers, timeout=10.0)
         resp.raise_for_status()
@@ -89,6 +93,7 @@ def fetch_price_from_provider(s: Settings) -> tuple[float, str] | None:
         log.warning("fuel_price.fetch_failed", url=url, error=str(exc))
         return None
 
+    # Sanity-band the value to reject parsing errors (wrong unit/field).
     if not (_MIN_PRICE < price < _MAX_PRICE):
         log.warning(
             "fuel_price.out_of_band",
@@ -138,6 +143,7 @@ def refresh_fuel_price(
     Pass ``conn`` to participate in an existing transaction; omit it to open a
     short-lived one.
     """
+    # No connection passed → open our own short-lived transaction.
     if conn is None:
         with transaction() as own_conn:
             return refresh_fuel_price(own_conn, force=force)
@@ -145,10 +151,12 @@ def refresh_fuel_price(
     s = settings()
     fuel_type = s.fuel_price_fuel_type
 
+    # Provider not configured → nothing to do, dashboards keep last value.
     if not s.fuel_price_api_url.strip():
         log.info("fuel_price.disabled", reason="FUEL_PRICE_API_URL unset")
         return RefreshResult(status="disabled")
 
+    # Staleness gate: skip the fetch if a recent live price already exists.
     if not force:
         age = _live_price_age_days(conn, fuel_type)
         if age is not None and age < s.fuel_price_refresh_days:
@@ -160,10 +168,12 @@ def refresh_fuel_price(
             )
             return RefreshResult(status="skipped_fresh", detail=f"{age:.1f}d old")
 
+    # Call the provider; on failure leave the table untouched.
     fetched = fetch_price_from_provider(s)
     if fetched is None:
         return RefreshResult(status="failed", detail="provider returned no usable price")
 
+    # Append the new price (idempotent on (fuel_type, effective_at)).
     price, source = fetched
     conn.execute(
         text(

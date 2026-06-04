@@ -38,10 +38,12 @@ def get_db() -> Iterator[Connection]:
         yield conn
 
 
+# Hand routes the shared RiskPredictor singleton built in lifespan.
 def get_risk_predictor_dep(request: Request) -> RiskPredictor:
     return request.app.state.risk_predictor
 
 
+# Hand routes the shared ClusterPredictor singleton built in lifespan.
 def get_cluster_predictor_dep(request: Request) -> ClusterPredictor:
     return request.app.state.cluster_predictor
 

@@ -82,6 +82,7 @@ class RiskPredictor:
       because the feature itself is unavailable, not malformed.
     """
 
+    # Start unloaded; the lock guards lazy loads across API worker threads.
     def __init__(self) -> None:
         self._artifact: dict[str, Any] | None = None
         self._feature_order: list[str] | None = None
@@ -115,6 +116,7 @@ class RiskPredictor:
             return []
         return sorted(int(t) for t in (self._artifact or {}).get("tenants", {}))
 
+    # True iff the loaded artifact contains a model for this tenant.
     def has_tenant(self, tenant_id: int) -> bool:
         if not self.is_loaded:
             return False
@@ -125,6 +127,7 @@ class RiskPredictor:
         """Idempotent load. Tries MLflow first, then local disk."""
         if self.is_loaded:
             return
+        # Double-checked locking: re-test under the lock before loading.
         with self._lock:
             if self.is_loaded:
                 return
@@ -132,6 +135,7 @@ class RiskPredictor:
                 return
             if self._try_load_local():
                 return
+            # Neither source had a model — fail loudly with remediation steps.
             raise RuntimeError(
                 "No risk-score model available. Train one with "
                 "`python scripts/train_risk_score.py` or register a model "
@@ -144,6 +148,7 @@ class RiskPredictor:
         Force a fresh load from MLflow (or local disk). Use after promoting
         a new model version so the running API picks it up without a restart.
         """
+        # Reset to unloaded state, then trigger a fresh load.
         with self._lock:
             self._artifact = None
             self._feature_order = None
@@ -153,6 +158,7 @@ class RiskPredictor:
         return {"model_version": self._model_version, "source": self._source}
 
     # ------------------------------------------------------------------
+    # Resolve the MLflow model name/stage from feature_definitions.yaml.
     def _risk_model_name(self) -> str:
         cfg = (load_feature_definitions().get("risk_score_model") or {})
         return str(cfg.get("mlflow_model_name", "device-risk-score"))
@@ -165,6 +171,7 @@ class RiskPredictor:
     def _try_load_mlflow(self) -> bool:
         """Load the latest Production-stage risk artifact from MLflow."""
         s = settings()
+        # mlflow is an optional dependency — absence just means "try disk".
         try:
             import mlflow
             from mlflow.tracking import MlflowClient
@@ -173,6 +180,7 @@ class RiskPredictor:
             return False
 
         try:
+            # Load the bundled artifact from the registry stage URI.
             mlflow.set_tracking_uri(s.mlflow_tracking_uri)
             client = MlflowClient()
             name = self._risk_model_name()
@@ -184,6 +192,7 @@ class RiskPredictor:
             self._artifact = artifact
             self._feature_order = list(artifact["feature_order"])
 
+            # Record the resolved version + source for diagnostics.
             versions = client.get_latest_versions(name, [stage])
             self._model_version = versions[0].version if versions else "unknown"
             self._source = f"mlflow:{uri}"
@@ -206,6 +215,7 @@ class RiskPredictor:
             logger.warning("joblib not installed; cannot load local risk model")
             return False
 
+        # Both the joblib artifact and its metadata sidecar must be present.
         artifact_path = RISK_MODEL_DIR / RISK_ARTIFACT_FILENAME
         meta_path = RISK_MODEL_DIR / RISK_METADATA_FILENAME
 
@@ -214,6 +224,7 @@ class RiskPredictor:
             return False
 
         try:
+            # Load artifact + feature order/version from the metadata file.
             self._artifact = joblib.load(artifact_path)
             with meta_path.open("r", encoding="utf-8") as f:
                 meta = json.load(f)
@@ -254,11 +265,13 @@ class RiskPredictor:
         entry = self._tenant_entry(tenant_id)
         feature_order = self.feature_order
 
+        # Build the feature row in trained order, defaulting missing keys to 0.
         vec = np.asarray(
             [float(features.get(name) or 0.0) for name in feature_order],
             dtype=float,
         ).reshape(1, -1)
 
+        # Scale, score (negated so higher = more anomalous), rescale, band it.
         scaled = entry["scaler"].transform(vec)
         raw = -entry["model"].decision_function(scaled)
         score = _rescale_one(raw[0], entry["raw_min"], entry["raw_max"])
@@ -296,10 +309,12 @@ class RiskPredictor:
         entry = self._tenant_entry(tenant_id)
         feature_order = self.feature_order
 
+        # Align columns to trained order; empty input → empty outputs.
         X = features_df.reindex(columns=feature_order).fillna(0).to_numpy(dtype=float)
         if X.size == 0:
             return np.zeros((0,)), np.zeros((0,), dtype=object)
 
+        # Vectorised scale → score → rescale → categorise over the whole frame.
         scaled = entry["scaler"].transform(X)
         raw = -entry["model"].decision_function(scaled)
         scores = _rescale_array(raw, entry["raw_min"], entry["raw_max"])
@@ -314,6 +329,7 @@ class TenantModelMissingError(LookupError):
 # ---------------------------------------------------------------------------
 # Pure helpers — mirror train_risk's math so prediction == training-time scoring
 # ---------------------------------------------------------------------------
+# Map a single raw anomaly score into the clamped 0-100 range.
 def _rescale_one(raw: float, raw_min: float, raw_max: float) -> float:
     span = max(raw_max - raw_min, _RESCALE_EPSILON)
     scaled = (raw - raw_min) / span
@@ -324,6 +340,7 @@ def _rescale_one(raw: float, raw_min: float, raw_max: float) -> float:
     return scaled * 100.0
 
 
+# Vectorised counterpart of _rescale_one over a whole array.
 def _rescale_array(
     raw: np.ndarray, raw_min: float, raw_max: float
 ) -> np.ndarray:
@@ -332,6 +349,7 @@ def _rescale_array(
     return np.clip(scaled, 0.0, 1.0) * 100.0
 
 
+# Map a single 0-100 score to its risk band, highest band first.
 def _categorize_one(score: float, thresholds: dict[str, float]) -> str:
     if score >= thresholds["critical"]:
         return "critical"
@@ -342,6 +360,7 @@ def _categorize_one(score: float, thresholds: dict[str, float]) -> str:
     return "low"
 
 
+# Vectorised band assignment: overwrite low with higher bands in order.
 def _categorize_array(
     scores: np.ndarray, thresholds: dict[str, float]
 ) -> np.ndarray:
@@ -368,6 +387,7 @@ class ClusterPredictor:
     green and the API can be deployed before the first training run.
     """
 
+    # Start unloaded; the lock guards lazy loads across API worker threads.
     def __init__(self) -> None:
         self._kmeans: Any = None
         self._scaler: Any = None
@@ -400,6 +420,7 @@ class ClusterPredictor:
         """Idempotent load. Tries MLflow first, then local disk."""
         if self.is_loaded:
             return
+        # Double-checked locking: re-test under the lock before loading.
         with self._lock:
             if self.is_loaded:
                 return
@@ -407,6 +428,7 @@ class ClusterPredictor:
                 return
             if self._try_load_local():
                 return
+            # Neither source had a model — fail loudly with remediation steps.
             raise RuntimeError(
                 "No clustering model available. Train one with "
                 "`python scripts/train_clustering.py` or register a model "
@@ -419,6 +441,7 @@ class ClusterPredictor:
         Force a fresh load from MLflow (or local disk). Use after promoting a
         new model version so the running API picks it up without a restart.
         """
+        # Reset to unloaded state, then trigger a fresh load.
         with self._lock:
             self._kmeans = None
             self._scaler = None
@@ -432,6 +455,7 @@ class ClusterPredictor:
     def _try_load_mlflow(self) -> bool:
         """Load latest Production-stage clustering pipeline from MLflow."""
         s = settings()
+        # mlflow is an optional dependency — absence just means "try disk".
         try:
             import mlflow
             from mlflow.tracking import MlflowClient
@@ -440,6 +464,7 @@ class ClusterPredictor:
             return False
 
         try:
+            # Load the registered pipeline dict from the stage URI.
             mlflow.set_tracking_uri(s.mlflow_tracking_uri)
             client = MlflowClient()
             uri = f"models:/{s.mlflow_model_name}/{s.mlflow_model_stage}"
@@ -452,6 +477,7 @@ class ClusterPredictor:
             self._scaler = artifact["scaler"]
             self._feature_order = list(artifact["feature_order"])
 
+            # Record the resolved version + source for diagnostics.
             versions = client.get_latest_versions(s.mlflow_model_name, [s.mlflow_model_stage])
             self._model_version = versions[0].version if versions else "unknown"
             self._source = f"mlflow:{uri}"
@@ -470,6 +496,7 @@ class ClusterPredictor:
             logger.warning("joblib not installed; cannot load local model")
             return False
 
+        # KMeans, scaler, and metadata sidecar must all be present.
         kmeans_path = CLUSTERING_MODEL_DIR / "kmeans_v1.joblib"
         scaler_path = CLUSTERING_MODEL_DIR / "scaler_v1.joblib"
         meta_path = CLUSTERING_MODEL_DIR / "metadata.json"
@@ -479,6 +506,7 @@ class ClusterPredictor:
             return False
 
         try:
+            # Load both estimators plus feature order/version from disk.
             self._kmeans = joblib.load(kmeans_path)
             self._scaler = joblib.load(scaler_path)
             with meta_path.open("r", encoding="utf-8") as f:
@@ -501,11 +529,13 @@ class ClusterPredictor:
         """
         self.ensure_loaded()
 
+        # Build the feature row in trained order, defaulting missing keys to 0.
         feature_order = self.feature_order
         vec = np.asarray(
             [[float(features.get(name) or 0.0) for name in feature_order]],
             dtype=float,
         )
+        # Scale, assign a cluster, and report distance to its centroid.
         scaled = self._scaler.transform(vec)
         cluster_id = int(self._kmeans.predict(scaled)[0])
         # KMeans.transform returns distances to all centroids.

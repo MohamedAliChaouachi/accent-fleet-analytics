@@ -56,13 +56,16 @@ _PIE_FRIENDLY_CATEGORIES: tuple[str, ...] = (
 )
 
 
+# Apply the ordered rules and return the first matching chart type.
 def suggest(columns: list[str], rows: list[dict[str, Any]]) -> ChartType:
     """Pick a chart type from the result shape. Never raises."""
+    # Rule 1: empty, single-row, or very wide results render as a table.
     if not rows or not columns:
         return "table"
     if len(rows) == 1 or len(columns) >= 5:
         return "table"
 
+    # Classify columns once: which are numeric and which read as time.
     sample = _first_non_null_row(rows)
     numeric_cols = [c for c in columns if _is_numeric(sample.get(c))]
     time_cols = [c for c in columns if any(h in c.lower() for h in _TIME_HINTS)]
@@ -106,6 +109,7 @@ def _first_non_null_row(rows: list[dict[str, Any]]) -> dict[str, Any]:
     return merged or rows[0]
 
 
+# True for real numeric cells, excluding bool (a subclass of int).
 def _is_numeric(v: Any) -> bool:
     if v is None:
         return False

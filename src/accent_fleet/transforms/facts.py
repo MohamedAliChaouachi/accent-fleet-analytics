@@ -50,6 +50,7 @@ def _extra_params_for_fact(fact_name: str, cfg: dict) -> dict:
     from `config/pipeline.yaml` under `archive_thresholds:` and
     `archive_telemetry:` keys (see those YAMLs for documentation).
     """
+    # Harsh-event detection thresholds (brake/accel/corner/high/extreme).
     if fact_name == "fact_harsh_event":
         thr = cfg.get("archive_thresholds", {})
         return {
@@ -59,6 +60,7 @@ def _extra_params_for_fact(fact_name: str, cfg: dict) -> dict:
             "thresh_high":    int(thr.get("high", 60)),
             "thresh_extreme": int(thr.get("extreme", 80)),
         }
+    # Telemetry aggregation params (ping cadence + high-RPM threshold).
     if fact_name == "fact_telemetry_daily":
         tel = cfg.get("archive_telemetry", {})
         return {
@@ -97,9 +99,11 @@ def load_fact_incremental(
     window_end : datetime | None
         Upper bound of the window (exclusive). Defaults to utcnow().
     """
+    # Reject unknown facts before touching the database.
     if fact_name not in FACT_SQL:
         raise ValueError(f"Unknown fact: {fact_name}")
 
+    # Resolve the SQL file, overlap, and the oldest event-time we'll scan to.
     sql_file = FACT_SQL[fact_name]
     s = settings()
     cfg = load_pipeline_config()
@@ -109,6 +113,7 @@ def load_fact_incremental(
     ).replace(tzinfo=None)
 
     with transaction() as conn:
+        # Compute the next event-time window from the stored watermark.
         ws = WatermarkStore(conn)
         window = ws.get_window(
             fact_name,
@@ -117,6 +122,7 @@ def load_fact_incremental(
             max_age_cap=max_age_cap,
         )
 
+        # Nothing new to process — return a zero-row result early.
         if window.is_empty:
             log.info("fact_load.skip_empty_window", fact=fact_name,
                      start=window.start, end=window.end)
@@ -125,6 +131,7 @@ def load_fact_incremental(
         log.info("fact_load.start", fact=fact_name,
                  start=window.start, end=window.end, run_id=run_id)
 
+        # Bind the window + run id (plus any per-fact extras) and run the SQL.
         params = {
             "window_start": window.start,
             "window_end": window.end,
@@ -152,6 +159,7 @@ def load_fact_incremental(
         log.info("fact_load.done", fact=fact_name, rows=rows,
                  new_watermark=window.end)
 
+        # Hand back the window + row count so the flow can drive mart recompute.
         return FactLoadResult(
             fact_name=fact_name,
             rows_loaded=rows,
@@ -171,6 +179,7 @@ def touched_dates_from_windows(
     """
     from datetime import timedelta
 
+    # Walk each non-empty window day by day, collecting distinct ISO dates.
     dates: set[str] = set()
     for r in results:
         if r.new_max_event_time is None or r.rows_loaded == 0:
@@ -190,6 +199,7 @@ def touched_months_from_windows(
     Derive the set of (year-month) strings that the facts in this run
     touched. The mart loader recomputes only these months.
     """
+    # Walk each non-empty window month by month, collecting YYYY-MM strings.
     months: set[str] = set()
     for r in results:
         if r.new_max_event_time is None or r.rows_loaded == 0:

@@ -79,6 +79,7 @@ class DashboardFilters:
     end: date
     tenant_ids: tuple[int, ...] = field(default_factory=tuple)
 
+    # ISO date strings for date-grain WHERE clauses.
     @property
     def start_iso(self) -> str:
         return self.start.isoformat()
@@ -87,6 +88,7 @@ class DashboardFilters:
     def end_iso(self) -> str:
         return self.end.isoformat()
 
+    # 'YYYY-MM' strings for month-grain (CHAR(7)) WHERE clauses.
     @property
     def start_month(self) -> str:
         return self.start.strftime("%Y-%m")
@@ -95,18 +97,22 @@ class DashboardFilters:
     def end_month(self) -> str:
         return self.end.strftime("%Y-%m")
 
+    # Optional tenant filter fragment (empty string means "all tenants").
     def tenant_clause(self, alias: str = "") -> str:
         if not self.tenant_ids:
             return ""
         prefix = f"{alias}." if alias else ""
         return f"AND {prefix}tenant_id = ANY(CAST(:tenant_ids AS int[]))"
 
+    # Date-grain window filter fragment.
     def date_clause(self, column: str) -> str:
         return f"AND {column} BETWEEN :start AND :end"
 
+    # Month-grain window filter fragment.
     def month_clause(self, column: str) -> str:
         return f"AND {column} BETWEEN :start_month AND :end_month"
 
+    # Bind params shared by every dashboard query (stable shape regardless of filters).
     def params(self) -> dict[str, Any]:
         # psycopg sends typeless NULL for Python None; SQLAlchemy with
         # `ANY(CAST(:tenant_ids AS int[]))` does the right thing because
@@ -161,6 +167,7 @@ _ADDITIVE_EXEC_COLS = (
 
 def fetch_executive(conn: Connection, f: DashboardFilters) -> ExecutiveDashboardResponse:
     """Per-tenant rows + per-month aggregate + latest-month KPI strip."""
+    # Pull per-tenant x month rows within the filter window.
     sql = f"""
         SELECT *
           FROM marts.v_executive_dashboard
@@ -188,6 +195,7 @@ def fetch_executive(conn: Connection, f: DashboardFilters) -> ExecutiveDashboard
                 bucket[c] += v
         tenants_in_month[r.year_month].add(r.tenant_id)
 
+    # Emit one aggregate row per month, recomputing cost_per_km from totals.
     monthly: list[ExecutiveMonthlyAggregate] = []
     for ym in sorted(by_month):
         b = by_month[ym]
@@ -211,6 +219,7 @@ def fetch_executive(conn: Connection, f: DashboardFilters) -> ExecutiveDashboard
             )
         )
 
+    # Build the latest-month KPI strip (skipped when there is no data).
     kpi = None
     if monthly:
         latest = monthly[-1]
@@ -245,6 +254,7 @@ def fetch_executive(conn: Connection, f: DashboardFilters) -> ExecutiveDashboard
 # ---------------------------------------------------------------------------
 
 
+# Daily operational rows + window-total KPI strip.
 def fetch_operations(conn: Connection, f: DashboardFilters) -> OperationsDashboardResponse:
     sql = f"""
         SELECT *
@@ -254,6 +264,7 @@ def fetch_operations(conn: Connection, f: DashboardFilters) -> OperationsDashboa
            {f.date_clause('fleet_date')}
          ORDER BY fleet_date
     """
+    # Normalise the date column to an ISO string for JSON serialization.
     raw = conn.execute(text(sql), f.params()).mappings().all()
     rows: list[OperationsDailyRow] = []
     for r in raw:
@@ -262,6 +273,7 @@ def fetch_operations(conn: Connection, f: DashboardFilters) -> OperationsDashboa
             d["fleet_date"] = d["fleet_date"].isoformat()
         rows.append(OperationsDailyRow(**d))
 
+    # Sum additive metrics across the window for the KPI strip.
     kpi = OperationsKpi(
         total_trips=sum(r.total_trips or 0 for r in rows),
         total_distance_km=sum(r.total_distance_km or 0.0 for r in rows),
@@ -276,6 +288,7 @@ def fetch_operations(conn: Connection, f: DashboardFilters) -> OperationsDashboa
 # ---------------------------------------------------------------------------
 
 
+# Per-vehicle maintenance cost rows + KPI strip + top-cost vehicles.
 def fetch_maintenance(conn: Connection, f: DashboardFilters) -> MaintenanceDashboardResponse:
     sql = f"""
         SELECT *
@@ -288,6 +301,7 @@ def fetch_maintenance(conn: Connection, f: DashboardFilters) -> MaintenanceDashb
     raw = conn.execute(text(sql), f.params()).mappings().all()
     rows = [MaintenanceRow(**dict(r)) for r in raw]
 
+    # Window totals for the KPI strip.
     kpi = MaintenanceKpi(
         maintenance_events=sum(r.maintenance_events or 0 for r in rows),
         total_cost=sum(r.total_cost or 0.0 for r in rows),
@@ -307,6 +321,7 @@ def fetch_maintenance(conn: Connection, f: DashboardFilters) -> MaintenanceDashb
 # ---------------------------------------------------------------------------
 
 
+# Fleet rollup + device risk rows + cluster overlay and crosstab.
 def fetch_risk(conn: Connection, f: DashboardFilters) -> RiskDashboardResponse:
     # Fleet rollup — no date column on this view; tenant filter only.
     fleet_sql = f"""
@@ -421,6 +436,7 @@ _ADDITIVE_FLEET_EFF_COLS = (
 )
 
 
+# Percent change vs prior period; None when either value is missing or prior is 0.
 def _pct_delta(current: float | None, prior: float | None) -> float | None:
     if current is None or prior is None or prior == 0:
         return None
@@ -467,6 +483,7 @@ def _filter_complete_months(
     return [ym for ym in monthly_year_months if _last_day_of_ym(ym) <= latest_trip_date]
 
 
+# Per-tenant rows + fleet monthly aggregate + KPI + best/worst-by-cost list.
 def fetch_fleet_efficiency(
     conn: Connection, f: DashboardFilters
 ) -> FleetEfficiencyDashboardResponse:
@@ -505,6 +522,7 @@ def fetch_fleet_efficiency(
         if r.idle_time_pct is not None and devices > 0:
             weighted_idle_num[r.year_month] += r.idle_time_pct * devices
 
+    # Emit one fleet-aggregate row per month, recomputing all ratios from totals.
     monthly: list[FleetEfficiencyMonthly] = []
     for ym in sorted(by_month):
         b = by_month[ym]
@@ -538,6 +556,7 @@ def fetch_fleet_efficiency(
             )
         )
 
+    # Latest-month KPI strip with MoM deltas, plus best/worst tenant ranking.
     kpi: FleetEfficiencyKpi | None = None
     best_worst: list[FleetEfficiencyRow] = []
     if monthly:
@@ -597,12 +616,14 @@ _ADDITIVE_SAFETY_COLS = (
 )
 
 
+# Absolute change vs prior period; None when either value is missing.
 def _abs_delta(current: float | None, prior: float | None) -> float | None:
     if current is None or prior is None:
         return None
     return current - prior
 
 
+# Per-tenant rows + fleet monthly aggregate (composite safety score) + KPI strip.
 def fetch_safety_scorecard(
     conn: Connection, f: DashboardFilters
 ) -> SafetyScorecardDashboardResponse:
@@ -627,6 +648,7 @@ def fetch_safety_scorecard(
             if v is not None:
                 b[c] += v
 
+    # Emit one fleet-aggregate row per month, recomputing rates + safety score.
     monthly: list[SafetyScorecardMonthly] = []
     for ym in sorted(by_month):
         b = by_month[ym]
@@ -664,6 +686,7 @@ def fetch_safety_scorecard(
             )
         )
 
+    # Latest-month KPI strip with absolute (not %) MoM deltas.
     kpi: SafetyScorecardKpi | None = None
     if monthly:
         latest = monthly[-1]
@@ -717,6 +740,7 @@ def _bucket_count(seq: list, key: str) -> list[AlertCount]:
     ]
 
 
+# Proactive alerts + live 24h stream, each with pre-aggregated summaries.
 def fetch_predictive_alerts(
     conn: Connection, f: DashboardFilters
 ) -> PredictiveAlertsDashboardResponse:
@@ -792,6 +816,7 @@ def fetch_predictive_alerts(
 # ---------------------------------------------------------------------------
 
 
+# Per-tenant billing rows + monthly aggregate + KPI strip + pricing-tier rollup.
 def fetch_tenant_billing(
     conn: Connection, f: DashboardFilters
 ) -> TenantBillingDashboardResponse:
@@ -825,6 +850,7 @@ def fetch_tenant_billing(
         b["data_volume_gb"] += r.data_volume_gb or 0.0
         b["estimated_revenue"] += r.estimated_revenue or 0.0
 
+    # Emit one summed aggregate row per month.
     monthly = [
         TenantBillingMonthly(
             year_month=ym,
@@ -855,6 +881,7 @@ def fetch_tenant_billing(
         prior_ym = kpi_yms[-2] if len(kpi_yms) > 1 else None
         prior_rows = [r for r in rows if r.year_month == prior_ym] if prior_ym else []
 
+        # Latest-vs-prior totals for tenants, devices, revenue, and storage.
         total_tenants = len({r.tenant_id for r in latest_rows if r.tenant_id is not None})
         prior_tenants = (
             len({r.tenant_id for r in prior_rows if r.tenant_id is not None})

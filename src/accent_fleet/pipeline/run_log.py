@@ -24,6 +24,7 @@ def begin_run(
     window_end: datetime | None = None,
 ) -> int:
     """Insert a 'running' row into etl_run_log and return its run_id."""
+    # Open the run with a config-hash stamp so reruns are traceable.
     sql = text(
         """
         INSERT INTO warehouse.etl_run_log
@@ -57,6 +58,7 @@ def end_run(
     error_message: str | None = None,
 ) -> None:
     """Mark a run as finished with its final counters."""
+    # Stamp finish time, terminal status, and the row/rejection counters.
     sql = text(
         """
         UPDATE warehouse.etl_run_log

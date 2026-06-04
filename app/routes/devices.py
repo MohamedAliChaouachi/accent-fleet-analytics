@@ -23,6 +23,7 @@ from app.schemas.device import (
     TopRiskResponse,
 )
 
+# Device lookup router — single-device profile + fleet top-risk listing.
 router = APIRouter(prefix="/devices", tags=["devices"])
 
 
@@ -70,9 +71,11 @@ def device_profile(
         {"device_id": device_id, "months": months},
     ).mappings().all()
 
+    # Neither the rolling row nor any history means the device is unknown.
     if not rolling_row and not history_rows:
         raise HTTPException(status_code=404, detail=f"device {device_id} not found")
 
+    # Shape the combined rolling-risk + monthly-history payload.
     return DeviceProfileResponse(
         device_id=device_id,
         rolling=DeviceRollingRisk(**dict(rolling_row)) if rolling_row else None,
@@ -113,6 +116,7 @@ def top_risk(
         """
         params = {"n": n, "tenant_id": tenant_id}
     rows = conn.execute(text(sql), params).mappings().all()
+    # Shape the ranked top-risk device list.
     return TopRiskResponse(
         n=n,
         devices=[TopRiskDevice(**dict(r)) for r in rows],

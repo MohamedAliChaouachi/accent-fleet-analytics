@@ -30,15 +30,18 @@ def summarize(
     settings: AISettings,
 ) -> str:
     """Return a one-sentence answer. Never raises."""
+    # No rows: skip the LLM and answer directly.
     if not rows:
         return "No results found for your question."
 
+    # Build the summary prompt from the question, SQL, and sampled rows.
     user_prompt = build_summary_user_prompt(
         question=question,
         sql=sql,
         rows=rows,
         sample_rows=settings.summary_sample_rows,
     )
+    # Call the LLM; on failure degrade to the deterministic fallback.
     try:
         resp = provider.summarize_result(SUMMARY_SYSTEM_PROMPT, user_prompt)
     except LLMProviderError as e:
@@ -49,6 +52,7 @@ def summarize(
     return " ".join(resp.text.strip().split())
 
 
+# Row-count-only summary used when the LLM call fails.
 def _fallback_summary(rows: list[dict[str, Any]]) -> str:
     """Deterministic answer derived from the result shape only."""
     n = len(rows)

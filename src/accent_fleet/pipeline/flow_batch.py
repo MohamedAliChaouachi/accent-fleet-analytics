@@ -51,6 +51,7 @@ log = structlog.get_logger()
 @task(retries=2, retry_delay_seconds=15)
 def task_bootstrap_schemas() -> None:
     """Create schemas + state tables. Idempotent."""
+    # Execute every DDL statement in the bootstrap SQL file in one transaction.
     sql = load_sql("00_schemas_and_state.sql")
     with transaction() as conn:
         for stmt in split_sql_statements(sql):
@@ -214,6 +215,7 @@ def task_detect_drift(touched_months: list[str], run_id: int) -> int:   # noqa: 
         log.warning("drift.skipped_import_error", error=str(exc))
         return 0
 
+    # Compute drift; any failure is logged and treated as "no drift".
     try:
         report = detect_drift_for_months(touched_months)
     except Exception as exc:  # noqa: BLE001 — drift should never fail the flow
@@ -225,6 +227,7 @@ def task_detect_drift(touched_months: list[str], run_id: int) -> int:   # noqa: 
     for f in report.features:
         ml_feature_drift_score.labels(feature=f.feature).set(f.psi)
 
+    # Log an alert when any feature drifted, otherwise a healthy heartbeat.
     if report.any_drifted:
         log.warning(
             "drift.alert",
@@ -364,6 +367,7 @@ def task_refresh_fuel_price() -> None:
     seeded STIR reference). The refresh itself is gated to run at most once per
     FUEL_PRICE_REFRESH_DAYS, so calling this every run is cheap.
     """
+    # Best-effort refresh: swallow every error so the flow can't be broken.
     try:
         from accent_fleet.ingestion.fuel_price import refresh_fuel_price
 
@@ -381,6 +385,7 @@ def _view_name_from_sql_filename(filename: str) -> str | None:
     parts = base.split("_", 1)
     if len(parts) != 2:
         return None
+    # Only the remainder counts as a view name if it keeps the v_ convention.
     name = parts[1]
     return name if name.startswith("v_") else None
 
@@ -388,6 +393,7 @@ def _view_name_from_sql_filename(filename: str) -> str | None:
 @task(retries=1)
 def task_ensure_mart_structure() -> None:
     """Create mart table/index DDL needed by views without recomputing data."""
+    # Return the first non-comment SQL keyword of a statement (uppercased).
     def _first_sql_token(statement: str) -> str:
         for line in statement.splitlines():
             stripped = line.strip()
@@ -396,6 +402,7 @@ def task_ensure_mart_structure() -> None:
             return stripped.upper()
         return ""
 
+    # Apply DDL only: stop at the first WITH/INSERT so no data is recomputed.
     with transaction() as conn:
         for sql_file in (
             "20_mart_device_monthly_behavior.sql",
@@ -427,6 +434,7 @@ def task_ensure_mart_structure() -> None:
 
 @task
 def task_run_validation(run_id: int) -> None:   # noqa: ARG001
+    # Run the suite and log a pass summary or the list of failures.
     report = run_validation_suite()
     if report.all_passed:
         log.info("validation.all_passed", n=len(report.checks))
@@ -442,6 +450,7 @@ def _months_ago_yyyy_mm(now: datetime, months: int) -> str:
     for a single subtraction. Always produces a string sortable against
     CHAR(7) year_month columns.
     """
+    # Work in absolute month indices, then convert back to (year, month).
     idx = now.year * 12 + (now.month - 1) - months
     year, month0 = divmod(idx, 12)
     return f"{year:04d}-{month0 + 1:02d}"
@@ -460,17 +469,20 @@ def task_apply_retention(run_id: int) -> None:   # noqa: ARG001
     retention window is enforced on every successful flow, which is the
     same cadence that fills these tables. No drift, no missed days.
     """
+    # No-op unless retention is explicitly enabled in config.
     cfg = load_pipeline_config()
     ret = cfg.get("retention") or {}
     if not ret.get("enabled", False):
         log.info("retention.skip_disabled")
         return
 
+    # Resolve per-table retention windows (with defaults) into a cutoff month.
     etl_days = int(ret.get("etl_run_log_days", 90))
     quarantine_days = int(ret.get("quarantine_days", 30))
     cluster_months = int(ret.get("cluster_assignment_months", 12))
     cutoff_month = _months_ago_yyyy_mm(datetime.utcnow(), cluster_months)
 
+    # Prune the operational tables in one transaction.
     with transaction() as conn:
         run_sql_file(
             conn,
@@ -521,6 +533,7 @@ def task_retrain_with_gate(month_from: str = "2025-01") -> dict:
         log.warning("retrain.skipped_import_error", error=str(exc))
         return {"promoted": False, "reason": f"import_error: {exc}"}
 
+    # Run the gated retrain; any failure is reported, never raised.
     try:
         result = retrain_with_gate(
             month_from=month_from, tolerance=DEFAULT_SILHOUETTE_TOLERANCE
@@ -529,6 +542,7 @@ def task_retrain_with_gate(month_from: str = "2025-01") -> dict:
         log.warning("retrain.failed", error=str(exc), month_from=month_from)
         return {"promoted": False, "reason": f"retrain_exception: {exc}"}
 
+    # Publish candidate/production silhouette gauges for the dashboards.
     ml_candidate_silhouette.set(result.candidate_silhouette)
     # When the gate held, the live Production model didn't change — keep
     # its gauge pointing at the same number we just compared against.
@@ -616,6 +630,7 @@ def task_retrain_risk_with_gate(month_from: str = "2025-01") -> dict:
             log.warning("risk_retrain.score_psi_failed", error=str(exc))
             return None
 
+    # Run the gated risk retrain; failures are reported, never raised.
     try:
         result = retrain_risk_with_gate(
             month_from=month_from,
@@ -690,6 +705,7 @@ def bootstrap_flow() -> None:
     """One-time bootstrap. Safe to re-run."""
     task_bootstrap_schemas()
     run_id = begin_run(mode="bootstrap")
+    # Build dimensions, mart structure, and views; record run outcome.
     try:
         task_refresh_dimensions()
         task_ensure_mart_structure()
@@ -813,6 +829,7 @@ def backfill_flow(chunk_days: int | None = None) -> None:
     by chunk". Crashes are resumable: re-running backfill picks up where
     the watermark left off.
     """
+    # Resolve chunk size and the historical start bound from config.
     cfg = load_pipeline_config()
     chunk_days = int(chunk_days or cfg["window"]["backfill_chunk_days"])
     min_time = datetime.fromisoformat(
@@ -830,6 +847,7 @@ def backfill_flow(chunk_days: int | None = None) -> None:
 
     # Seed the watermark at min_time so the first chunk's window starts there.
     # (The incremental flow's max_age_cap handles the "never loaded" case.)
+    # Walk the history chunk by chunk, replaying the incremental flow on each.
     cursor = min_time
     while cursor < end:
         next_cursor = min(cursor + timedelta(days=chunk_days), end)
@@ -856,6 +874,7 @@ def retrain_flow(month_from: str = "2025-01") -> dict:
     surface the outcome in stdout and CI can assert on it.
     """
     run_id = begin_run(mode="retrain")
+    # Run the gated clustering retrain and record the run outcome.
     try:
         result = task_retrain_with_gate(month_from=month_from)
         end_run(run_id, status="success")
@@ -888,6 +907,7 @@ def retrain_risk_flow(month_from: str = "2025-01") -> dict:
     already a label on Prefect's side.
     """
     run_id = begin_run(mode="retrain")
+    # Run the gated risk-model retrain and record the run outcome.
     try:
         result = task_retrain_risk_with_gate(month_from=month_from)
         end_run(run_id, status="success")

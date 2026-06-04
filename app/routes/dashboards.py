@@ -57,6 +57,7 @@ from app.services.dashboards import (
     parse_filters,
 )
 
+# Dashboards router — one thin route per React page, all sharing the same filters.
 router = APIRouter(prefix="/dashboards", tags=["dashboards"])
 
 # Annotated aliases keep the four route signatures short and let ruff's B008
@@ -107,6 +108,7 @@ def _effective_tenant_ids(raw: list[int] | None) -> list[int]:
     return [p.tenant_id]
 
 
+# Executive overview page — KPIs, monthly aggregates, per-tenant rows.
 @router.get("/executive", response_model=ExecutiveDashboardResponse)
 def executive_overview(
     start: StartParam = None,
@@ -118,6 +120,7 @@ def executive_overview(
     return fetch_executive(conn, f)
 
 
+# Operations page — daily fleet activity and alert breakdown.
 @router.get("/operations", response_model=OperationsDashboardResponse)
 def operations_overview(
     start: StartParam = None,
@@ -129,6 +132,7 @@ def operations_overview(
     return fetch_operations(conn, f)
 
 
+# Maintenance page — per-vehicle cost rows plus top-cost vehicles.
 @router.get("/maintenance", response_model=MaintenanceDashboardResponse)
 def maintenance_overview(
     start: StartParam = None,
@@ -140,6 +144,7 @@ def maintenance_overview(
     return fetch_maintenance(conn, f)
 
 
+# Risk & behavior page — fleet rollup, device risk, cluster overlay.
 @router.get("/risk", response_model=RiskDashboardResponse)
 def risk_overview(
     start: StartParam = None,
@@ -151,6 +156,7 @@ def risk_overview(
     return fetch_risk(conn, f)
 
 
+# Fleet efficiency page — cost/utilization ratios with MoM deltas.
 @router.get("/fleet-efficiency", response_model=FleetEfficiencyDashboardResponse)
 def fleet_efficiency_overview(
     start: StartParam = None,
@@ -162,6 +168,7 @@ def fleet_efficiency_overview(
     return fetch_fleet_efficiency(conn, f)
 
 
+# Safety scorecard page — overspeed/harsh rates and composite safety score.
 @router.get("/safety-scorecard", response_model=SafetyScorecardDashboardResponse)
 def safety_scorecard_overview(
     start: StartParam = None,
@@ -173,6 +180,7 @@ def safety_scorecard_overview(
     return fetch_safety_scorecard(conn, f)
 
 
+# Predictive alerts page — proactive alerts plus the live 24h stream.
 @router.get("/predictive-alerts", response_model=PredictiveAlertsDashboardResponse)
 def predictive_alerts_overview(
     start: StartParam = None,
@@ -184,6 +192,7 @@ def predictive_alerts_overview(
     return fetch_predictive_alerts(conn, f)
 
 
+# Tenant billing page — per-tenant revenue, devices, and pricing tiers.
 @router.get("/tenant-billing", response_model=TenantBillingDashboardResponse)
 def tenant_billing_overview(
     start: StartParam = None,

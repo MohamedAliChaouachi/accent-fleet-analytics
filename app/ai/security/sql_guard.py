@@ -111,6 +111,7 @@ _FORBIDDEN_SCHEMAS: frozenset[str] = frozenset(
 _BIND_TENANT = "tenant_id"
 
 
+# Result of a successful validation pass: safe SQL + its bind params.
 @dataclass(frozen=True)
 class GuardOutcome:
     """Validated, normalised SQL plus the bind parameters needed to run it."""
@@ -119,6 +120,7 @@ class GuardOutcome:
     binds: dict[str, object]
 
 
+# Public entry point: parse, structurally validate, and normalise the SQL.
 def validate(sql: str, *, tenant_id: int, max_rows: int) -> GuardOutcome:
     """Validate ``sql`` and return a normalised, executable form.
 
@@ -297,6 +299,7 @@ def _has_tenant_predicate(tree: exp.Expression) -> bool:
     return False
 
 
+# True when the node is a column reference named exactly "tenant_id".
 def _is_tenant_column(node: exp.Expression) -> bool:
     if isinstance(node, exp.Column):
         return node.name == "tenant_id"
@@ -341,6 +344,7 @@ def _apply_limit(tree: exp.Expression, *, max_rows: int) -> None:
     select.set("limit", exp.Limit(expression=exp.Literal.number(max_rows)))
 
 
+# Find the top-level SELECT the LIMIT should attach to, if any.
 def _outer_select(tree: exp.Expression) -> exp.Select | None:
     if isinstance(tree, exp.Select):
         return tree

@@ -36,6 +36,7 @@ from accent_fleet.config import settings
 logger = logging.getLogger(__name__)
 
 
+# Lazily fetch the request's auth Principal; None outside the web stack.
 def _try_get_principal():  # noqa: ANN202 — Principal type lives in soft dep
     """
     Return the request-scoped Principal, or None if app.auth isn't loaded.
@@ -51,6 +52,7 @@ def _try_get_principal():  # noqa: ANN202 — Principal type lives in soft dep
     return current_principal()
 
 
+# Per-transaction RLS hook: set the tenant GUC (or elevate superadmin role).
 def _set_tenant_guc(conn: Connection) -> None:
     """
     Fired by SQLAlchemy's `begin` event. Issues `SET LOCAL` so RLS
@@ -73,6 +75,7 @@ def _set_tenant_guc(conn: Connection) -> None:
         to principal.tenant_id. Policies match; cross-tenant rows are
         invisible.
     """
+    # No Principal (ETL/Prefect/scripts run as BYPASSRLS roles): nothing to set.
     p = _try_get_principal()
     if p is None:
         # ETL / Prefect / ad-hoc scripts: no Principal in scope. Today these
@@ -80,6 +83,7 @@ def _set_tenant_guc(conn: Connection) -> None:
         # of a SET LOCAL is harmless. If you ever route an API-style request
         # through an ETL connection, this is the place to fix it.
         return
+    # Superadmin: switch to the BYPASSRLS role for the duration of this txn.
     if p.role == "superadmin":
         # Post-M6 the API connects as accent_app (NOBYPASSRLS), so a superadmin
         # principal *also* runs through that connection. Without intervention,
@@ -91,6 +95,7 @@ def _set_tenant_guc(conn: Connection) -> None:
         # (sql/54_grant_superadmin_membership.sql).
         conn.exec_driver_sql("SET LOCAL ROLE accent_superadmin")
         return
+    # Defensive guard: a tenant principal with no tenant_id must never set an empty GUC.
     if p.tenant_id is None:
         # Should be unreachable — Principal.__post_init__ rejects this
         # combo — but a future bug here would be silent + dangerous,
@@ -104,6 +109,7 @@ def _set_tenant_guc(conn: Connection) -> None:
     conn.exec_driver_sql(f"SET LOCAL app.current_tenant = '{tenant_id_int}'")
 
 
+# Build the process-wide engine once and wire up the RLS begin-listener.
 @lru_cache(maxsize=1)
 def get_engine() -> Engine:
     """Create (once) and return the process-wide engine."""
@@ -122,6 +128,7 @@ def get_engine() -> Engine:
     return engine
 
 
+# Context manager yielding a connection wrapped in one atomic transaction.
 @contextmanager
 def transaction() -> Iterator[Connection]:
     """

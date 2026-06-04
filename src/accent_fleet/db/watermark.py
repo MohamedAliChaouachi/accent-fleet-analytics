@@ -20,6 +20,7 @@ from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
 
+# The event-time slice a single incremental load will process.
 @dataclass
 class WatermarkWindow:
     """A half-open [start, end) window in event-time."""
@@ -28,11 +29,13 @@ class WatermarkWindow:
     end: datetime
     table_name: str
 
+    # True when there's nothing to process (start has caught up to end).
     @property
     def is_empty(self) -> bool:
         return self.start >= self.end
 
 
+# Reads/advances per-table watermarks in warehouse.etl_watermark.
 class WatermarkStore:
     """
     Reader/writer for warehouse.etl_watermark.
@@ -51,12 +54,14 @@ class WatermarkStore:
         self.layer = layer
 
     # ------------------------------------------------------------------
+    # Read the table's last loaded event-time, locking the row against races.
     def get_last_event_time(self, table_name: str) -> datetime | None:
         """
         Return the last event-time successfully loaded, or None if this
         table has never been loaded. Acquires a row lock so concurrent
         runners don't race on the same table.
         """
+        # SELECT ... FOR UPDATE blocks a second runner until this txn commits.
         row = self.conn.execute(
             text(
                 """
@@ -68,6 +73,7 @@ class WatermarkStore:
             ),
             {"layer": self.layer, "table_name": table_name},
         ).first()
+        # A missing row means bootstrap never seeded this table — fail loudly.
         if row is None:
             raise KeyError(
                 f"Watermark row missing for ({self.layer}, {table_name}). "
@@ -76,6 +82,7 @@ class WatermarkStore:
         return row.last_event_time
 
     # ------------------------------------------------------------------
+    # Derive the [start, end) window for the next incremental load.
     def get_window(
         self,
         table_name: str,
@@ -97,6 +104,7 @@ class WatermarkStore:
         last = self.get_last_event_time(table_name)
         end = now or datetime.utcnow()
 
+        # First load backfills from max_age_cap; later loads rewind by overlap.
         if last is None:
             # Never loaded — start from max_age_cap (typically 2019-10-01)
             if max_age_cap is None:
@@ -110,6 +118,7 @@ class WatermarkStore:
         return WatermarkWindow(start=start, end=end, table_name=table_name)
 
     # ------------------------------------------------------------------
+    # Roll the watermark forward and record run metadata (monotonic only).
     def advance(
         self,
         table_name: str,
@@ -147,6 +156,7 @@ class WatermarkStore:
         )
 
     # ------------------------------------------------------------------
+    # Operational escape hatch: clear a watermark so the next run backfills.
     def reset(self, table_name: str) -> None:
         """
         Danger: reset a watermark to NULL, causing the next run to back-fill.

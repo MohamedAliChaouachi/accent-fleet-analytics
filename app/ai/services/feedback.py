@@ -89,8 +89,10 @@ def upsert_feedback(
     by the router so client-side stale state (a stale event_id from a
     cleared audit table) is distinguishable from a bug.
     """
+    # Ownership check and upsert share one transaction (no TOCTOU window).
     try:
         with get_engine().begin() as conn:
+            # Confirm the caller owns the target query row before writing.
             owner = conn.execute(
                 _OWNERSHIP_STMT,
                 {"event_id": event_id, "user_id": user_id},
@@ -102,6 +104,7 @@ def upsert_feedback(
                 )
             tenant_id = owner[0]
 
+            # Insert or flip the vote, stamping the original tenant_id.
             row = conn.execute(
                 _UPSERT_STMT,
                 {
@@ -121,6 +124,7 @@ def upsert_feedback(
         )
         raise FeedbackError("db", str(exc)) from exc
 
+    # Shape the RETURNING row into the response dict the schema expects.
     assert row is not None  # guaranteed by RETURNING on a successful upsert
     return {
         "feedback_id": int(row[0]),

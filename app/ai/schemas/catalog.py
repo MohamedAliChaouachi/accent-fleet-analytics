@@ -29,6 +29,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 
+# One column in a catalog table — name/type/description for the prompt.
 @dataclass(frozen=True)
 class ColumnSpec:
     name: str
@@ -36,6 +37,7 @@ class ColumnSpec:
     description: str = ""
 
 
+# One whitelisted table/view plus the metadata the guard and prompt need.
 @dataclass(frozen=True)
 class TableSpec:
     """One catalog entry.
@@ -53,14 +55,17 @@ class TableSpec:
     tenant_scoped: bool
     columns: tuple[ColumnSpec, ...] = field(default_factory=tuple)
 
+    # Schema half of the fully qualified name.
     @property
     def schema(self) -> str:
         return self.fqname.split(".", 1)[0]
 
+    # Table/view half of the fully qualified name.
     @property
     def name(self) -> str:
         return self.fqname.split(".", 1)[1]
 
+    # Set of column names, used by the guard to reject invented columns.
     def column_names(self) -> set[str]:
         return {c.name for c in self.columns}
 
@@ -72,6 +77,7 @@ class TableSpec:
 # /v1/dashboards/* endpoints already serve to the React client. Keep these
 # in sync when adding columns to either side.
 
+# Executive KPI surface: monthly fleet-wide cost/volume per tenant.
 _EXECUTIVE = TableSpec(
     fqname="marts.v_executive_dashboard",
     description=(
@@ -104,6 +110,7 @@ _EXECUTIVE = TableSpec(
     ),
 )
 
+# Daily operational metrics: trips, alert mix, driver-behaviour rates.
 _OPERATIONS = TableSpec(
     fqname="marts.v_operational_dashboard",
     description=(
@@ -142,6 +149,7 @@ _OPERATIONS = TableSpec(
     ),
 )
 
+# Monthly maintenance + fuel cost per vehicle, with precomputed cost rank.
 _MAINTENANCE = TableSpec(
     fqname="marts.v_maintenance_dashboard",
     description=(
@@ -183,6 +191,7 @@ _MAINTENANCE = TableSpec(
     ),
 )
 
+# Tenant-level risk roll-up: device counts by risk band and risk drivers.
 _FLEET_RISK = TableSpec(
     fqname="marts.v_fleet_risk_dashboard",
     description=(
@@ -209,6 +218,7 @@ _FLEET_RISK = TableSpec(
     ),
 )
 
+# Per-device rolling 3-month risk profile for deep-dives and top-N lists.
 _DEVICE_RISK = TableSpec(
     fqname="marts.v_device_risk_profile",
     description=(
@@ -232,6 +242,7 @@ _DEVICE_RISK = TableSpec(
     ),
 )
 
+# Per-device monthly behaviour fact for individual-vehicle trends.
 _DEVICE_MONTHLY = TableSpec(
     fqname="marts.mart_device_monthly_behavior",
     description=(
@@ -254,6 +265,7 @@ _DEVICE_MONTHLY = TableSpec(
     ),
 )
 
+# K-means cluster assignment per device-month for behaviour-segment questions.
 _CLUSTER_ASSIGNMENT = TableSpec(
     fqname="marts.fact_device_cluster_assignment",
     description=(
@@ -275,6 +287,7 @@ _CLUSTER_ASSIGNMENT = TableSpec(
     ),
 )
 
+# Registry of every admitted table, keyed by fully qualified name.
 CATALOG: dict[str, TableSpec] = {
     t.fqname: t
     for t in (

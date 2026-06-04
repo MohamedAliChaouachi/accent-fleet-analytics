@@ -33,10 +33,12 @@ class QualityReport:
     checks: list[dict[str, Any]] = field(default_factory=list)
     freshness: dict[str, Any] = field(default_factory=dict)
 
+    # True only if every collected check passed.
     @property
     def all_passed(self) -> bool:
         return all(c.get("passed", False) for c in self.checks)
 
+    # Names of the checks that failed, for log/alert summaries.
     @property
     def failed_checks(self) -> list[str]:
         return [c["check_name"] for c in self.checks if not c.get("passed", False)]
@@ -50,12 +52,14 @@ def run_validation_suite() -> QualityReport:
     The SQL file has 8 SELECT statements separated by semicolons. We split
     and run each, collecting a dict per check.
     """
+    # Load the suite and keep only the SELECT statements (one per check).
     sql_text = load_sql("99_validation_suite.sql")
     statements = [
         s for s in split_sql_statements(sql_text)
         if s.strip().upper().startswith("SELECT")
     ]
 
+    # Run each check; a failing query is recorded as an ERROR check, not raised.
     report = QualityReport()
     engine = get_engine()
     with engine.connect() as conn:
@@ -71,6 +75,7 @@ def run_validation_suite() -> QualityReport:
                     "passed": False,
                     "error": str(exc),
                 })
+    # Attach the freshness snapshot alongside the suite results.
     report.freshness = check_freshness()
     return report
 
@@ -85,6 +90,7 @@ def check_freshness() -> dict[str, Any]:
     """
     cfg = load_pipeline_config()["monitoring"]["freshness"]
 
+    # Per-fact lag = now minus the newest event-time present in the warehouse.
     queries = {
         "fact_trip": (
             "SELECT EXTRACT(EPOCH FROM (NOW() - MAX(begin_path_time::timestamptz))) AS lag "
@@ -96,6 +102,7 @@ def check_freshness() -> dict[str, Any]:
         ),
     }
 
+    # Measure each fact's lag and compare it to its configured threshold.
     out: dict[str, Any] = {}
     engine = get_engine()
     with engine.connect() as conn:
@@ -118,6 +125,7 @@ def recent_rejection_summary(hours: int = 24) -> list[dict[str, Any]]:
     Rejection counts by rule over the last N hours. Used by the dashboard
     notebook and for weekly review of quarantine health.
     """
+    # Group quarantine rejections by rule over the trailing window.
     sql = """
         SELECT rule_id, COUNT(*) AS rejected
         FROM warehouse.quarantine_rejected

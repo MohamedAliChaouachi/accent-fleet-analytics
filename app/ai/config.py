@@ -18,9 +18,11 @@ from typing import Literal
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Selectable LLM backends; "stub" is the test-only deterministic provider.
 Provider = Literal["openai", "anthropic", "stub"]
 
 
+# Pydantic settings model read from env vars / .env at startup.
 class AISettings(BaseSettings):
     """Runtime configuration for the Text2SQL assistant.
 
@@ -77,6 +79,7 @@ class AISettings(BaseSettings):
     )
 
 
+# Process-wide singleton accessor — settings are read from env once.
 @lru_cache(maxsize=1)
 def ai_settings() -> AISettings:
     return AISettings()  # type: ignore[call-arg]

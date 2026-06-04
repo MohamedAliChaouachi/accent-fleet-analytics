@@ -64,9 +64,11 @@ class LoginRateLimiter:
         loop never gets as far as the Argon2 verify (which is the
         expensive bit we're protecting).
         """
+        # Window boundary: attempts older than `cutoff` no longer count.
         now = time.monotonic()
         cutoff = now - self.window_seconds
 
+        # Serialize counter mutation so concurrent requests stay consistent.
         async with self._lock:
             bucket = self._buckets.setdefault(ip, _Bucket())
             # Drop expired attempts. Tight loop in Python is fine — the
@@ -80,6 +82,7 @@ class LoginRateLimiter:
                 retry_after = int(oldest + self.window_seconds - now) + 1
                 raise RateLimitExceededError(max(retry_after, 1))
 
+            # Under the limit: record this attempt and allow it.
             bucket.attempts.append(now)
 
             # Periodic purge: any time the dict grows past a small

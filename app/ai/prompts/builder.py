@@ -21,16 +21,20 @@ from app.ai.schemas.ai import ChatTurn
 from app.ai.schemas.catalog import CATALOG, TableSpec
 
 
+# Flatten every catalog entry into one text block for the prompt.
 def render_catalog() -> str:
     """Render the whole catalog as plain text for the user message."""
     blocks: list[str] = ["Available views (use the fully qualified name):", ""]
+    # One rendered block per table, blank-line separated.
     for spec in CATALOG.values():
         blocks.append(_render_table(spec))
         blocks.append("")
     return "\n".join(blocks).rstrip() + "\n"
 
 
+# Render one table's header, grain, tenant-scope note, and column list.
 def _render_table(spec: TableSpec) -> str:
+    # Spell out the tenant-filter requirement so the LLM can't miss it.
     tenant_note = (
         "tenant-scoped — MUST filter with `tenant_id = :tenant_id`"
         if spec.tenant_scoped
@@ -43,6 +47,7 @@ def _render_table(spec: TableSpec) -> str:
         f"  - {tenant_note}",
         "  - Columns:",
     ]
+    # Append each column as "name (type) — description".
     for c in spec.columns:
         suffix = f" — {c.description}" if c.description else ""
         lines.append(f"      {c.name} ({c.type}){suffix}")
@@ -60,6 +65,7 @@ def _render_history(history: Sequence[ChatTurn]) -> str:
     SQL-generation rules.
     """
     lines = ["Previous conversation (oldest first):", ""]
+    # Label each turn by speaker so the model can resolve back-references.
     for turn in history:
         speaker = "User" if turn.role == "user" else "Assistant"
         lines.append(f"{speaker}: {turn.content.strip()}")
@@ -85,10 +91,12 @@ def build_sql_user_prompt(
     still regenerates SQL from scratch — the guardrails apply
     uniformly regardless of history.
     """
+    # Start with the catalog, then optionally splice in prior turns.
     sections: list[str] = [render_catalog(), "---"]
     if history:
         sections.append(_render_history(history))
         sections.append("---")
+    # Restate the tenant binding rule and append the current question last.
     sections.extend(
         [
             f"Caller tenant_id: {tenant_id}  (do NOT inline; use `:tenant_id`)",
@@ -113,6 +121,7 @@ def build_summary_user_prompt(
     column names attached to values (vital for accurate one-liner
     answers about specific fields).
     """
+    # Truncate to the sample cap and wrap with the row count for context.
     sample = rows[:sample_rows]
     body = {
         "question": question,

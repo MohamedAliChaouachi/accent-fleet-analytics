@@ -21,6 +21,7 @@ from fastapi import Depends, HTTPException, status
 from app.auth.principal import Principal, current_principal
 
 
+# Resolve the request principal set by AuthMiddleware, or 401 if absent.
 def _require_principal() -> Principal:
     principal = current_principal()
     if principal is None:
@@ -32,6 +33,7 @@ def _require_principal() -> Principal:
     return principal
 
 
+# Require an authenticated principal that is specifically a superadmin.
 def _require_superadmin() -> Principal:
     principal = _require_principal()
     if not principal.is_superadmin:
@@ -42,6 +44,7 @@ def _require_superadmin() -> Principal:
     return principal
 
 
+# Require a principal whose role is tenant_admin or superadmin.
 def _require_tenant_admin() -> Principal:
     """
     Pass through for `tenant_admin` and `superadmin`. Routes that
@@ -57,6 +60,7 @@ def _require_tenant_admin() -> Principal:
     return principal
 
 
+# Pre-built Depends() markers for use in route signatures.
 CurrentPrincipalDep = Depends(_require_principal)
 RequireSuperadminDep = Depends(_require_superadmin)
 RequireTenantAdminDep = Depends(_require_tenant_admin)

@@ -69,9 +69,11 @@ def write_audit_event(
     request" — the row commits even if the caller's outer logic later
     fails or returns 401.
     """
+    # Warn on an unrecognised action name but still write the row.
     if action not in ACTIONS:
         logger.warning("auth.audit.unknown_action", action=action)
 
+    # Assemble the bind parameters for the audit INSERT.
     params = {
         "user_id": user_id,
         "tenant_id": tenant_id,
@@ -82,6 +84,7 @@ def write_audit_event(
         # None writes a NULL rather than the string "null".
         "detail": detail,
     }
+    # Build the parameterised INSERT with an explicit JSONB cast for detail.
     stmt = text(
         "INSERT INTO auth.audit_log "
         "  (user_id, tenant_id, action, source_ip, user_agent, detail) "
@@ -95,6 +98,7 @@ def write_audit_event(
         import json
         params["detail"] = json.dumps(detail)
 
+    # Reuse the caller's connection if given; otherwise commit independently.
     try:
         if conn is not None:
             conn.execute(stmt, params)

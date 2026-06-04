@@ -121,6 +121,7 @@ def decide_promotion(
       2. candidate >= current - tolerance → promote.
       3. Otherwise → hold.
     """
+    # Cold start: no incumbent to compare against, so always promote.
     if current_silhouette is None:
         return PromotionDecision(
             promote=True,
@@ -130,6 +131,7 @@ def decide_promotion(
             tolerance=tolerance,
         )
 
+    # Promote if the candidate stays within tolerance of the incumbent.
     floor = current_silhouette - tolerance
     if candidate_silhouette >= floor:
         return PromotionDecision(
@@ -142,6 +144,7 @@ def decide_promotion(
             current_silhouette=current_silhouette,
             tolerance=tolerance,
         )
+    # Otherwise the candidate regressed too far — hold the incumbent.
     return PromotionDecision(
         promote=False,
         reason=(
@@ -169,6 +172,7 @@ def get_current_production_silhouette() -> float | None:
     Never raises — a failed lookup defaults to "no baseline" which
     short-circuits the gate into the cold-start branch.
     """
+    # mlflow optional — no registry means no baseline (cold start).
     try:
         import mlflow
         from mlflow.tracking import MlflowClient
@@ -178,6 +182,7 @@ def get_current_production_silhouette() -> float | None:
 
     s = settings()
     try:
+        # Fetch the current Production version and read its silhouette metric.
         mlflow.set_tracking_uri(s.mlflow_tracking_uri)
         client = MlflowClient()
         versions = client.get_latest_versions(
@@ -207,6 +212,7 @@ def _transition_to_production(version: str) -> tuple[bool, str]:
 
     s = settings()
     try:
+        # Transition the version to Production, archiving the prior one.
         mlflow.set_tracking_uri(s.mlflow_tracking_uri)
         client = MlflowClient()
         client.transition_model_version_stage(
@@ -236,6 +242,7 @@ def retrain_with_gate(
     Returns a RetrainResult describing what happened. Caller should log
     the result and emit metrics; this function only does the decision.
     """
+    # Load data and fit a candidate clustering model.
     df = load_training_frame(month_from=month_from)
     kmeans, scaler, train = fit_clustering(df)
     train.training_window = f">= {month_from}"
@@ -247,6 +254,7 @@ def retrain_with_gate(
     # Register without auto-promoting so the gate can run first.
     version = log_to_mlflow(kmeans, scaler, train, promote=False)
 
+    # Compare candidate vs. incumbent via the pure gate.
     current = get_current_production_silhouette()
     decision = decide_promotion(
         candidate_silhouette=train.silhouette,
@@ -254,6 +262,7 @@ def retrain_with_gate(
         tolerance=tolerance,
     )
 
+    # Promote only if the gate passed and the version actually registered.
     promoted = False
     reason = decision.reason
     if decision.promote and version is not None:
@@ -359,6 +368,7 @@ def decide_risk_promotion(
     the operationally meaningful tails — a swing in the 'low' / 'moderate'
     boundary doesn't trigger work for anyone.
     """
+    # Start from YAML defaults, overriding with any explicit caller caps.
     cap_crit, cap_high, cap_psi = _load_risk_gate_defaults()
     if max_critical_shift_pp is not None:
         cap_crit = max_critical_shift_pp
@@ -367,6 +377,7 @@ def decide_risk_promotion(
     if max_score_psi is not None:
         cap_psi = max_score_psi
 
+    # Cold start: no incumbent share to compare against, so always promote.
     if current_share is None:
         return RiskPromotionDecision(
             promote=True,
@@ -390,6 +401,7 @@ def decide_risk_promotion(
         * 100
     )
 
+    # Collect each tolerance breach; an empty list means the gate passed.
     reasons: list[str] = []
     if delta_crit_pp > cap_crit:
         reasons.append(
@@ -402,6 +414,7 @@ def decide_risk_promotion(
     if score_psi is not None and score_psi >= cap_psi:
         reasons.append(f"score_psi={score_psi:.4f} >= {cap_psi:.4f}")
 
+    # No breaches → promote.
     if not reasons:
         return RiskPromotionDecision(
             promote=True,
@@ -417,6 +430,7 @@ def decide_risk_promotion(
             max_high_shift_pp=cap_high,
             max_score_psi=cap_psi,
         )
+    # One or more tolerances breached → hold the incumbent.
     return RiskPromotionDecision(
         promote=False,
         reason="stability_regression: " + "; ".join(reasons),
@@ -438,6 +452,7 @@ def get_current_production_risk_share() -> dict[str, float] | None:
     model version. Returns None when nothing is registered yet, mlflow isn't
     installed, or the metrics are missing — keeping the gate cold-start safe.
     """
+    # mlflow optional — no registry means no baseline (cold start).
     try:
         import mlflow
         from mlflow.tracking import MlflowClient
@@ -449,6 +464,7 @@ def get_current_production_risk_share() -> dict[str, float] | None:
     name = _risk_model_name()
     stage = _risk_model_stage()
     try:
+        # Read the incumbent's per-category share metrics off its run.
         mlflow.set_tracking_uri(s.mlflow_tracking_uri)
         client = MlflowClient()
         versions = client.get_latest_versions(name, stages=[stage])
@@ -479,6 +495,7 @@ def _transition_risk_to_production(version: str) -> tuple[bool, str]:
     name = _risk_model_name()
     stage = _risk_model_stage()
     try:
+        # Transition the version to Production, archiving the prior one.
         mlflow.set_tracking_uri(s.mlflow_tracking_uri)
         client = MlflowClient()
         client.transition_model_version_stage(
@@ -524,6 +541,7 @@ def retrain_risk_with_gate(
     # at the top of this file.
     from accent_fleet.ml import train_risk
 
+    # Load data and fit a candidate risk model.
     df = train_risk.load_training_frame(month_from=month_from)
     artifact, train = train_risk.fit_risk_model(df)
     train.training_window = f">= {month_from}"
@@ -534,6 +552,7 @@ def retrain_risk_with_gate(
     # Register without auto-promoting so the gate can run first.
     version = train_risk.log_to_mlflow(artifact, train, promote=False)
 
+    # Gather the incumbent share and (optionally) the score-drift PSI.
     current_share = get_current_production_risk_share()
     score_psi: float | None = None
     if score_psi_provider is not None:
@@ -543,6 +562,7 @@ def retrain_risk_with_gate(
             logger.warning("score_psi_provider failed: %s — treating as unknown", exc)
             score_psi = None
 
+    # Run the stability gate against the incumbent.
     decision = decide_risk_promotion(
         candidate_share=train.overall_share,
         current_share=current_share,
@@ -552,6 +572,7 @@ def retrain_risk_with_gate(
         max_score_psi=max_score_psi,
     )
 
+    # Promote only if the gate passed and the version actually registered.
     promoted = False
     reason = decision.reason
     if decision.promote and version is not None:

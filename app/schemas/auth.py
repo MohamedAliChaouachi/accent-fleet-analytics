@@ -19,6 +19,7 @@ EmailLike = Field(..., min_length=3, max_length=320, pattern=r"^[^@\s]+@[^@\s]+$
 
 # --- /v1/auth/login ---------------------------------------------------
 
+# Credentials posted to /login.
 class LoginRequest(BaseModel):
     email: str = EmailLike
     password: str = Field(..., min_length=1, max_length=256)
@@ -38,18 +39,21 @@ class TokenPair(BaseModel):
 
 # --- /v1/auth/refresh -------------------------------------------------
 
+# Refresh token presented to /refresh to mint a new access token.
 class RefreshRequest(BaseModel):
     refresh_token: str = Field(..., min_length=8, max_length=128)
 
 
 # --- /v1/auth/logout --------------------------------------------------
 
+# Refresh token to revoke on /logout.
 class LogoutRequest(BaseModel):
     refresh_token: str = Field(..., min_length=8, max_length=128)
 
 
 # --- /v1/auth/me ------------------------------------------------------
 
+# Current authenticated user's profile, returned by /me.
 class MeResponse(BaseModel):
     user_id: int
     email: str
@@ -61,11 +65,13 @@ class MeResponse(BaseModel):
 
 # --- /v1/admin/tenants ------------------------------------------------
 
+# Payload to provision a new tenant via /admin/tenants.
 class CreateTenantRequest(BaseModel):
     tenant_id: int = Field(..., ge=1)
     display_name: str = Field(..., min_length=1, max_length=128)
 
 
+# Tenant record returned after creation / lookup.
 class TenantResponse(BaseModel):
     tenant_id: int
     display_name: str
@@ -75,6 +81,7 @@ class TenantResponse(BaseModel):
 
 # --- /v1/admin/users --------------------------------------------------
 
+# Payload to provision a new user via /admin/users.
 class CreateUserRequest(BaseModel):
     email: str = EmailLike
     role: Literal["tenant_user", "tenant_admin", "superadmin"]
@@ -82,6 +89,7 @@ class CreateUserRequest(BaseModel):
     initial_password: str = Field(..., min_length=12, max_length=256)
 
 
+# Newly created user record returned to the admin.
 class CreatedUserResponse(BaseModel):
     user_id: int
     email: str
@@ -90,6 +98,7 @@ class CreatedUserResponse(BaseModel):
     is_active: bool
 
 
+# Result of an admin password reset, carrying the one-shot temp password.
 class ResetPasswordResponse(BaseModel):
     user_id: int
     email: str

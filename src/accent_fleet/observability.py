@@ -205,10 +205,12 @@ def setup_logging(level: str | None = None) -> None:
     Safe to call multiple times — subsequent calls are no-ops so unit tests
     that import the API module don't re-add handlers.
     """
+    # Idempotency guard: only the first call configures logging.
     global _LOGGING_CONFIGURED
     if _LOGGING_CONFIGURED:
         return
 
+    # Resolve the effective level (arg > env > INFO default).
     log_level = (level or os.environ.get("PIPELINE_LOG_LEVEL", "INFO")).upper()
     numeric_level = getattr(logging, log_level, logging.INFO)
 
@@ -234,6 +236,7 @@ def setup_logging(level: str | None = None) -> None:
         structlog.processors.format_exc_info,
     ]
 
+    # Pretty console in dev, machine-readable JSON everywhere else.
     if _is_dev():
         renderer: Any = structlog.dev.ConsoleRenderer(colors=False)
     else:

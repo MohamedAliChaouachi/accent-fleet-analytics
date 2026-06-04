@@ -106,6 +106,8 @@ include_versioned_router(app, auth_router)
 include_versioned_router(app, auth_admin_router)
 
 
+# Service descriptor / discovery endpoint — points clients at docs, health,
+# and the canonical API version, and advertises the legacy sunset date.
 @app.get("/", tags=["meta"])
 def root() -> dict[str, str]:
     return {

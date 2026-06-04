@@ -37,6 +37,7 @@ from app.ai.services.summarizer import summarize
 Stage = Literal["llm", "sql_guard", "tenant_filter", "execution", "summarization", "config"]
 
 
+# Single error type carrying the failing stage for HTTP mapping.
 class PipelineError(RuntimeError):
     """Wraps any per-stage failure with the stage that produced it."""
 
@@ -47,6 +48,7 @@ class PipelineError(RuntimeError):
         self.sql = sql
 
 
+# Immutable input bundle for one pipeline run.
 @dataclass(frozen=True, slots=True)
 class PipelineInput:
     question: str
@@ -108,6 +110,7 @@ def run(
         settings=settings,
     )
 
+    # 7: assemble the response with timing and provider/model metadata
     elapsed_ms = int((time.perf_counter() - t0) * 1000)
     return AIQueryResponse(
         question=inp.question,

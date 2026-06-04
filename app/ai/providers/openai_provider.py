@@ -23,9 +23,11 @@ if TYPE_CHECKING:  # pragma: no cover
     from openai import OpenAI
 
 
+# OpenAI-compatible implementation of the provider contract.
 class OpenAIProvider(BaseLLMProvider):
     name = "openai"
 
+    # Lazily import the SDK and build a (optionally base-URL-overridden) client.
     def __init__(self, settings: AISettings) -> None:
         try:
             from openai import OpenAI
@@ -34,6 +36,7 @@ class OpenAIProvider(BaseLLMProvider):
                 "AI_PROVIDER=openai but the `openai` package is not "
                 "installed. Add `openai>=1.40.0` to requirements.txt."
             ) from e
+        # Refuse to construct without a key rather than failing per-call.
         if not settings.openai_api_key:
             raise LLMProviderError(
                 "OPENAI_API_KEY is empty — refusing to construct OpenAIProvider."
@@ -42,11 +45,13 @@ class OpenAIProvider(BaseLLMProvider):
             "api_key": settings.openai_api_key,
             "timeout": settings.llm_timeout_seconds,
         }
+        # Only override the endpoint when a custom base URL is configured.
         if settings.openai_base_url:
             kwargs["base_url"] = settings.openai_base_url
         self._client: OpenAI = OpenAI(**kwargs)  # type: ignore[arg-type]
         self.model = settings.openai_model
 
+    # Deterministic SQL generation — temperature 0.
     def generate_sql(self, system_prompt: str, user_prompt: str) -> LLMResponse:
         return self._chat(system_prompt, user_prompt, temperature=0.0)
 
@@ -55,7 +60,9 @@ class OpenAIProvider(BaseLLMProvider):
         # robotic, but capped — we still want grounded answers.
         return self._chat(system_prompt, user_prompt, temperature=0.2)
 
+    # Shared chat-completions call wrapping both public methods.
     def _chat(self, system_prompt: str, user_prompt: str, *, temperature: float) -> LLMResponse:
+        # Convert any SDK exception into the pipeline's LLMProviderError.
         try:
             resp = self._client.chat.completions.create(
                 model=self.model,
@@ -69,6 +76,7 @@ class OpenAIProvider(BaseLLMProvider):
             raise LLMProviderError(f"openai chat call failed: {e}") from e
         if not resp.choices:
             raise LLMProviderError("openai returned no choices")
+        # Take the first choice's message content as the response text.
         text = (resp.choices[0].message.content or "").strip()
         if not text:
             raise LLMProviderError("openai returned empty content")

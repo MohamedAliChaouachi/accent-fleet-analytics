@@ -41,9 +41,11 @@ from app.schemas.auth import (
 
 logger = structlog.get_logger("accent_fleet.api.auth.admin")
 
+# Router for all tenant/user admin endpoints, merged under the /admin prefix.
 router = APIRouter(prefix="/admin", tags=["admin-auth"])
 
 
+# Extract the originating client IP, preferring X-Forwarded-For over the peer.
 def _client_ip(request: Request) -> str:
     xff = request.headers.get("x-forwarded-for")
     if xff:
@@ -53,6 +55,7 @@ def _client_ip(request: Request) -> str:
 
 def _generate_temp_password(length: int = 20) -> str:
     """Same generator used by scripts/seed_auth.py for consistency."""
+    # Draw each character from a CSPRNG (secrets) over a fixed alphabet.
     alphabet = string.ascii_letters + string.digits + "-_.!@#$%^&*+="
     return "".join(secrets.choice(alphabet) for _ in range(length))
 
@@ -65,6 +68,7 @@ def _generate_temp_password(length: int = 20) -> str:
     response_model=list[TenantResponse],
     summary="List all tenants known to the auth layer (superadmin only).",
 )
+# GET /admin/tenants — return every auth.tenants row, alphabetised.
 def list_tenants(
     principal: Principal = RequireSuperadminDep,  # noqa: ARG001 — gate only
     conn: Connection = DbDep,
@@ -96,6 +100,7 @@ def list_tenants(
     status_code=status.HTTP_201_CREATED,
     summary="Create an auth.tenants row for a known warehouse tenant.",
 )
+# POST /admin/tenants — name a known warehouse tenant in the auth layer.
 def create_tenant(
     body: CreateTenantRequest,
     request: Request,
@@ -132,6 +137,7 @@ def create_tenant(
         {"tid": body.tenant_id, "name": body.display_name},
     ).first()
 
+    # Record the admin action in the append-only audit log.
     write_audit_event(
         action="admin_create_tenant",
         user_id=principal.user_id,
@@ -160,6 +166,7 @@ def create_tenant(
     summary="Create a user. superadmin may target any tenant; "
             "tenant_admin only their own.",
 )
+# POST /admin/users — create a user after role/tenant authorization checks.
 def create_user(
     body: CreateUserRequest,
     request: Request,
@@ -192,8 +199,10 @@ def create_user(
                 detail="tenant_admin cannot create users in another tenant",
             )
 
+    # Hash the supplied initial password before it touches the DB.
     password_hash = hash_password(body.initial_password)
 
+    # Insert the user; map the unique-email violation to a clean 409.
     try:
         row = conn.execute(
             text(
@@ -220,6 +229,7 @@ def create_user(
             ) from exc
         raise
 
+    # Record the admin action in the append-only audit log.
     write_audit_event(
         action="admin_create_user",
         user_id=principal.user_id,
@@ -248,12 +258,14 @@ def create_user(
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Deactivate a user and revoke all of their refresh tokens.",
 )
+# POST /admin/users/{id}/disable — deactivate a user, revoke their tokens.
 def disable_user(
     user_id: int,
     request: Request,
     principal: Principal = RequireTenantAdminDep,
     conn: Connection = DbDep,
 ) -> None:
+    # Fetch the target so we can authorize against its tenant/role.
     target = conn.execute(
         text(
             "SELECT user_id, tenant_id, role FROM auth.users "
@@ -267,6 +279,7 @@ def disable_user(
             detail="no such user",
         )
 
+    # tenant_admin may only act within its own tenant and never on a superadmin.
     if not principal.is_superadmin:
         if target.tenant_id != principal.tenant_id:
             raise HTTPException(
@@ -288,6 +301,7 @@ def disable_user(
             detail="cannot disable your own account",
         )
 
+    # Deactivate the account, then revoke every outstanding refresh token.
     conn.execute(
         text(
             "UPDATE auth.users SET is_active = FALSE "
@@ -304,6 +318,7 @@ def disable_user(
         {"uid": user_id},
     )
 
+    # Record the admin action in the append-only audit log.
     write_audit_event(
         action="admin_disable_user",
         user_id=principal.user_id,
@@ -322,12 +337,14 @@ def disable_user(
     response_model=ResetPasswordResponse,
     summary="Generate a new temp password and revoke all refresh tokens.",
 )
+# POST /admin/users/{id}/reset-password — set a new temp password, revoke tokens.
 def reset_password(
     user_id: int,
     request: Request,
     principal: Principal = RequireTenantAdminDep,
     conn: Connection = DbDep,
 ) -> ResetPasswordResponse:
+    # Fetch the target so we can authorize against its tenant/role.
     target = conn.execute(
         text(
             "SELECT user_id, tenant_id, role, email FROM auth.users "
@@ -341,6 +358,7 @@ def reset_password(
             detail="no such user",
         )
 
+    # tenant_admin may only act within its own tenant and never on a superadmin.
     if not principal.is_superadmin:
         if target.tenant_id != principal.tenant_id:
             raise HTTPException(
@@ -353,9 +371,11 @@ def reset_password(
                 detail="tenant_admin cannot reset a superadmin's password",
             )
 
+    # Generate and hash a fresh temp password to store.
     new_password = _generate_temp_password()
     new_hash = hash_password(new_password)
 
+    # Update the stored hash, then revoke every outstanding refresh token.
     conn.execute(
         text(
             "UPDATE auth.users SET password_hash = :h "
@@ -372,6 +392,7 @@ def reset_password(
         {"uid": user_id},
     )
 
+    # Record the admin action in the append-only audit log.
     write_audit_event(
         action="password_reset",
         user_id=principal.user_id,

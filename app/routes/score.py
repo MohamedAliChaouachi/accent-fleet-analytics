@@ -31,6 +31,7 @@ from app.schemas.score import (
     RiskScoreResponse,
 )
 
+# Scoring router — risk (per-tenant Isolation Forest) and cluster (KMeans).
 router = APIRouter(prefix="/score", tags=["scoring"])
 
 
@@ -49,6 +50,7 @@ def score_risk(
             detail="tenant_id is required for /score/risk",
         )
 
+    # Route the vector to the tenant's model; map "not ready" failures to 503.
     try:
         prediction = predictor.predict(
             tenant_id=int(payload.tenant_id),
@@ -69,6 +71,7 @@ def score_risk(
             detail=str(exc),
         ) from exc
 
+    # Shape the score, category band, per-feature z-scores, and version stamp.
     return RiskScoreResponse(
         risk_score=prediction.score,
         category=prediction.category,
@@ -84,6 +87,7 @@ def score_cluster(
     predictor: ClusterPredictor = ClusterPredictorDep,
 ) -> ClusterScoreResponse:
     """Assign the feature vector to a KMeans cluster."""
+    # Predict cluster + centroid distance; 503 when no model is trained yet.
     try:
         cluster_id, distance = predictor.predict(payload.as_dict())
     except RuntimeError as exc:

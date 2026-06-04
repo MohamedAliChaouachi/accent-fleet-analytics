@@ -105,6 +105,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
     """
 
     async def dispatch(self, request: Request, call_next):  # type: ignore[override]
+        # Read the enforcement mode and target path for this request.
         mode = settings().auth_enforcement.lower()
         path = request.url.path
 
@@ -112,14 +113,17 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if mode == "off" or _is_exempt(path):
             return await call_next(request)
 
+        # Pull the bearer token from the Authorization header (may be None).
         token = _extract_bearer(request)
 
+        # No token: reject under enforce, otherwise log and pass through.
         if token is None:
             if mode == "enforce":
                 return _unauth_response("missing bearer token")
             logger.info("auth.missing_token", path=path, mode=mode)
             return await call_next(request)
 
+        # Verify the token and derive a Principal; branch by failure mode.
         try:
             payload = verify_access_token(token)
             principal = principal_from_payload(payload)

@@ -65,6 +65,7 @@ PSI_EPSILON = 1e-6  # floor for empty bins to keep log() finite
 DEFAULT_REFERENCE_WINDOW_MONTHS = 6
 
 
+# Per-feature PSI result and whether it crossed the alert threshold.
 @dataclass
 class FeatureDrift:
     feature: str
@@ -72,6 +73,7 @@ class FeatureDrift:
     drifted: bool
 
 
+# Aggregate drift result over all features for a reference/current window pair.
 @dataclass
 class DriftReport:
     reference_months: list[str]
@@ -105,6 +107,7 @@ def compute_psi(
     Returns 0.0 when either side is empty (we don't have evidence of drift),
     not NaN — keeps downstream comparisons trivial.
     """
+    # Coerce to float and drop NaNs from both samples.
     ref = np.asarray(reference, dtype=float)
     cur = np.asarray(current, dtype=float)
     ref = ref[~np.isnan(ref)]
@@ -127,6 +130,7 @@ def compute_psi(
     edges[0] = -np.inf
     edges[-1] = np.inf
 
+    # Bin both samples on the reference edges and convert to proportions.
     ref_counts, _ = np.histogram(ref, bins=edges)
     cur_counts, _ = np.histogram(cur, bins=edges)
 
@@ -149,8 +153,10 @@ def _months_before(yyyy_mm: str, n: int) -> list[str]:
     Return the `n` calendar months strictly preceding `yyyy_mm`, in
     ascending order. Pure integer arithmetic — no python-dateutil.
     """
+    # Convert YYYY-MM into a single month index for arithmetic.
     year, month = (int(x) for x in yyyy_mm.split("-"))
     idx_end = year * 12 + (month - 1)  # exclusive upper bound
+    # Walk back n months and re-format each as YYYY-MM, ascending.
     out = []
     for k in range(n, 0, -1):
         idx = idx_end - k
@@ -188,6 +194,7 @@ def _load_feature_frame(months: list[str], features: list[str]) -> pd.DataFrame:
     """
     if not months:
         return pd.DataFrame(columns=features)
+    # Select only the drift features for the requested months.
     cols = ", ".join(features)
     sql = text(
         f"""
@@ -215,6 +222,7 @@ def compare_frames(
     current_months: list[str] | None = None,
 ) -> DriftReport:
     """Compute the drift report from two already-loaded frames."""
+    # Seed the report with window metadata and row counts.
     report = DriftReport(
         reference_months=reference_months or [],
         current_months=current_months or [],
@@ -222,6 +230,7 @@ def compare_frames(
         n_current_rows=len(current),
         threshold=threshold,
     )
+    # Compute PSI per feature, skipping any column missing from either frame.
     for feat in features:
         if feat not in reference.columns or feat not in current.columns:
             log.warning("drift.feature_missing_from_view", feature=feat)
@@ -258,10 +267,12 @@ def compute_score_drift(
     if not current_months:
         return None
 
+    # Derive the reference window anchored to the earliest current month.
     reference_months = derive_reference_window(current_months, reference_window_months)
     if not reference_months:
         return None
 
+    # Pull risk scores for both windows from the fact table.
     sql = text(
         """
         SELECT year_month, risk_score
@@ -273,6 +284,7 @@ def compute_score_drift(
         ref_df = pd.read_sql(sql, conn, params={"months": reference_months})
         cur_df = pd.read_sql(sql, conn, params={"months": list(current_months)})
 
+    # No baseline or no current data → no drift signal to report.
     if ref_df.empty or cur_df.empty:
         log.info(
             "drift.score.empty_window",
@@ -281,6 +293,7 @@ def compute_score_drift(
         )
         return None
 
+    # PSI between the two score distributions.
     psi = compute_psi(
         ref_df["risk_score"].to_numpy(dtype=float, na_value=np.nan),
         cur_df["risk_score"].to_numpy(dtype=float, na_value=np.nan),
@@ -309,6 +322,7 @@ def detect_drift_for_months(
     returns a DriftReport. Safe to call when no rows exist — returns a
     report with empty features list rather than raising.
     """
+    # Empty request → return an empty report rather than raising.
     if not current_months:
         return DriftReport(
             reference_months=[],
@@ -317,10 +331,12 @@ def detect_drift_for_months(
             n_current_rows=0,
             threshold=threshold,
         )
+    # Resolve features and load both windows from the feature view.
     feats = list(features or DEFAULT_FEATURES)
     reference_months = derive_reference_window(current_months, reference_window_months)
     ref_df = _load_feature_frame(reference_months, feats)
     cur_df = _load_feature_frame(list(current_months), feats)
+    # Run the comparison and log timing/summary metrics.
     started = datetime.utcnow()
     report = compare_frames(
         ref_df,

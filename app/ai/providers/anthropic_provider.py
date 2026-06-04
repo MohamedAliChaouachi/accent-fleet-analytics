@@ -21,9 +21,11 @@ if TYPE_CHECKING:  # pragma: no cover
 _MAX_TOKENS = 1024
 
 
+# Anthropic-backed implementation of the provider contract.
 class AnthropicProvider(BaseLLMProvider):
     name = "anthropic"
 
+    # Lazily import the SDK and build a timeout-bounded client.
     def __init__(self, settings: AISettings) -> None:
         try:
             from anthropic import Anthropic
@@ -32,6 +34,7 @@ class AnthropicProvider(BaseLLMProvider):
                 "AI_PROVIDER=anthropic but the `anthropic` package is not "
                 "installed. Add `anthropic>=0.34.0` to requirements.txt."
             ) from e
+        # Refuse to construct without a key rather than failing per-call.
         if not settings.anthropic_api_key:
             raise LLMProviderError(
                 "ANTHROPIC_API_KEY is empty — refusing to construct AnthropicProvider."
@@ -42,13 +45,17 @@ class AnthropicProvider(BaseLLMProvider):
         )
         self.model = settings.anthropic_model
 
+    # Deterministic SQL generation — temperature 0.
     def generate_sql(self, system_prompt: str, user_prompt: str) -> LLMResponse:
         return self._chat(system_prompt, user_prompt, temperature=0.0)
 
+    # Slightly warmer for a natural-sounding one-line summary.
     def summarize_result(self, system_prompt: str, user_prompt: str) -> LLMResponse:
         return self._chat(system_prompt, user_prompt, temperature=0.2)
 
+    # Shared messages.create() call wrapping both public methods.
     def _chat(self, system_prompt: str, user_prompt: str, *, temperature: float) -> LLMResponse:
+        # Convert any SDK exception into the pipeline's LLMProviderError.
         try:
             resp = self._client.messages.create(
                 model=self.model,
@@ -63,6 +70,7 @@ class AnthropicProvider(BaseLLMProvider):
         # response there's exactly one of type "text". Be defensive in
         # case the API ever returns tool_use blocks alongside text.
         chunks: list[str] = []
+        # Collect text from every text block, ignoring non-text blocks.
         for block in resp.content:
             text = getattr(block, "text", None)
             if isinstance(text, str):

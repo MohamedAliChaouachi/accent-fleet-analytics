@@ -35,6 +35,7 @@ class DeviceRollingRisk(BaseModel):
     risk_category: str | None = None
 
 
+# Combined single-device payload: rolling risk + recent monthly history.
 class DeviceProfileResponse(BaseModel):
     device_id: int
     rolling: DeviceRollingRisk | None = Field(
@@ -44,6 +45,7 @@ class DeviceProfileResponse(BaseModel):
     history: list[DeviceMonthRow] = Field(default_factory=list)
 
 
+# One entry in the ranked top-risk device list.
 class TopRiskDevice(BaseModel):
     tenant_id: int | None = None
     device_id: int
@@ -52,6 +54,7 @@ class TopRiskDevice(BaseModel):
     risk_category: str
 
 
+# Top-N highest-risk devices response wrapper.
 class TopRiskResponse(BaseModel):
     n: int = Field(..., ge=1)
     devices: list[TopRiskDevice]

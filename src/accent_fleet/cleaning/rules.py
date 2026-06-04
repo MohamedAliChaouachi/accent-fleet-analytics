@@ -29,6 +29,7 @@ import polars as pl
 from accent_fleet.config import load_cleaning_rules
 
 
+# Per-run counters of rows in/out and how each rule acted.
 @dataclass
 class RuleResult:
     """Counters returned after applying the engine to a DataFrame."""
@@ -39,11 +40,13 @@ class RuleResult:
     clamped_by_rule: dict[str, int] = field(default_factory=dict)
     nullified_by_rule: dict[str, int] = field(default_factory=dict)
 
+    # Total rows dropped across all reject rules.
     @property
     def total_rejected(self) -> int:
         return sum(self.rejected_by_rule.values())
 
 
+# One declarative cleaning rule loaded from the YAML catalog.
 @dataclass
 class CleaningRule:
     """One rule from cleaning_rules.yaml."""
@@ -60,6 +63,7 @@ class CleaningRule:
     clamp_column: str | None = None
     clamp_max: float | None = None
 
+    # Build a CleaningRule from one YAML entry, applying defaults for optional keys.
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> CleaningRule:
         return cls(
@@ -84,6 +88,7 @@ class RuleEngine:
         self.rules = rules
 
     # ------------------------------------------------------------------
+    # Select the enabled rules that target a given source table.
     def rules_for(self, table: str) -> list[CleaningRule]:
         return [r for r in self.rules if r.enabled and table in r.targets]
 
@@ -97,19 +102,23 @@ class RuleEngine:
         result = RuleResult(total_in=len(df))
         out = df
 
+        # Dispatch each rule by action, recording how many rows it affected.
         for rule in self.rules_for(table):
             if rule.action == "reject":
+                # Drop invalid rows and record the count removed.
                 before = len(out)
                 out = self._apply_reject(out, rule, table)
                 removed = before - len(out)
                 if removed:
                     result.rejected_by_rule[rule.id] = removed
             elif rule.action == "clamp":
+                # Count out-of-range rows, then cap the column.
                 clamped = self._apply_clamp(out, rule)
                 if clamped > 0:
                     result.clamped_by_rule[rule.id] = clamped
                 out = self._clamp_column(out, rule)
             elif rule.action == "nullify":
+                # Count out-of-bounds rows, then null the column (row kept).
                 nulled = self._apply_nullify_count(out, rule)
                 if nulled > 0:
                     result.nullified_by_rule[rule.id] = nulled
@@ -144,12 +153,14 @@ class RuleEngine:
             case _:
                 return df
 
+    # Count rows whose value exceeds the clamp threshold.
     def _apply_clamp(self, df: pl.DataFrame, rule: CleaningRule) -> int:
         col = rule.clamp_column or "max_speed"
         if col not in df.columns or rule.clamp_max is None:
             return 0
         return int(df.filter(pl.col(col) > rule.clamp_max).height)
 
+    # Cap the target column at clamp_max, leaving smaller values untouched.
     def _clamp_column(self, df: pl.DataFrame, rule: CleaningRule) -> pl.DataFrame:
         col = rule.clamp_column or "max_speed"
         if col not in df.columns or rule.clamp_max is None:
@@ -169,6 +180,7 @@ class RuleEngine:
             df.filter((pl.col("fuel_used") < 0) | (pl.col("fuel_used") > 500)).height
         )
 
+    # C4: set fuel_used to NULL where it falls outside [0, 500], keeping the row.
     def _nullify_column(self, df: pl.DataFrame, rule: CleaningRule) -> pl.DataFrame:
         if rule.id != "C4" or "fuel_used" not in df.columns:
             return df
@@ -181,6 +193,7 @@ class RuleEngine:
 
 
 # ---------------------------------------------------------------------------
+# Construct a ready-to-use RuleEngine from the YAML rule catalog.
 def load_rule_engine() -> RuleEngine:
     """Build a RuleEngine from the YAML catalog."""
     cfg = load_cleaning_rules()

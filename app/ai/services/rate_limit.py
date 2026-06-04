@@ -34,6 +34,7 @@ import time
 from dataclasses import dataclass, field
 
 
+# Raised on overflow; carries which scope tripped and the retry delay.
 class AIRateLimitExceededError(Exception):
     """Raised when either the per-user or per-tenant bucket is full."""
 
@@ -45,6 +46,7 @@ class AIRateLimitExceededError(Exception):
         self.retry_after_seconds = retry_after_seconds
 
 
+# One sliding-window bucket: timestamps of recent attempts.
 @dataclass
 class _Bucket:
     # Wall-clock seconds (monotonic) of every attempt within the window.
@@ -60,6 +62,7 @@ class AIRateLimiter:
     nearly-simultaneous calls reflects the first.
     """
 
+    # Store the two ceilings, window, per-scope buckets, and the lock.
     def __init__(
         self,
         *,
@@ -92,6 +95,7 @@ class AIRateLimiter:
         cutoff = now - self.window_seconds
 
         with self._lock:
+            # Prune the user bucket to the window, then check its ceiling.
             user_bucket = self._user.setdefault(user_id, _Bucket())
             user_bucket.attempts = [t for t in user_bucket.attempts if t >= cutoff]
 
@@ -100,6 +104,7 @@ class AIRateLimiter:
                 retry_after = int(oldest + self.window_seconds - now) + 1
                 raise AIRateLimitExceededError("user", max(retry_after, 1))
 
+            # Same prune/check for the tenant bucket (skipped for superadmin).
             if tenant_id is not None:
                 tenant_bucket = self._tenant.setdefault(tenant_id, _Bucket())
                 tenant_bucket.attempts = [
@@ -113,6 +118,7 @@ class AIRateLimiter:
                 # Both checks passed — charge tenant bucket too.
                 tenant_bucket.attempts.append(now)
 
+            # Both checks passed — record this attempt in the user bucket.
             user_bucket.attempts.append(now)
 
             # Periodic compaction: drop empty buckets so the dicts don't
@@ -128,6 +134,7 @@ class AIRateLimiter:
         self._tenant.clear()
 
 
+# Process-wide limiter instance, built lazily on first use.
 _singleton: AIRateLimiter | None = None
 
 

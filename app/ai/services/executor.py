@@ -37,6 +37,7 @@ class ExecutorError(RuntimeError):
     """Raised when the DB rejects, times out, or otherwise fails the query."""
 
 
+# Column names, JSON-ready rows, and the row count returned to the caller.
 @dataclass(frozen=True, slots=True)
 class ExecutionResult:
     columns: list[str]
@@ -44,6 +45,7 @@ class ExecutionResult:
     row_count: int
 
 
+# Run validated SQL in a fresh read-only, timeout-bounded transaction.
 def execute(sql: str, *, binds: dict[str, object], settings: AISettings) -> ExecutionResult:
     """Run ``sql`` in a fresh READ ONLY transaction and return its rows."""
     engine = get_engine()
@@ -66,6 +68,7 @@ def execute(sql: str, *, binds: dict[str, object], settings: AISettings) -> Exec
                     f"{settings.statement_timeout_ms}"
                 )
             )
+            # Run the query and coerce every row to JSON-native primitives.
             result = conn.execute(text(sql), binds)
             columns = list(result.keys())
             rows = [_jsonable(dict(r)) for r in result.mappings().all()]
@@ -85,10 +88,12 @@ def execute(sql: str, *, binds: dict[str, object], settings: AISettings) -> Exec
 # every catalog table.
 
 
+# Coerce every value in one result row to a JSON-native primitive.
 def _jsonable(row: dict[str, Any]) -> dict[str, Any]:
     return {k: _coerce(v) for k, v in row.items()}
 
 
+# Map a single DB value to int/float/str/bool/None/list/dict.
 def _coerce(v: Any) -> Any:  # noqa: ANN401 — pass-through coercer
     if v is None or isinstance(v, (str, int, float, bool)):
         return v

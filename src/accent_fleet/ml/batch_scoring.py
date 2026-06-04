@@ -48,6 +48,7 @@ _CLUSTER_PREDICTOR: ClusterPredictor | None = None
 _RISK_PREDICTOR: RiskPredictor | None = None
 
 
+# Lazily construct (and cache) the process-wide cluster predictor singleton.
 def _get_cluster_predictor() -> ClusterPredictor:
     global _CLUSTER_PREDICTOR
     if _CLUSTER_PREDICTOR is None:
@@ -55,6 +56,7 @@ def _get_cluster_predictor() -> ClusterPredictor:
     return _CLUSTER_PREDICTOR
 
 
+# Lazily construct (and cache) the process-wide risk predictor singleton.
 def _get_risk_predictor() -> RiskPredictor:
     global _RISK_PREDICTOR
     if _RISK_PREDICTOR is None:
@@ -94,10 +96,12 @@ def _load_features(
     ``include_tenant`` decides whether the resulting frame contains
     tenant_id — the risk path groups by it; cluster path doesn't need it.
     """
+    # Always carry the id columns plus the model's feature columns.
     base_cols = ["tenant_id", "device_id", "year_month", *feature_order]
     if not months:
         return pd.DataFrame(columns=base_cols)
 
+    # Build a parameterised query over only the touched months.
     select_list = ", ".join(base_cols)
     sql = text(
         f"""
@@ -132,6 +136,7 @@ def _upsert_cluster_rows(rows: Iterable[dict], months: list[str], run_id: int) -
     """
     rows = list(rows)
     with transaction() as conn:
+        # Delete the existing partition rows so the insert is a clean replace.
         conn.execute(
             text(
                 """
@@ -143,6 +148,7 @@ def _upsert_cluster_rows(rows: Iterable[dict], months: list[str], run_id: int) -
         )
         if not rows:
             return 0
+        # Insert the freshly-scored cluster assignments.
         conn.execute(
             text(
                 """
@@ -171,6 +177,7 @@ def score_partitions(touched_months: list[str], run_id: int) -> ScoreResult:
     Returns a ScoreResult describing what happened. Never raises on a missing
     model — instead returns skipped_reason set, so the pipeline keeps going.
     """
+    # Nothing to score — short-circuit before touching the DB.
     if not touched_months:
         return ScoreResult(
             rows_scored=0,
@@ -180,6 +187,7 @@ def score_partitions(touched_months: list[str], run_id: int) -> ScoreResult:
             skipped_reason="no_touched_months",
         )
 
+    # Load the model; on absence, skip the batch instead of failing the flow.
     predictor = _get_cluster_predictor()
     try:
         predictor.ensure_loaded()
@@ -193,6 +201,7 @@ def score_partitions(touched_months: list[str], run_id: int) -> ScoreResult:
             skipped_reason=f"no_model: {exc}",
         )
 
+    # Load feature rows for the touched months in the model's feature order.
     feature_order = predictor.feature_order
     df = _load_features(touched_months, feature_order)
     if df.empty:
@@ -218,6 +227,7 @@ def score_partitions(touched_months: list[str], run_id: int) -> ScoreResult:
     model_version = predictor.model_version
     model_source = predictor.source
 
+    # Materialise one fact row per device-month from the vectorised outputs.
     rows = [
         {
             "tenant_id": int(r.tenant_id),
@@ -259,6 +269,7 @@ def _upsert_risk_rows(rows: Iterable[dict], months: list[str], run_id: int) -> i
     """
     rows = list(rows)
     with transaction() as conn:
+        # Delete the existing partition rows so the insert is a clean replace.
         conn.execute(
             text(
                 """
@@ -270,6 +281,7 @@ def _upsert_risk_rows(rows: Iterable[dict], months: list[str], run_id: int) -> i
         )
         if not rows:
             return 0
+        # Insert the freshly-scored risk rows.
         conn.execute(
             text(
                 """
@@ -305,6 +317,7 @@ def score_risk_partitions(touched_months: list[str], run_id: int) -> ScoreResult
     missing or unloadable risk artifact; the flow keeps moving and surfaces
     the reason in logs / metrics.
     """
+    # Nothing to score — short-circuit before touching the DB.
     if not touched_months:
         return ScoreResult(
             rows_scored=0,
@@ -314,6 +327,7 @@ def score_risk_partitions(touched_months: list[str], run_id: int) -> ScoreResult
             skipped_reason="no_touched_months",
         )
 
+    # Load the model; on absence, skip the batch instead of failing the flow.
     predictor = _get_risk_predictor()
     try:
         predictor.ensure_loaded()
@@ -327,6 +341,7 @@ def score_risk_partitions(touched_months: list[str], run_id: int) -> ScoreResult
             skipped_reason=f"no_model: {exc}",
         )
 
+    # Load feature rows (with tenant_id, since we score per tenant).
     feature_order = predictor.feature_order
     df = _load_features(touched_months, feature_order, include_tenant=True)
     if df.empty:
@@ -378,6 +393,7 @@ def score_risk_partitions(touched_months: list[str], run_id: int) -> ScoreResult
             for i, r in enumerate(sub.itertuples(index=False))
         )
 
+    # Replace the touched partitions with the scored rows.
     written = _upsert_risk_rows(rows, touched_months, run_id)
     logger.info(
         "risk scored %d device-months across %d partitions (model=%s, "

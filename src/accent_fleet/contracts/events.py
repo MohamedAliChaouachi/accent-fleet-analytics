@@ -19,6 +19,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 
+# Shared base for all events: tenant/device identity plus a canonical event-time.
 class _BaseEvent(BaseModel):
     """Common shape: all events carry tenant, device, and event-time."""
 
@@ -33,6 +34,7 @@ class _BaseEvent(BaseModel):
     event_time: datetime           # canonical event-time (varies per source)
 
 
+# A completed trip: distance, duration, speed, fuel, and start/end geo.
 class PathEvent(_BaseEvent):
     """One trip from staging.path."""
 
@@ -49,6 +51,7 @@ class PathEvent(_BaseEvent):
     end_path_longitude: float | None = None
 
 
+# A vehicle stop: duration, location, and whether it occurred mid-path.
 class StopEvent(_BaseEvent):
     """One stop from staging.stop."""
 
@@ -60,6 +63,7 @@ class StopEvent(_BaseEvent):
     stop_adress: str | None = None
 
 
+# An overspeed segment: peak speed over a distance/duration window.
 class OverspeedEvent(_BaseEvent):
     """One overspeed segment from staging.rep_overspeed."""
 
@@ -69,6 +73,7 @@ class OverspeedEvent(_BaseEvent):
     distance_driven: float | None = Field(None, ge=0)
 
 
+# A speed alert: typed description plus optional value and location.
 class NotificationEvent(_BaseEvent):
     """One speed alert from staging.notification."""
 
@@ -79,6 +84,7 @@ class NotificationEvent(_BaseEvent):
     lng: float | None = None
 
 
+# A daily activity rollup: odometer span and total working time.
 class ActivityEvent(_BaseEvent):
     """One daily activity row from staging.rep_activity_daily."""
 

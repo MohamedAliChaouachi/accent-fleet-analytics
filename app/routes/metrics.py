@@ -16,9 +16,11 @@ from fastapi import APIRouter, Response
 
 from accent_fleet.observability import render_metrics
 
+# Operational metrics router — unauthenticated, hidden from the OpenAPI schema.
 router = APIRouter(tags=["meta"])
 
 
+# Render the Prometheus registry to its text exposition format.
 @router.get("/metrics", include_in_schema=False)
 def metrics() -> Response:
     body, content_type = render_metrics()

@@ -51,6 +51,7 @@ from app.schemas.auth import (
 
 logger = structlog.get_logger("accent_fleet.api.auth.routes")
 
+# Router for the public /auth/* endpoints (mounted at /v1/auth and /auth).
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
@@ -80,11 +81,13 @@ def _client_ip(request: Request) -> str:
     status_code=status.HTTP_200_OK,
     summary="Exchange email + password for a token pair.",
 )
+# POST /auth/login — authenticate credentials and issue an access+refresh pair.
 async def login(
     body: LoginRequest,
     request: Request,
     conn: Connection = DbDep,
 ) -> TokenPair:
+    # Capture client identity for rate limiting and audit records.
     ip = _client_ip(request)
     user_agent = request.headers.get("user-agent")
 
@@ -106,6 +109,7 @@ async def login(
             headers={"Retry-After": str(exc.retry_after_seconds)},
         ) from exc
 
+    # Look up the user by email (single row; email is unique).
     row = conn.execute(
         text(
             "SELECT user_id, tenant_id, email, password_hash, role, "
@@ -133,6 +137,7 @@ async def login(
             detail="invalid credentials",
         )
 
+    # Verify the password against the stored Argon2id hash.
     try:
         verify_password(body.password, row.password_hash)
     except InvalidPasswordError:
@@ -172,6 +177,7 @@ async def login(
                 error=str(exc),
             )
 
+    # Build the principal and mint a short-lived signed access token.
     principal = Principal(
         user_id=row.user_id,
         tenant_id=row.tenant_id,
@@ -201,6 +207,7 @@ async def login(
             "ip": ip,
         },
     )
+    # Stamp the successful login time on the user row.
     conn.execute(
         text(
             "UPDATE auth.users SET last_login_at = NOW() "
@@ -209,6 +216,7 @@ async def login(
         {"uid": row.user_id},
     )
 
+    # Audit the successful login.
     write_audit_event(
         action="login_success",
         user_id=row.user_id,
@@ -233,11 +241,13 @@ async def login(
     response_model=TokenPair,
     summary="Rotate refresh token, mint a new access token.",
 )
+# POST /auth/refresh — validate the refresh token and rotate it for a new pair.
 def refresh(
     body: RefreshRequest,
     request: Request,
     conn: Connection = DbDep,
 ) -> TokenPair:
+    # Capture client identity for audit records.
     ip = _client_ip(request)
     user_agent = request.headers.get("user-agent")
 
@@ -259,6 +269,7 @@ def refresh(
         {"tid": body.refresh_token},
     ).first()
 
+    # Reject if the token is unknown, already revoked, or the user is disabled.
     if row is None or row.revoked_at is not None or not row.is_active:
         write_audit_event(
             action="login_failure",
@@ -271,6 +282,7 @@ def refresh(
             detail="invalid refresh token",
         )
 
+    # Reject an expired (but otherwise valid) refresh token.
     if row.expires_at <= datetime.now(UTC):
         write_audit_event(
             action="login_failure",
@@ -298,6 +310,7 @@ def refresh(
         seconds=settings().jwt_refresh_ttl_seconds
     )
 
+    # Revoke the presented token, then persist its replacement.
     conn.execute(
         text(
             "UPDATE auth.refresh_tokens SET revoked_at = NOW() "
@@ -321,6 +334,7 @@ def refresh(
         },
     )
 
+    # Audit the successful token rotation.
     write_audit_event(
         action="refresh",
         user_id=row.user_id,
@@ -344,11 +358,13 @@ def refresh(
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Revoke a refresh token.",
 )
+# POST /auth/logout — idempotently revoke the supplied refresh token.
 def logout(
     body: LogoutRequest,
     request: Request,
     conn: Connection = DbDep,
 ) -> None:
+    # Capture client identity for audit records.
     ip = _client_ip(request)
     user_agent = request.headers.get("user-agent")
 
@@ -369,6 +385,7 @@ def logout(
         {"tid": body.refresh_token},
     ).first()
 
+    # Only audit when a live token was actually revoked.
     if result is not None:
         write_audit_event(
             action="logout",
@@ -386,6 +403,7 @@ def logout(
     response_model=MeResponse,
     summary="Identity of the current bearer-token holder.",
 )
+# GET /auth/me — enrich the token's principal with DB-only profile fields.
 def me(
     principal: Principal = CurrentPrincipalDep,
     conn: Connection = DbDep,
@@ -403,6 +421,7 @@ def me(
             {"tid": principal.tenant_id},
         ).scalar()
 
+    # Fetch the last successful login timestamp for this user.
     last_login = conn.execute(
         text(
             "SELECT last_login_at FROM auth.users WHERE user_id = :uid"

@@ -57,6 +57,7 @@ class BatchStagingSource:
     """Pull rows from a staging table inside an event-time window."""
 
     def __init__(self, table_name: str, time_column: str) -> None:
+        # Reject tables we have no projection for — schema drift stays explicit.
         if table_name not in PROJECTIONS:
             raise ValueError(f"No projection defined for staging table {table_name!r}")
         self.table_name = table_name
@@ -77,12 +78,14 @@ class BatchStagingSource:
         We use server-side cursors (SQLAlchemy's `yield_per`) so that a
         100-day backfill window doesn't load everything into memory.
         """
+        # Build the projection + optional table-specific WHERE clause.
         select_list = ", ".join(self._columns)
         # The optional SPEED% filter for the notification table is added here.
         extra_where = ""
         if self.table_name == "notification":
             extra_where = " AND description LIKE 'SPEED%'"
 
+        # Event-time range query, ordered so OFFSET-free paging is stable.
         sql = f"""
             SELECT {select_list}
             FROM staging.{self.table_name}
@@ -92,6 +95,7 @@ class BatchStagingSource:
             ORDER BY {self.time_column}
         """
 
+        # Stream rows server-side so a wide backfill window stays memory-light.
         engine = get_engine()
         with engine.connect().execution_options(yield_per=batch_size) as conn:
             result = conn.execute(
@@ -99,6 +103,7 @@ class BatchStagingSource:
                 {"window_start": window_start, "window_end": window_end},
             )
             keys = list(result.keys())
+            # Fetch and yield one Polars frame per batch until exhausted.
             while True:
                 chunk = result.fetchmany(batch_size)
                 if not chunk:
@@ -111,9 +116,11 @@ class BatchStagingSource:
     # ------------------------------------------------------------------
     def count(self, *, window_start: datetime, window_end: datetime) -> int:
         """Row count inside the window — used for monitoring."""
+        # Apply the same notification SPEED% filter as iter_batches.
         extra_where = ""
         if self.table_name == "notification":
             extra_where = " AND description LIKE 'SPEED%'"
+        # Count rows in the same event-time window the source would yield.
         sql = f"""
             SELECT COUNT(*) AS n FROM staging.{self.table_name}
             WHERE {self.time_column} >= :window_start

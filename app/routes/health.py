@@ -17,6 +17,7 @@ from accent_fleet.config import settings
 from accent_fleet.db.engine import get_engine
 from app import __version__
 
+# Operational probe router — never versioned (k8s reads these paths).
 router = APIRouter(tags=["meta"])
 logger = logging.getLogger("accent_fleet.api.health")
 
